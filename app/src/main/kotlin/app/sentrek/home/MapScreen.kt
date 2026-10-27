@@ -17,11 +17,16 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sentrek.R
+import app.sentrek.map.MapFeatureInfo
+import app.sentrek.map.MapFeatures
 import app.sentrek.map.MapOverlays
 import app.sentrek.map.MapStyle
 import app.sentrek.map.SentrekMap
@@ -55,6 +60,10 @@ fun MapScreen(
     val currentOnCameraChange by rememberUpdatedState(onCameraChange)
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var style by remember { mutableStateOf<Style?>(null) }
+    var pressed by remember { mutableStateOf<MapFeatureInfo?>(null) }
+    val haptics = LocalHapticFeedback.current
+    // A gloved fingertip covers about 10 mm: accept anything within that.
+    val pressRadiusPx = with(LocalDensity.current) { 28.dp.toPx() }
 
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f)) {
@@ -102,6 +111,21 @@ fun MapScreen(
         m.addOnCameraIdleListener(onIdle)
         onDispose { m.removeOnCameraIdleListener(onIdle) }
     }
+
+    DisposableEffect(map) {
+        val m = map ?: return@DisposableEffect onDispose {}
+        val onLongPress = MapLibreMap.OnMapLongClickListener { latLng ->
+            val info = MapFeatures.at(m, m.projection.toScreenLocation(latLng), latLng, pressRadiusPx)
+                ?: return@OnMapLongClickListener false
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            pressed = info
+            true
+        }
+        m.addOnMapLongClickListener(onLongPress)
+        onDispose { m.removeOnMapLongClickListener(onLongPress) }
+    }
+
+    pressed?.let { FeatureSheet(it, onDismiss = { pressed = null }) }
 
     LaunchedEffect(style, rasters, overlays, showDifficulty) {
         style?.let { MapOverlays.sync(it, rasters, overlays, showDifficulty) }

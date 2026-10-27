@@ -125,9 +125,10 @@ fun RegionsScreen(
             }
         }
 
+        val trailsLabel = stringResource(R.string.regions_cell_trails)
         LaunchedEffect(style, view, regions, selection) {
             val s = style ?: return@LaunchedEffect
-            RegionGridLayer.update(s, view, cellLooks(regions, selection))
+            RegionGridLayer.update(s, view, cellLooks(regions, selection, trailsLabel))
         }
 
         LaunchedEffect(style, imported) {
@@ -190,14 +191,19 @@ private fun MapLibreMap.visibleBox(): BoundingBox? {
 private fun cellLooks(
     regions: Map<RegionCell, RegionState>,
     selection: Set<RegionCell>,
+    trailsLabel: String,
 ): Map<RegionCell, Pair<CellLook, String?>> {
     val looks = HashMap<RegionCell, Pair<CellLook, String?>>()
     for ((cell, state) in regions) {
         looks[cell] = when (val m = state.map) {
             MapDownload.Queued -> CellLook.Queued to null
             is MapDownload.Downloading -> CellLook.Downloading to "${(m.fraction * 100).roundToInt()}%"
-            // A failed trail overlay is reported in the panel; the map itself is usable.
-            is MapDownload.Ready -> CellLook.Ready to null
+            // Green only once the hiking details (trails, huts, springs…) are there too.
+            is MapDownload.Ready -> when (state.trails) {
+                TrailsDownload.Ready -> CellLook.Ready to null
+                TrailsDownload.Failed -> CellLook.Failed to null
+                TrailsDownload.Missing, TrailsDownload.Downloading -> CellLook.Downloading to trailsLabel
+            }
         }
     }
     for (cell in selection) looks[cell] = CellLook.Selected to looks[cell]?.second

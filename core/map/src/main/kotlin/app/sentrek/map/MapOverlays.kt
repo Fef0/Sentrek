@@ -78,6 +78,10 @@ object MapOverlays {
     /** First label layer of the hiking style. */
     private const val BELOW_LAYER = "water-name"
 
+    internal fun isPointLayer(id: String) = id.startsWith(TRAILS) && id.contains(POINTS)
+
+    internal fun isTrailLayer(id: String) = id.startsWith(TRAILS) && (id.endsWith(CLEAR) || id.endsWith(FAINT))
+
     /** [overlays]: cell id → overlay file. [showDifficulty] hides only the trail colours, not the points. */
     fun sync(style: Style, rasters: List<RasterOverlay>, overlays: Map<String, File>, showDifficulty: Boolean) {
         // Layers are cheap to rebuild and that keeps the order right; sources (parsed

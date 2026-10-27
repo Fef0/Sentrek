@@ -14,6 +14,8 @@
     <string name="regions_download">Download (%d)</string>
     <string name="regions_delete">Delete (%d)</string>
     <string name="regions_clear">Clear</string>
+    <!-- On a grid cell whose map is ready but whose hiking details are still downloading. -->
+    <string name="regions_cell_trails">Trails…</string>
     <plurals name="regions_downloading">
         <item quantity="one">Downloading %1$d of %2$d area…</item>
         <item quantity="other">Downloading %1$d of %2$d areas…</item>

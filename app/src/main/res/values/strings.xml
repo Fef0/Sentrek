@@ -5,6 +5,14 @@
     <string name="zoom_out">Zoom out</string>
     <string name="bar_maps">Maps</string>
     <string name="bar_settings">Settings</string>
+    <string name="feature_unnamed">Map feature</string>
+    <string name="feature_elevation">Elevation</string>
+    <string name="feature_difficulty">Difficulty (SAC)</string>
+    <string name="feature_visibility">Trail visibility</string>
+    <string name="feature_coordinates">Coordinates</string>
+    <string name="feature_osm_tags">OpenStreetMap data</string>
+    <string name="feature_open_osm">View on openstreetmap.org</string>
+    <string name="feature_close">Close</string>
     <string name="settings_back">Back to map</string>
     <string name="settings_map">Map</string>
     <string name="settings_trail_difficulty">Trail difficulty colours</string>

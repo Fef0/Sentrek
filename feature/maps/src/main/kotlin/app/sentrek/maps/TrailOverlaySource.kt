@@ -65,10 +65,11 @@ class OverpassTrailSource @Inject constructor() : TrailOverlaySource {
 
     private companion object {
         val ENDPOINTS = listOf(
-            // "No rate limit; notify us before large-scale use" (support@private.coffee).
-            "https://overpass.private.coffee/api/interpreter",
-            // FOSSGIS main instance: often at capacity, so only a fallback.
+            // FOSSGIS main instance: answers a cell in under a minute, or fails fast (502) when busy.
             "https://overpass-api.de/api/interpreter",
+            // "No rate limit; notify us before large-scale use" (support@private.coffee). It can
+            // hold a request for minutes without answering, so it's only a fallback.
+            "https://overpass.private.coffee/api/interpreter",
         )
         const val ROUNDS = 3
         const val BACKOFF_MS = 30_000L

@@ -13,17 +13,14 @@ import kotlin.math.roundToLong
 /**
  * The per-cell hiking overlay: details the OpenMapTiles base tiles leave out. One Overpass
  * request returns both, converted into one compact GeoJSON file:
- * - trail lines: `s` = SAC grade 1–6, `v` = visibility 1–6 (0 when unknown);
- * - hiking points (huts, water, caves, guideposts, crosses…): `k` = [PoiKind.icon], `n` = name.
+ * - trail lines: `s` = SAC grade 1–6, `v` = visibility 1–6 (0 when unknown), `id` = "way/…";
+ * - hiking points (huts, water, caves, guideposts, crosses…): `k` = [PoiKind.icon], `n` = name,
+ *   `id` = "node/…" (or way/relation), plus every other OSM tag of the point except mapper
+ *   bookkeeping ([isBookkeeping]), shown when the user long-presses it.
  */
 object OverpassOverlay {
     /** About 1 m: plenty for trails, keeps lines visually intact at z17. */
     const val SIMPLIFY_TOLERANCE_M = 2.0
-
-    private val POI_TAGS = listOf(
-        "natural", "tourism", "historic", "man_made", "amenity", "emergency", "information", "waterway",
-        "shelter_type", "name",
-    )
 
     fun query(box: BoundingBox): String =
         "[out:json][timeout:180][bbox:${box.south},${box.west},${box.north},${box.east}];" +
@@ -41,7 +38,7 @@ object OverpassOverlay {
             "node[\"waterway\"=\"waterfall\"];" +
             "node[\"emergency\"=\"phone\"];" +
             ");" +
-            "convert poi ::id=id()," + POI_TAGS.joinToString(",") { "$it=t[\"$it\"]" } + ",::geom=center(geom());" +
+            "convert poi ::=::,::id=id(),$OSM_TYPE=type(),::geom=center(geom());" +
             "out geom;"
 
     /** Streams [input] (Overpass JSON) to [output] (GeoJSON FeatureCollection). Returns the feature count. */
@@ -75,6 +72,7 @@ object OverpassOverlay {
 
     private class Element(
         val type: String?,
+        val id: Long?,
         val tags: Map<String, String>,
         val geometryType: String?,
         val lons: DoubleArray,
@@ -83,6 +81,7 @@ object OverpassOverlay {
 
     private fun readElement(json: JsonReader): Element {
         var type: String? = null
+        var id: Long? = null
         val tags = HashMap<String, String>()
         var geometryType: String? = null
         var lons = DoubleArray(0)
@@ -91,6 +90,7 @@ object OverpassOverlay {
         while (json.hasNext()) {
             when (json.nextName()) {
                 "type" -> type = json.nextString()
+                "id" -> id = json.nextLong()
                 "tags" -> {
                     json.beginObject()
                     while (json.hasNext()) {
@@ -114,7 +114,7 @@ object OverpassOverlay {
             }
         }
         json.endObject()
-        return Element(type, tags, geometryType, lons, lats)
+        return Element(type, id, tags, geometryType, lons, lats)
     }
 
     /** Reads a Point (`[x, y]`) or LineString (`[[x, y], …]`) coordinate array. */
@@ -146,21 +146,43 @@ object OverpassOverlay {
         val vis = TrailVisibility.fromOsm(e.tags["vis"])?.level ?: 0
         val coords = Simplify.douglasPeucker(e.lons, e.lats, toleranceM)
             .joinToString(",") { i -> "[${round5(e.lons[i])},${round5(e.lats[i])}]" }
-        return """{"type":"Feature","properties":{"s":${sac.grade},"v":$vis},""" +
+        val id = e.id?.let { ""","id":"way/$it"""" }.orEmpty()
+        return """{"type":"Feature","properties":{"s":${sac.grade},"v":$vis$id},""" +
             """"geometry":{"type":"LineString","coordinates":[$coords]}}"""
     }
 
     private fun poiFeature(e: Element): String? {
         val kind = PoiKind.classify(e.tags) ?: return null
         if (e.geometryType != "Point" || e.lons.isEmpty()) return null
-        val name = e.tags["name"]?.takeIf { it.isNotBlank() }?.let { ""","n":${jsonString(it)}""" }.orEmpty()
-        return """{"type":"Feature","properties":{"k":"${kind.icon}"$name},""" +
+        val properties = StringWriter()
+        JsonWriter(properties).use { json ->
+            json.beginObject()
+            json.name("k").value(kind.icon)
+            e.tags["name"]?.takeIf { it.isNotBlank() }?.let { json.name("n").value(it) }
+            val osmType = e.tags[OSM_TYPE]
+            if (osmType != null && e.id != null) json.name("id").value("$osmType/${e.id}")
+            for ((key, value) in e.tags.toSortedMap()) {
+                if (key in RESERVED || value.isBlank() || isBookkeeping(key)) continue
+                json.name(key).value(value)
+            }
+            json.endObject()
+        }
+        return """{"type":"Feature","properties":$properties,""" +
             """"geometry":{"type":"Point","coordinates":[${round5(e.lons[0])},${round5(e.lats[0])}]}}"""
     }
 
-    /** JSON string literal with proper escaping (names can contain quotes). */
-    private fun jsonString(s: String): String =
-        StringWriter().also { out -> JsonWriter(out).use { it.isLenient = true; it.value(s) } }.toString()
+    /** Overpass-side helper tag carrying the element type (node/way/relation). */
+    private const val OSM_TYPE = "osm_type"
+
+    /** Our own property names, plus `name` (stored as `n`). */
+    private val RESERVED = setOf("k", "n", "id", "name", OSM_TYPE)
+
+    /** Tags about the mapping itself, of no use on the trail. */
+    private fun isBookkeeping(key: String): Boolean {
+        val k = key.lowercase()
+        return k.startsWith("source") || k.startsWith("check_date") || k.startsWith("fixme") ||
+            k.startsWith("survey") || k == "created_by"
+    }
 
     /** Five decimals ≈ 1 m. */
     private fun round5(v: Double): String = ((v * 1e5).roundToLong() / 1e5).toString()

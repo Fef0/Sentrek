@@ -115,7 +115,9 @@ class RegionRepository @Inject constructor(
             }
             remove(cell)
             region?.delete(object : OfflineRegion.OfflineRegionDeleteCallback {
-                override fun onDelete() = Unit
+                // MapLibre keeps a deleted region's tiles as browsing cache (up to 50 MB), so
+                // deleting freed nothing and downloading the area again "finished" instantly.
+                override fun onDelete() = offline.clearAmbientCache(null)
                 override fun onError(error: String) {
                     Log.e(TAG, "Cannot delete region ${cell.id}: $error")
                 }
@@ -236,7 +238,7 @@ class RegionRepository @Inject constructor(
     private companion object {
         const val TAG = "RegionRepository"
 
-        /** Bump when the overlay file format changes (v2: points, v3: huts, v4: all hiking points). */
-        const val OVERLAY_SUFFIX = ".v4.geojson"
+        /** Bump when the overlay file format changes (v2: points, v3: huts, v4: all hiking points, v5: all tags). */
+        const val OVERLAY_SUFFIX = ".v5.geojson"
     }
 }

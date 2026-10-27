@@ -20,10 +20,11 @@ class OverpassOverlayTest {
 
         assertEquals(5, count)
         assertTrue(json.startsWith("""{"type":"FeatureCollection","features":[{"type":"Feature""""))
-        assertTrue(json.contains(""""properties":{"s":1,"v":2}"""))
+        assertTrue(json.contains(""""properties":{"s":1,"v":2,"id":"way/8233525"}"""))
         assertTrue(json.contains("[8.00614,45.62199]"))
-        assertTrue(json.contains(""""properties":{"k":"cave","n":"Grotta \"del\" Lupo"}"""))
-        assertTrue(json.contains(""""properties":{"k":"cross"},"geometry":{"type":"Point","coordinates":[7.65859,45.97633]}"""))
+        // All tags are kept (sorted), minus empty values and mapper bookkeeping.
+        assertTrue(json.contains(""""properties":{"k":"cave","n":"Grotta \"del\" Lupo","id":"node/1","ele":"1520","natural":"cave_entrance"}"""))
+        assertTrue(json.contains(""""properties":{"k":"cross","man_made":"cross","natural":"peak"},"geometry":{"type":"Point","coordinates":[7.65859,45.97633]}"""))
         assertTrue(json.endsWith("]}"))
     }
 
@@ -45,7 +46,7 @@ class OverpassOverlayTest {
         val q = OverpassOverlay.query(BoundingBox(45.5, 7.5, 46.0, 8.0))
         assertTrue(q.contains("[bbox:45.5,7.5,46.0,8.0]"))
         assertTrue(q.contains("cave_entrance"))
-        assertTrue(q.contains("::geom=center(geom())"))
+        assertTrue(q.contains("::=::,::id=id(),osm_type=type(),::geom=center(geom())"))
     }
 
     @Test

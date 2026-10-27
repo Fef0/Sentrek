@@ -112,7 +112,10 @@
     ]
    },
    "tags": {
+    "osm_type": "node",
     "natural": "cave_entrance",
+    "ele": "1520",
+    "source": "survey",
     "tourism": "",
     "historic": "",
     "man_made": "",

@@ -26,6 +26,16 @@
     <string name="record_discard_title">Discard this track?</string>
     <string name="record_discard_text">The recording will be deleted. This can\'t be undone.</string>
     <string name="record_saved">Saved: %s</string>
+    <string name="track_follow">Follow</string>
+    <string name="track_stop_following">Stop following</string>
+    <string name="track_color">Colour</string>
+    <string name="track_hide">Hide from map</string>
+    <string name="follow_off_route">Off route · %s</string>
+    <string name="follow_reverse">Reverse</string>
+    <string name="follow_stop">Stop</string>
+    <string name="follow_distance_left">Left</string>
+    <string name="follow_ascent_left">Climb left</string>
+    <string name="follow_time_left">Time left</string>
     <string name="feature_unnamed">Map feature</string>
     <string name="feature_elevation">Elevation</string>
     <string name="feature_difficulty">Difficulty (SAC)</string>
@@ -41,6 +51,9 @@
     <string name="settings_map">Map</string>
     <string name="settings_trail_difficulty">Trail difficulty colours</string>
     <string name="settings_trail_difficulty_hint">On downloaded areas: yellow T1, red T2–T3, blue T4–T6 (SAC scale). Sparse dots mean a faint trail. Caves, springs and other points stay visible.</string>
+    <string name="settings_routes">Routes</string>
+    <string name="settings_off_route_vibration">Vibrate when off route</string>
+    <string name="settings_off_route_vibration_hint">Three long pulses when you leave the route you are following, two short ones when you are back on it.</string>
     <string name="settings_about">About</string>
     <string name="settings_version">Sentrek %s</string>
     <string name="settings_credits">Map data © OpenStreetMap contributors, available under the Open Database License (ODbL).\nVector tiles: OpenFreeMap, OpenMapTiles.\nTerrain: Mapzen terrain tiles via AWS Open Data.\nTrail details: Overpass API (private.coffee, FOSSGIS).\nMap icons: OpenStreetMap Carto (CC0).</string>

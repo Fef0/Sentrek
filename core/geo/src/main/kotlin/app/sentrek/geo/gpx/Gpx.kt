@@ -27,12 +27,25 @@ data class GpxWaypoint(val name: String?, val position: LatLon)
  * so the same code is unit-tested here and runs on old phones without loading whole files.
  */
 object Gpx {
-    fun write(out: Writer, name: String, segments: List<List<TrackPoint>>, creator: String) {
+    fun write(
+        out: Writer,
+        name: String,
+        segments: List<List<TrackPoint>>,
+        creator: String,
+        waypoints: List<GpxWaypoint> = emptyList(),
+    ) {
         out.write("""<?xml version="1.0" encoding="UTF-8"?>""")
         out.write("\n")
         out.write("""<gpx version="1.1" creator="${escape(creator)}" xmlns="http://www.topografix.com/GPX/1/1">""")
         out.write("\n")
         out.write("  <metadata><name>${escape(name)}</name></metadata>\n")
+        for (w in waypoints) {
+            val p = w.position
+            out.write("""  <wpt lat="${coordinate(p.lat)}" lon="${coordinate(p.lon)}">""")
+            p.ele?.let { out.write("<ele>${"%.1f".format(Locale.ROOT, it)}</ele>") }
+            w.name?.let { out.write("<name>${escape(it)}</name>") }
+            out.write("</wpt>\n")
+        }
         out.write("  <trk>\n    <name>${escape(name)}</name>\n")
         for (segment in segments) {
             out.write("    <trkseg>\n")

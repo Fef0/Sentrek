@@ -1,6 +1,9 @@
 package app.sentrek.record
 
+import android.Manifest
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -42,29 +45,35 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sentrek.feature.record.R
 import app.sentrek.geo.BoundingBox
+import app.sentrek.geo.route.HikingTime
 import app.sentrek.ui.Format
 import app.sentrek.ui.TouchTarget
 import app.sentrek.ui.MapButton
 import app.sentrek.ui.SentrekIcons
 
-/** Saved tracks: show on the map, share, save as GPX, delete. */
+/** Saved and imported tracks: follow, show on the map, share, save as GPX, rename, delete; import files. */
 @Composable
 fun TracksScreen(
     onBack: () -> Unit,
-    onShowOnMap: (BoundingBox) -> Unit,
+    onShowOnMap: (BoundingBox?) -> Unit,
     viewModel: TracksViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
     val shown by viewModel.shown.collectAsStateWithLifecycle()
+    val following by viewModel.following.collectAsStateWithLifecycle()
     var exporting by remember { mutableStateOf<SavedTrack?>(null) }
     var deleting by remember { mutableStateOf<SavedTrack?>(null) }
     var renaming by remember { mutableStateOf<SavedTrack?>(null) }
+    var toFollow by remember { mutableStateOf<SavedTrack?>(null) }
+    var importing by remember { mutableStateOf(false) }
+    var coloring by remember { mutableStateOf<SavedTrack?>(null) }
 
     val saveAs = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(GPX_MIME)) { uri ->
         val track = exporting ?: return@rememberLauncherForActivityResult
@@ -75,6 +84,21 @@ fun TracksScreen(
             }
         }
     }
+    val pickFiles = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        importing = true
+        viewModel.import(uris) { result ->
+            importing = false
+            showImportResult(context, result)
+            result.bounds?.let(onShowOnMap)
+        }
+    }
+    val startFollowing = { track: SavedTrack -> viewModel.follow(track, onShowOnMap) }
+    val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        val track = toFollow
+        toFollow = null
+        if (track != null && hasLocation(context)) startFollowing(track)
+    }
 
     Column(Modifier.fillMaxSize()) {
         Surface(shadowElevation = 4.dp) {
@@ -84,7 +108,16 @@ fun TracksScreen(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 MapButton(SentrekIcons.Back, stringResource(R.string.tracks_back), onBack)
-                Text(stringResource(R.string.tracks_title), style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    stringResource(R.string.tracks_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedButton(
+                    onClick = { pickFiles.launch(arrayOf("*/*")) },
+                    enabled = !importing,
+                    modifier = Modifier.heightIn(min = TouchTarget),
+                ) { Text(stringResource(if (importing) R.string.tracks_importing else R.string.tracks_import)) }
             }
         }
 
@@ -106,6 +139,19 @@ fun TracksScreen(
                     TrackCard(
                         track = track,
                         isShown = track.id in shown,
+                        isFollowed = track.id == following,
+                        onFollow = {
+                            when {
+                                track.id == following -> viewModel.stopFollowing()
+                                hasLocation(context) -> startFollowing(track)
+                                else -> {
+                                    toFollow = track
+                                    locationPermission.launch(
+                                        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                                    )
+                                }
+                            }
+                        },
                         onToggleMap = {
                             if (track.id in shown) viewModel.hide(track) else viewModel.show(track, onShowOnMap)
                         },
@@ -126,11 +172,20 @@ fun TracksScreen(
                         },
                         onDelete = { deleting = track },
                         onRename = { renaming = track },
+                        onColor = { coloring = track },
                     )
                 }
                 item { Box(Modifier.navigationBarsPadding()) }
             }
         }
+    }
+
+    coloring?.let { track ->
+        TrackColorDialog(
+            current = track.color,
+            onPick = { viewModel.setColor(track, it); coloring = null },
+            onDismiss = { coloring = null },
+        )
     }
 
     renaming?.let { track ->
@@ -164,15 +219,34 @@ fun TracksScreen(
     }
 }
 
+/** Toast for an import from this screen or from another app ("Open with", "Share"). */
+fun showImportResult(context: Context, result: ImportResult) {
+    val text = when (result) {
+        is ImportResult.Imported -> context.getString(R.string.tracks_imported, result.track.name)
+        is ImportResult.ImportedMany -> context.resources.getQuantityString(R.plurals.tracks_imported_many, result.tracks.size, result.tracks.size) +
+            if (result.failed > 0) context.resources.getQuantityString(R.plurals.tracks_import_failed_many, result.failed, result.failed) else ""
+        ImportResult.Empty -> context.getString(R.string.tracks_import_empty)
+        ImportResult.UnknownFormat -> context.getString(R.string.tracks_import_unknown)
+        ImportResult.Failed -> context.getString(R.string.tracks_import_failed)
+    }
+    Toast.makeText(context, text, Toast.LENGTH_LONG).show()
+}
+
+private fun hasLocation(context: Context) =
+    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
 @Composable
 private fun TrackCard(
     track: SavedTrack,
     isShown: Boolean,
+    isFollowed: Boolean,
+    onFollow: () -> Unit,
     onToggleMap: () -> Unit,
     onShare: () -> Unit,
     onSave: () -> Unit,
     onDelete: () -> Unit,
     onRename: () -> Unit,
+    onColor: () -> Unit,
 ) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -182,8 +256,9 @@ private fun TrackCard(
                     .heightIn(min = TouchTarget)
                     .clickable(onClickLabel = stringResource(R.string.tracks_rename), onClick = onRename),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                ColorSwatch(track.color, selected = false, size = TouchTarget * 0.6f, onClick = onColor)
                 Text(
                     track.name,
                     style = MaterialTheme.typography.titleLarge,
@@ -192,21 +267,36 @@ private fun TrackCard(
                 )
                 Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.tracks_rename))
             }
+            // Planned routes have no times: show the signpost estimate instead.
+            val time = if (track.duration > 0) {
+                Format.duration(track.duration)
+            } else {
+                "≈ " + Format.duration(HikingTime.millis(track.distance, track.ascent, track.descent))
+            }
             Text(
                 stringResource(
                     R.string.tracks_stats,
                     Format.distance(track.distance),
-                    Format.duration(track.duration),
+                    time,
                     Format.meters(track.ascent),
                     Format.meters(track.descent),
                 ),
                 style = MaterialTheme.typography.bodyLarge,
             )
+            val buttonModifier = Modifier.weight(1f).heightIn(min = TouchTarget)
+            val padding = PaddingValues(horizontal = 4.dp)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val buttonModifier = Modifier.weight(1f).heightIn(min = TouchTarget)
-                val padding = PaddingValues(horizontal = 4.dp)
+                if (isFollowed) {
+                    Button(onClick = onFollow, modifier = buttonModifier, contentPadding = padding) {
+                        Text(stringResource(R.string.tracks_stop_following))
+                    }
+                } else {
+                    Button(onClick = onFollow, modifier = buttonModifier, contentPadding = padding) {
+                        Text(stringResource(R.string.tracks_follow))
+                    }
+                }
                 if (isShown) {
-                    Button(onClick = onToggleMap, modifier = buttonModifier, contentPadding = padding) {
+                    OutlinedButton(onClick = onToggleMap, modifier = buttonModifier, contentPadding = padding) {
                         Text(stringResource(R.string.tracks_hide))
                     }
                 } else {
@@ -214,6 +304,8 @@ private fun TrackCard(
                         Text(stringResource(R.string.tracks_show))
                     }
                 }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onShare, modifier = buttonModifier, contentPadding = padding) {
                     Text(stringResource(R.string.tracks_share))
                 }

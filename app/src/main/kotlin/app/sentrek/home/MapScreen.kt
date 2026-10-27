@@ -51,6 +51,7 @@ import app.sentrek.map.MapOverlays
 import app.sentrek.map.MapStyle
 import app.sentrek.map.SentrekMap
 import app.sentrek.map.TrackLayers
+import app.sentrek.record.SavedTrack
 import app.sentrek.record.TrackNameDialog
 import app.sentrek.ui.BarItem
 import app.sentrek.ui.BottomBar
@@ -73,7 +74,7 @@ val DefaultCamera: CameraPosition = CameraPosition.Builder()
     .build()
 
 /** What a location permission request was for, to carry on once granted. */
-private enum class AfterPermission { Follow, Record }
+private enum class AfterPermission { Follow, Record, FollowRoute }
 
 @Composable
 fun MapScreen(
@@ -95,6 +96,7 @@ fun MapScreen(
     val rasters by viewModel.rasters.collectAsStateWithLifecycle()
     val recording by viewModel.recording.collectAsStateWithLifecycle()
     val shownTracks by viewModel.shownTracks.collectAsStateWithLifecycle()
+    val followedRoute by viewModel.following.collectAsStateWithLifecycle()
     val currentOnCameraChange by rememberUpdatedState(onCameraChange)
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var style by remember { mutableStateOf<Style?>(null) }
@@ -105,8 +107,11 @@ fun MapScreen(
     var askDiscard by remember { mutableStateOf(false) }
     var askName by remember { mutableStateOf(false) }
     var afterPermission by remember { mutableStateOf<AfterPermission?>(null) }
+    var routeToFollow by remember { mutableStateOf<SavedTrack?>(null) }
     val haptics = LocalHapticFeedback.current
     val pressRadiusPx = with(LocalDensity.current) { LocalTouch.current.pressRadius.toPx() }
+    // "Right under the finger": what a fingertip covers, but never wider than the mode's reach.
+    val exactPressPx = with(LocalDensity.current) { minOf(LocalTouch.current.pressRadius, 10.dp).toPx() }
 
     // The user may grant or revoke location in system settings while we're in the background.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { hasLocation = viewModel.hasLocationPermission() }
@@ -128,7 +133,9 @@ fun MapScreen(
             }
             next == AfterPermission.Record -> startRecording()
             next == AfterPermission.Follow -> follow()
+            next == AfterPermission.FollowRoute -> routeToFollow?.let(viewModel::followTrack)
         }
+        routeToFollow = null
     }
     val withLocation = { action: AfterPermission, run: () -> Unit ->
         if (hasLocation) {
@@ -156,16 +163,23 @@ fun MapScreen(
                 },
             )
 
-            recording?.let {
-                RecordingStats(
-                    recording = it,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .statusBarsPadding()
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                        .padding(end = TouchTarget) // Keep clear of the compass.
-                        .fillMaxWidth(),
-                )
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .padding(end = TouchTarget), // Keep clear of the compass.
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                recording?.let { RecordingStats(recording = it, modifier = Modifier.fillMaxWidth()) }
+                followedRoute?.let {
+                    FollowPanel(
+                        following = it,
+                        onReverse = viewModel::reverseRoute,
+                        onStop = viewModel::stopFollowing,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
 
             // Map controls stay on the right edge, in the lower half: reachable with the thumb.
@@ -222,7 +236,7 @@ fun MapScreen(
     DisposableEffect(map) {
         val m = map ?: return@DisposableEffect onDispose {}
         val onLongPress = MapLibreMap.OnMapLongClickListener { latLng ->
-            val info = MapFeatures.at(m, m.projection.toScreenLocation(latLng), latLng, pressRadiusPx)
+            val info = MapFeatures.at(m, m.projection.toScreenLocation(latLng), latLng, pressRadiusPx, exactPressPx)
                 ?: return@OnMapLongClickListener false
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             pressed = info
@@ -265,7 +279,30 @@ fun MapScreen(
         onFocusDone()
     }
 
-    pressed?.let { FeatureSheet(it, onDismiss = { pressed = null }) }
+    pressed?.let { info ->
+        val track = info.trackId?.takeIf { info.kind == "track" }?.let(viewModel::track)
+        if (track == null) {
+            FeatureSheet(info, onDismiss = { pressed = null })
+        } else {
+            TrackSheet(
+                track = track,
+                isFollowed = followedRoute?.trackId == track.id,
+                onFollow = {
+                    pressed = null
+                    routeToFollow = track
+                    withLocation(AfterPermission.FollowRoute) { viewModel.followTrack(track); routeToFollow = null }
+                },
+                onStopFollowing = { pressed = null; viewModel.stopFollowing() },
+                onColor = { viewModel.setTrackColor(track, it) },
+                onHide = {
+                    pressed = null
+                    if (followedRoute?.trackId == track.id) viewModel.stopFollowing()
+                    viewModel.hideTrack(track.id)
+                },
+                onDismiss = { pressed = null },
+            )
+        }
+    }
 
     val current = recording
     if (askStop && current != null) {
@@ -316,6 +353,6 @@ fun MapScreen(
     }
 
     LaunchedEffect(style, recording?.segments, shownTracks) {
-        style?.let { TrackLayers.sync(it, recording?.segments.orEmpty(), shownTracks.values) }
+        style?.let { TrackLayers.sync(it, recording?.segments.orEmpty(), shownTracks) }
     }
 }

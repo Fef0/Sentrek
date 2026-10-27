@@ -20,6 +20,30 @@
     <string name="tracks_name">Name</string>
     <string name="tracks_rename">Rename track</string>
     <string name="tracks_rename_confirm">Rename</string>
+    <string name="tracks_follow">Follow</string>
+    <string name="tracks_stop_following">Stop following</string>
+    <string name="tracks_import">Import</string>
+    <string name="tracks_importing">Importing…</string>
+    <string name="tracks_imported">Imported: %s</string>
+    <plurals name="tracks_imported_many">
+        <item quantity="one">Imported %d track</item>
+        <item quantity="other">Imported %d tracks</item>
+    </plurals>
+    <plurals name="tracks_import_failed_many">
+        <item quantity="one">, %d file could not be read</item>
+        <item quantity="other">, %d files could not be read</item>
+    </plurals>
+    <string name="tracks_color">Track colour</string>
+    <string name="tracks_color_custom">Custom colour</string>
+    <string name="tracks_color_use">Use colour</string>
+    <string name="tracks_import_empty">No track or route in this file</string>
+    <string name="tracks_import_unknown">Not a GPX, KML or KMZ file</string>
+    <string name="tracks_import_failed">Could not import the file</string>
+
+    <string name="follow_notification_title">Following %s</string>
+    <string name="follow_notification_off_route">Off route · %s</string>
+    <!-- Distance left, time left. -->
+    <string name="follow_notification_left">%1$s left · %2$s</string>
     <string name="tracks_delete_title">Delete this track?</string>
     <string name="tracks_saved">Track saved</string>
     <string name="tracks_save_failed">Could not save the track</string>

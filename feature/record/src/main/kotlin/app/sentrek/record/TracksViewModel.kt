@@ -14,12 +14,20 @@ import java.io.File
 import javax.inject.Inject
 
 @HiltViewModel
-class TracksViewModel @Inject constructor(private val repository: TrackRepository) : ViewModel() {
+class TracksViewModel @Inject constructor(
+    private val repository: TrackRepository,
+    private val follow: FollowRepository,
+) : ViewModel() {
     val tracks: StateFlow<List<SavedTrack>> = repository.tracks
 
     val shown: StateFlow<Set<String>> = repository.shown
         .map { it.keys }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    /** Id of the track being followed. */
+    val following: StateFlow<String?> = follow.state
+        .map { it?.trackId }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     fun shareCopy(track: SavedTrack, onReady: (File) -> Unit) {
         viewModelScope.launch { repository.shareCopy(track)?.let(onReady) }
@@ -31,15 +39,33 @@ class TracksViewModel @Inject constructor(private val repository: TrackRepositor
 
     fun hide(track: SavedTrack) = repository.hide(track)
 
+    /** Starts following [track]; [onStarted] gets the route's bounds to show it. */
+    fun follow(track: SavedTrack, onStarted: (BoundingBox?) -> Unit) {
+        viewModelScope.launch {
+            if (follow.start(track)) onStarted(repository.show(track))
+        }
+    }
+
+    fun stopFollowing() = follow.stop()
+
     fun rename(track: SavedTrack, name: String) {
         viewModelScope.launch { repository.rename(track, name) }
     }
 
     fun delete(track: SavedTrack) {
+        follow.stopIfFollowing(track.id)
         viewModelScope.launch { repository.delete(track) }
     }
 
     fun export(track: SavedTrack, target: Uri, onDone: (Boolean) -> Unit) {
         viewModelScope.launch { onDone(repository.export(track, target)) }
+    }
+
+    fun import(uris: List<Uri>, onDone: (ImportResult) -> Unit) {
+        viewModelScope.launch { onDone(repository.importAll(uris)) }
+    }
+
+    fun setColor(track: SavedTrack, color: Int) {
+        viewModelScope.launch { repository.setColor(track, color) }
     }
 }

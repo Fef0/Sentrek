@@ -2,15 +2,21 @@ package app.sentrek.record
 
 import android.content.Context
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.util.Log
 import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.LatLon
 import app.sentrek.geo.gpx.Gpx
+import app.sentrek.geo.gpx.GpxFile
+import app.sentrek.geo.gpx.GpxWaypoint
+import app.sentrek.geo.gpx.TrackFiles
+import app.sentrek.geo.route.Route
 import app.sentrek.geo.track.TrackPoint
 import app.sentrek.geo.track.TrackStats
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,9 +42,42 @@ data class SavedTrack(
     val distance: Double,
     val ascent: Double,
     val descent: Double,
-    /** Moving time, without pauses. */
+    /** Moving time, without pauses; 0 for planned routes without times. */
     val duration: Long,
+    /** Imported from a file rather than recorded here. */
+    val imported: Boolean = false,
+    /** Line colour on the map (ARGB), one of [TrackColors.palette]. */
+    val color: Int = TrackColors.palette.first(),
 )
+
+/** Track colours: dark and saturated, so they read on the light map and next to the trail colours. */
+object TrackColors {
+    val palette: List<Int> = listOf(
+        0xFF7B1FA2, // purple
+        0xFFC2185B, // magenta
+        0xFF00838F, // teal
+        0xFF2E7D32, // green
+        0xFF3949AB, // indigo
+        0xFF6D4C41, // brown
+        0xFF212121, // black
+        0xFF9E9D24, // olive
+    ).map { it.toInt() }
+}
+
+/** A track as drawn on the map. */
+data class TrackShape(val segments: List<List<LatLon>>, val waypoints: List<GpxWaypoint>)
+
+sealed interface ImportResult {
+    /** Area to show on the map after the import, if anything was imported. */
+    val bounds: BoundingBox? get() = null
+
+    data class Imported(val track: SavedTrack, override val bounds: BoundingBox?) : ImportResult
+    /** Several files at once: [failed] couldn't be read. */
+    data class ImportedMany(val tracks: List<SavedTrack>, val failed: Int, override val bounds: BoundingBox?) : ImportResult
+    data object Empty : ImportResult
+    data object UnknownFormat : ImportResult
+    data object Failed : ImportResult
+}
 
 /** Saved tracks, and which of them are drawn on the map. */
 @Singleton
@@ -49,9 +88,14 @@ class TrackRepository @Inject constructor(@ApplicationContext private val contex
     private val _tracks = MutableStateFlow<List<SavedTrack>>(emptyList())
     val tracks: StateFlow<List<SavedTrack>> = _tracks.asStateFlow()
 
-    /** Tracks shown on the map: id → segments. */
-    private val _shown = MutableStateFlow<Map<String, List<List<LatLon>>>>(emptyMap())
-    val shown: StateFlow<Map<String, List<List<LatLon>>>> = _shown.asStateFlow()
+    /** Tracks shown on the map, by id. Kept on disk, so they're still there after a restart. */
+    private val _shown = MutableStateFlow<Map<String, TrackShape>>(emptyMap())
+    val shown: StateFlow<Map<String, TrackShape>> = _shown.asStateFlow()
+    private val shownFile = File(context.filesDir, "shown.txt")
+
+    /** One write at a time, in order: parallel writes could finish out of order and save an old list. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val fileWrites = Dispatchers.IO.limitedParallelism(1)
 
     init {
         scope.launch {
@@ -60,23 +104,65 @@ class TrackRepository @Inject constructor(@ApplicationContext private val contex
                     .mapNotNull { runCatching { readSummary(it) }.getOrNull() }
                     .sortedByDescending { it.startTime }
             }
+            val ids = withContext(Dispatchers.IO) { runCatching { shownFile.readLines() }.getOrDefault(emptyList()) }
+            ids.mapNotNull(::find).forEach { show(it) }
         }
     }
 
     fun gpxFile(track: SavedTrack) = File(dir, track.id + GPX)
 
     /** [name]: blank or null uses [defaultName]. */
-    suspend fun save(segments: List<List<TrackPoint>>, name: String?): SavedTrack = withContext(Dispatchers.IO) {
+    suspend fun save(
+        segments: List<List<TrackPoint>>,
+        name: String?,
+        waypoints: List<GpxWaypoint> = emptyList(),
+        imported: Boolean = false,
+    ): SavedTrack = withContext(Dispatchers.IO) {
         val stats = TrackStats.of(segments)
         val start = stats.startTime.takeIf { it > 0 } ?: System.currentTimeMillis()
-        val id = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(Date(start))
+        val id = uniqueId(start)
         val title = name?.trim()?.takeIf { it.isNotEmpty() } ?: defaultName(start)
+        // Each new track takes the next colour, so tracks shown together look different.
+        val color = TrackColors.palette[_tracks.value.size % TrackColors.palette.size]
         val track = SavedTrack(
-            id, title, start, stats.endTime.coerceAtLeast(start), stats.distance, stats.ascent, stats.descent, stats.activeMillis,
+            id, title, start, stats.endTime.coerceAtLeast(start), stats.distance, stats.ascent, stats.descent,
+            stats.activeMillis, imported, color,
         )
-        write(track, segments)
-        _tracks.update { (listOf(track) + it.filter { t -> t.id != id }).sortedByDescending { t -> t.startTime } }
+        write(track, segments, waypoints)
+        _tracks.update { (listOf(track) + it).sortedByDescending { t -> t.startTime } }
         track
+    }
+
+    /** Imports several files; they're all shown, and the bounds cover them all. */
+    suspend fun importAll(uris: List<Uri>): ImportResult {
+        if (uris.size == 1) return import(uris.single())
+        val results = uris.map { import(it) }
+        val imported = results.filterIsInstance<ImportResult.Imported>()
+        if (imported.isEmpty()) return results.firstOrNull() ?: ImportResult.Failed
+        val corners = imported.mapNotNull { it.bounds }.flatMap { listOf(LatLon(it.south, it.west), LatLon(it.north, it.east)) }
+        return ImportResult.ImportedMany(imported.map { it.track }, results.size - imported.size, bounds(corners))
+    }
+
+    /** Imports a GPX, KML or KMZ file; all its tracks become one track, with its waypoints. */
+    suspend fun import(uri: Uri): ImportResult {
+        val result = withContext(Dispatchers.IO) {
+            runCatching {
+                val file = context.contentResolver.openInputStream(uri)?.use { TrackFiles.read(it.buffered()) }
+                    ?: return@runCatching ImportResult.Failed
+                val segments = file.tracks.flatMap { it.segments }.filter { it.size >= 2 }
+                if (segments.isEmpty()) return@runCatching ImportResult.Empty
+                val name = file.name?.takeIf { it.isNotBlank() }
+                    ?: file.tracks.firstNotNullOfOrNull { it.name?.takeIf(String::isNotBlank) }
+                    ?: displayName(uri)
+                val track = save(segments, name, file.waypoints, imported = true)
+                ImportResult.Imported(track, bounds(segments.flatten().map(TrackPoint::position)))
+            }.getOrElse {
+                Log.w(TAG, "Import of $uri failed", it)
+                if (it is TrackFiles.UnsupportedFormatException) ImportResult.UnknownFormat else ImportResult.Failed
+            }
+        }
+        if (result is ImportResult.Imported) show(result.track)
+        return result
     }
 
     /** Renames the track, in the list and inside its GPX file. */
@@ -85,24 +171,22 @@ class TrackRepository @Inject constructor(@ApplicationContext private val contex
         val renamed = track.copy(name = title)
         val ok = withContext(Dispatchers.IO) {
             runCatching {
-                val segments = gpxFile(track).inputStream().buffered().use { Gpx.read(it) }.tracks.flatMap { it.segments }
-                write(renamed, segments)
+                val gpx = read(track)
+                write(renamed, gpx.tracks.flatMap { it.segments }, gpx.waypoints)
             }.onFailure { Log.w(TAG, "Cannot rename ${track.id}", it) }.isSuccess
         }
         if (ok) _tracks.update { all -> all.map { if (it.id == track.id) renamed else it } }
     }
 
+    suspend fun setColor(track: SavedTrack, color: Int) {
+        val recolored = track.copy(color = color)
+        withContext(Dispatchers.IO) { File(dir, track.id + SUMMARY).writeText(summaryJson(recolored)) }
+        _tracks.update { all -> all.map { if (it.id == track.id) recolored else it } }
+    }
+
     /** Date and time the track started, e.g. "Oct 27, 2026 2:55 PM". */
     fun defaultName(start: Long): String =
         DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(start))
-
-    private fun write(track: SavedTrack, segments: List<List<TrackPoint>>) {
-        // Write to a temp file first: a half-written GPX must never replace a good one.
-        val gpxTmp = File(dir, "${track.id}$GPX.tmp")
-        gpxTmp.bufferedWriter().use { Gpx.write(it, track.name, segments, CREATOR) }
-        gpxTmp.renameTo(File(dir, track.id + GPX))
-        File(dir, track.id + SUMMARY).writeText(summaryJson(track))
-    }
 
     suspend fun delete(track: SavedTrack) {
         hide(track)
@@ -115,17 +199,38 @@ class TrackRepository @Inject constructor(@ApplicationContext private val contex
 
     /** Draws [track] on the map; returns its bounds to fly to. */
     suspend fun show(track: SavedTrack): BoundingBox? {
-        val segments = withContext(Dispatchers.IO) {
+        val shape = withContext(Dispatchers.IO) {
             runCatching {
-                gpxFile(track).inputStream().buffered().use { Gpx.read(it) }
-                    .tracks.flatMap { t -> t.segments.map { s -> s.map(TrackPoint::position) } }
+                val gpx = read(track)
+                TrackShape(gpx.tracks.flatMap { t -> t.segments.map { s -> s.map(TrackPoint::position) } }, gpx.waypoints)
             }.onFailure { Log.w(TAG, "Cannot read ${track.id}", it) }.getOrNull()
         } ?: return null
-        _shown.update { it + (track.id to segments) }
-        return bounds(segments.flatten())
+        _shown.update { it + (track.id to shape) }
+        saveShown()
+        return bounds(shape.segments.flatten() + shape.waypoints.map { it.position })
     }
 
-    fun hide(track: SavedTrack) = _shown.update { it - track.id }
+    fun hide(track: SavedTrack) = hide(track.id)
+
+    fun hide(trackId: String) {
+        _shown.update { it - trackId }
+        saveShown()
+    }
+
+    private fun saveShown() {
+        val ids = _shown.value.keys.joinToString("\n")
+        scope.launch(fileWrites) { runCatching { shownFile.writeText(ids) } }
+    }
+
+    /** The track as a route to follow (segments joined), or null when it can't be read. */
+    suspend fun route(track: SavedTrack): Route? = withContext(Dispatchers.IO) {
+        runCatching {
+            val points = read(track).tracks.flatMap { it.segments }.flatten().map(TrackPoint::position)
+            Route(points)
+        }.onFailure { Log.w(TAG, "Cannot load route ${track.id}", it) }.getOrNull()
+    }
+
+    fun find(id: String): SavedTrack? = _tracks.value.firstOrNull { it.id == id }
 
     /**
      * A copy of the GPX named after the track, for the share sheet: the receiving app shows
@@ -147,6 +252,31 @@ class TrackRepository @Inject constructor(@ApplicationContext private val contex
         }.onFailure { Log.w(TAG, "Export of ${track.id} failed", it) }.isSuccess
     }
 
+    private fun read(track: SavedTrack): GpxFile = gpxFile(track).inputStream().buffered().use { Gpx.read(it) }
+
+    private fun write(track: SavedTrack, segments: List<List<TrackPoint>>, waypoints: List<GpxWaypoint>) {
+        // Write to a temp file first: a half-written GPX must never replace a good one.
+        val gpxTmp = File(dir, "${track.id}$GPX.tmp")
+        gpxTmp.bufferedWriter().use { Gpx.write(it, track.name, segments, CREATOR, waypoints) }
+        gpxTmp.renameTo(File(dir, track.id + GPX))
+        File(dir, track.id + SUMMARY).writeText(summaryJson(track))
+    }
+
+    /** Ids are start times; the same file imported twice gets "-2", "-3"… */
+    private fun uniqueId(start: Long): String {
+        val base = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(Date(start))
+        var id = base
+        var n = 2
+        while (File(dir, id + SUMMARY).exists()) id = "$base-${n++}"
+        return id
+    }
+
+    private fun displayName(uri: Uri): String? = runCatching {
+        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0)?.substringBeforeLast('.') else null
+        }
+    }.getOrNull() ?: uri.lastPathSegment?.substringAfterLast('/')?.substringBeforeLast('.')
+
     private fun summaryJson(t: SavedTrack) = JSONObject()
         .put("name", t.name)
         .put("start", t.startTime)
@@ -155,6 +285,8 @@ class TrackRepository @Inject constructor(@ApplicationContext private val contex
         .put("distance", t.distance)
         .put("ascent", t.ascent)
         .put("descent", t.descent)
+        .put("imported", t.imported)
+        .put("color", t.color)
         .toString()
 
     private fun readSummary(file: File): SavedTrack {
@@ -171,18 +303,20 @@ class TrackRepository @Inject constructor(@ApplicationContext private val contex
             descent = json.getDouble("descent"),
             // Summaries written before pauses existed have no "duration".
             duration = json.optLong("duration", (end - start).coerceAtLeast(0)),
+            imported = json.optBoolean("imported", false),
+            color = json.optInt("color", TrackColors.palette.first()),
         )
     }
 
     companion object {
         private const val TAG = "TrackRepository"
+        private const val GPX = ".gpx"
+        private const val SUMMARY = ".json"
+        private const val CREATOR = "Sentrek"
 
         /** "<name>.gpx", without characters that file systems reject (dates contain some). */
         fun fileName(track: SavedTrack): String =
             track.name.replace(Regex("""[\\/:*?"<>|,]+"""), "-").trim('-', ' ').ifEmpty { track.id } + ".gpx"
-        private const val GPX = ".gpx"
-        private const val SUMMARY = ".json"
-        private const val CREATOR = "Sentrek"
 
         fun bounds(points: List<LatLon>): BoundingBox? {
             if (points.isEmpty()) return null

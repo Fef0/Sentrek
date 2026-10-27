@@ -52,8 +52,15 @@ class SettingsViewModel @Inject constructor(private val settings: SettingsReposi
         viewModelScope.launch { settings.setShowTrailDifficulty(show) }
     }
 
+    val offRouteVibration: StateFlow<Boolean> =
+        settings.offRouteVibration.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
     fun setGloveMode(on: Boolean) {
         viewModelScope.launch { settings.setGloveMode(on) }
+    }
+
+    fun setOffRouteVibration(on: Boolean) {
+        viewModelScope.launch { settings.setOffRouteVibration(on) }
     }
 }
 
@@ -61,6 +68,7 @@ class SettingsViewModel @Inject constructor(private val settings: SettingsReposi
 fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
     val showTrailDifficulty by viewModel.showTrailDifficulty.collectAsStateWithLifecycle()
     val gloveMode by viewModel.gloveMode.collectAsStateWithLifecycle()
+    val offRouteVibration by viewModel.offRouteVibration.collectAsStateWithLifecycle()
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
@@ -89,6 +97,14 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 hint = stringResource(R.string.settings_trail_difficulty_hint),
                 checked = showTrailDifficulty,
                 onChange = viewModel::setShowTrailDifficulty,
+            )
+
+            SectionTitle(stringResource(R.string.settings_routes))
+            ToggleRow(
+                title = stringResource(R.string.settings_off_route_vibration),
+                hint = stringResource(R.string.settings_off_route_vibration_hint),
+                checked = offRouteVibration,
+                onChange = viewModel::setOffRouteVibration,
             )
 
             HorizontalDivider()

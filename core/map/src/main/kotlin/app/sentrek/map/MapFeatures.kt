@@ -21,6 +21,8 @@ data class MapFeatureInfo(
     val sacGrade: Int? = null,
     val visibility: Int? = null,
     val tags: Map<String, String> = emptyMap(),
+    /** A saved track shown on the map (its line, or one of its waypoints). */
+    val trackId: String? = null,
 )
 
 /** Finds the map feature under a long press. */
@@ -29,31 +31,29 @@ object MapFeatures {
     private val BASE_POINT_LAYERS = setOf("poi-hiking", "poi-landmarks", "poi-detail", "peak")
 
     /** Base tile properties that only drive the rendering. */
-    private val BASE_HIDDEN = setOf("rank", "class", "subclass", "agg_stop", "level", "indoor", "layer", "ele_ft")
+    private val BASE_HIDDEN = setOf("rank", "class", "subclass", "agg_stop", "level", "indoor", "layer", "ele_ft", "c", "track")
 
     /**
-     * The point nearest to [screen] within [radiusPx] (generous, for gloves), or else the hiking
-     * overlay trail under it. Null when there is nothing to describe.
+     * What's under the finger, in this order: an icon or a shown track right under it (within
+     * [exactPx]), then the nearest icon or a track within [radiusPx], then a hiking overlay
+     * trail. So a track pressed squarely wins over an icon that's merely within reach.
+     * Null when there is nothing to describe.
      */
-    fun at(map: MapLibreMap, screen: PointF, at: LatLng, radiusPx: Float): MapFeatureInfo? {
+    fun at(map: MapLibreMap, screen: PointF, at: LatLng, radiusPx: Float, exactPx: Float): MapFeatureInfo? {
         val layerIds = map.style?.layers?.map { it.id } ?: return null
-        val box = RectF(screen.x - radiusPx, screen.y - radiusPx, screen.x + radiusPx, screen.y + radiusPx)
+        val exact = box(screen, exactPx)
+        val near = box(screen, radiusPx)
+        val pointLayers = layerIds.filter { MapOverlays.isPointLayer(it) || it in BASE_POINT_LAYERS || it == TrackLayers.WAYPOINTS }
+        val hasTracks = TrackLayers.SHOWN in layerIds
 
-        val pointLayers = layerIds.filter { MapOverlays.isPointLayer(it) || it in BASE_POINT_LAYERS }
-        val nearest = map.queryRenderedFeatures(box, *pointLayers.toTypedArray())
-            .mapNotNull { feature -> (feature.geometry() as? Point)?.let { feature to it } }
-            .minByOrNull { (_, p) ->
-                val s = map.projection.toScreenLocation(LatLng(p.latitude(), p.longitude()))
-                (s.x - screen.x) * (s.x - screen.x) + (s.y - screen.y) * (s.y - screen.y)
-            }
-        if (nearest != null) {
-            val (feature, p) = nearest
-            return pointInfo(feature, LatLng(p.latitude(), p.longitude()))
-        }
+        nearestPoint(map, exact, screen, pointLayers)?.let { return it }
+        if (hasTracks) track(map, exact, at)?.let { return it }
+        nearestPoint(map, near, screen, pointLayers)?.let { return it }
+        if (hasTracks) track(map, near, at)?.let { return it }
 
         val trailLayers = layerIds.filter(MapOverlays::isTrailLayer)
         if (trailLayers.isEmpty()) return null
-        val trail = map.queryRenderedFeatures(box, *trailLayers.toTypedArray()).firstOrNull() ?: return null
+        val trail = map.queryRenderedFeatures(near, *trailLayers.toTypedArray()).firstOrNull() ?: return null
         val props = properties(trail)
         return MapFeatureInfo(
             name = null,
@@ -63,6 +63,25 @@ object MapFeatures {
             sacGrade = props["s"]?.toIntOrNull(),
             visibility = props["v"]?.toIntOrNull(),
         )
+    }
+
+    private fun box(center: PointF, radius: Float) =
+        RectF(center.x - radius, center.y - radius, center.x + radius, center.y + radius)
+
+    private fun nearestPoint(map: MapLibreMap, box: RectF, screen: PointF, layers: List<String>): MapFeatureInfo? {
+        if (layers.isEmpty()) return null
+        val (feature, p) = map.queryRenderedFeatures(box, *layers.toTypedArray())
+            .mapNotNull { feature -> (feature.geometry() as? Point)?.let { feature to it } }
+            .minByOrNull { (_, p) ->
+                val s = map.projection.toScreenLocation(LatLng(p.latitude(), p.longitude()))
+                (s.x - screen.x) * (s.x - screen.x) + (s.y - screen.y) * (s.y - screen.y)
+            } ?: return null
+        return pointInfo(feature, LatLng(p.latitude(), p.longitude()))
+    }
+
+    private fun track(map: MapLibreMap, box: RectF, at: LatLng): MapFeatureInfo? {
+        val track = map.queryRenderedFeatures(box, TrackLayers.SHOWN).firstOrNull() ?: return null
+        return MapFeatureInfo(name = null, kind = "track", position = at, osmId = null, trackId = properties(track)["id"])
     }
 
     private fun pointInfo(feature: Feature, position: LatLng): MapFeatureInfo {
@@ -85,6 +104,7 @@ object MapFeatures {
                 position = position,
                 osmId = null,
                 tags = props.filterKeys { !it.startsWith("name") && it !in BASE_HIDDEN }.toSortedMap(),
+                trackId = props["track"],
             )
         }
     }

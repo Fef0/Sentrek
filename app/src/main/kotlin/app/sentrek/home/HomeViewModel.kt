@@ -10,11 +10,15 @@ import app.sentrek.maps.ImportedMap
 import app.sentrek.maps.ImportedMapsRepository
 import app.sentrek.maps.RegionRepository
 import app.sentrek.maps.TrailsDownload
+import app.sentrek.record.FollowRepository
+import app.sentrek.record.Following
 import app.sentrek.record.LocationRepository
 import app.sentrek.record.Recording
 import app.sentrek.record.RecordingRepository
 import app.sentrek.record.SavedTrack
 import app.sentrek.record.TrackRepository
+import app.sentrek.map.MapTrack
+import kotlinx.coroutines.flow.combine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -33,6 +37,7 @@ class HomeViewModel @Inject constructor(
     private val tracks: TrackRepository,
     private val location: LocationRepository,
     private val recorder: RecordingRepository,
+    private val follower: FollowRepository,
 ) : ViewModel() {
     /** Hiking overlay files to draw (trail difficulty + points), by cell id. */
     val overlays: StateFlow<Map<String, File>> = regions.state
@@ -52,11 +57,37 @@ class HomeViewModel @Inject constructor(
     val recording: StateFlow<Recording?> = recorder.state
 
     /** Saved tracks the user chose to show. */
-    val shownTracks: StateFlow<Map<String, List<List<LatLon>>>> = tracks.shown
+    val shownTracks: StateFlow<List<MapTrack>> = combine(tracks.shown, tracks.tracks) { shown, all ->
+        val byId = all.associateBy { it.id }
+        shown.mapNotNull { (id, shape) ->
+            byId[id]?.let { MapTrack(id, it.color, shape.segments, shape.waypoints) }
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val following: StateFlow<Following?> = follower.state
+
+    fun track(id: String): SavedTrack? = tracks.find(id)
+
+    fun hideTrack(id: String) = tracks.hide(id)
+
+    fun setTrackColor(track: SavedTrack, color: Int) {
+        viewModelScope.launch { tracks.setColor(track, color) }
+    }
+
+    fun followTrack(track: SavedTrack) {
+        viewModelScope.launch { follower.start(track) }
+    }
 
     init {
-        // The app is in the foreground: a recording interrupted by the system resumes now.
+        // The app is in the foreground: tracking interrupted by the system resumes now.
         recorder.ensureService()
+        follower.ensureService()
+    }
+
+    fun stopFollowing() = follower.stop()
+
+    fun reverseRoute() {
+        viewModelScope.launch { follower.reverse() }
     }
 
     fun hasLocationPermission() = location.hasPermission()

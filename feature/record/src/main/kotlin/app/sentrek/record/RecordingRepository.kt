@@ -98,7 +98,7 @@ class RecordingRepository @Inject constructor(
         publish()
     }
 
-    /** Called by [RecordingService] with every GPS fix. */
+    /** Called by [TrackingService] with every GPS fix. */
     fun onLocation(location: Location) {
         if (writer == null || pausedSince != null) return
         if (location.hasAccuracy() && location.accuracy > MAX_ACCURACY_M) return
@@ -176,7 +176,7 @@ class RecordingRepository @Inject constructor(
      */
     fun ensureService() {
         if (_state.value == null) return
-        runCatching { RecordingService.start(context) }
+        runCatching { TrackingService.start(context) }
             .onFailure { Log.w(TAG, "Cannot start recording service", it) }
     }
 

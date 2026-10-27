@@ -29,7 +29,6 @@ dependencies {
     implementation(project(":core:map"))
     implementation(project(":core:ui"))
     implementation(project(":feature:record"))
-    implementation(libs.okhttp)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)

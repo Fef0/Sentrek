@@ -8,20 +8,20 @@ import kotlin.math.ceil
  * The points of a route being planned, with undo and redo. Every change is one step in the
  * history; a drag is applied once, when the finger lifts.
  */
-class PlanEditor {
-    private val history = mutableListOf<List<LatLon>>(emptyList())
+class PlanEditor<T> {
+    private val history = mutableListOf<List<T>>(emptyList())
     private var current = 0
 
-    val points: List<LatLon> get() = history[current]
+    val points: List<T> get() = history[current]
     val canUndo: Boolean get() = current > 0
     val canRedo: Boolean get() = current < history.size - 1
 
-    fun add(p: LatLon) = push(points + p)
+    fun add(p: T) = push(points + p)
 
     /** Inserts [p] so it becomes point [index]. */
-    fun insert(index: Int, p: LatLon) = push(points.toMutableList().apply { add(index.coerceIn(0, size), p) })
+    fun insert(index: Int, p: T) = push(points.toMutableList().apply { add(index.coerceIn(0, size), p) })
 
-    fun move(index: Int, p: LatLon) {
+    fun move(index: Int, p: T) {
         if (index !in points.indices) return
         push(points.toMutableList().apply { set(index, p) })
     }
@@ -43,12 +43,40 @@ class PlanEditor {
         if (canRedo) current++
     }
 
-    private fun push(next: List<LatLon>) {
+    private fun push(next: List<T>) {
         // A new change after some undos drops the undone steps.
         while (history.size > current + 1) history.removeAt(history.size - 1)
         history += next
         current++
     }
+}
+
+/**
+ * A leg as drawn: along the paths, or straight ([onTrails] false, also when no way was found).
+ * [offPathStart] / [offPathEnd]: the first / last stretch is a straight link between an
+ * off-path point and the path.
+ */
+data class PlanLeg(
+    val points: List<LatLon>,
+    val onTrails: Boolean,
+    val offPathStart: Boolean = false,
+    val offPathEnd: Boolean = false,
+) {
+    /** Stretches to draw: along a path (true) or straight across country (false). */
+    val pieces: List<Pair<List<LatLon>, Boolean>>
+        get() {
+            if (!onTrails || points.size < 2) return listOf(points to false)
+            val from = if (offPathStart) 1 else 0
+            val to = if (offPathEnd) points.lastIndex - 1 else points.lastIndex
+            return listOfNotNull(
+                if (offPathStart) points.subList(0, 2) to false else null,
+                if (to > from) points.subList(from, to + 1) to true else null,
+                if (offPathEnd) points.subList(points.size - 2, points.size) to false else null,
+            )
+        }
+
+    /** Where the handle that inserts a point on this leg goes. */
+    val middle: LatLon get() = PlanGeometry.halfway(points)
 }
 
 object PlanGeometry {
@@ -76,4 +104,21 @@ object PlanGeometry {
     /** Middle of each leg: where the planner draws the handles that insert a point. */
     fun midpoints(points: List<LatLon>): List<LatLon> =
         points.zipWithNext { a, b -> LatLon((a.lat + b.lat) / 2, (a.lon + b.lon) / 2) }
+
+    /** The point halfway along a polyline, by distance. */
+    fun halfway(line: List<LatLon>): LatLon {
+        if (line.size < 2) return line.first()
+        var left = Geo.length(line) / 2
+        for (i in 1 until line.size) {
+            val a = line[i - 1]
+            val b = line[i]
+            val d = Geo.distance(a, b)
+            if (d >= left && d > 0) {
+                val t = left / d
+                return LatLon(a.lat + (b.lat - a.lat) * t, a.lon + (b.lon - a.lon) * t)
+            }
+            left -= d
+        }
+        return line.last()
+    }
 }

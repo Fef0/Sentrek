@@ -49,7 +49,6 @@ import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.Geo
 import app.sentrek.geo.LatLon
 import app.sentrek.geo.place.Place
-import app.sentrek.geo.plan.PlanGeometry
 import app.sentrek.geo.place.PlaceKind
 import app.sentrek.map.MapFeatureInfo
 import app.sentrek.map.MapFeatures
@@ -57,12 +56,14 @@ import app.sentrek.map.MapLocation
 import app.sentrek.map.MapOverlays
 import app.sentrek.map.MapStyle
 import app.sentrek.map.PlaceLayers
+import app.sentrek.map.MapTrails
 import app.sentrek.map.PlanLayers
 import app.sentrek.planner.DiscardPlanDialog
 import app.sentrek.planner.PlanGestures
 import app.sentrek.planner.PlanHandle
 import app.sentrek.planner.PlanPanel
 import app.sentrek.planner.PlannerViewModel
+import app.sentrek.planner.TrailSource
 import app.sentrek.map.SentrekMap
 import app.sentrek.map.TrackLayers
 import app.sentrek.record.DeletePlaceDialog
@@ -120,6 +121,7 @@ fun MapScreen(
     val places by viewModel.places.collectAsStateWithLifecycle()
     val plan by planner.state.collectAsStateWithLifecycle()
     val planStats by planner.stats.collectAsStateWithLifecycle()
+    val planLegs by planner.legs.collectAsStateWithLifecycle()
     val planning by rememberUpdatedState(plan.active)
     // Points while a handle is dragged, before the drop commits them.
     var planPreview by remember { mutableStateOf<List<LatLon>?>(null) }
@@ -145,9 +147,11 @@ fun MapScreen(
     // "Right under the finger": what a fingertip covers, but never wider than the mode's reach.
     val exactPressPx = with(LocalDensity.current) { minOf(LocalTouch.current.pressRadius, 10.dp).toPx() }
     // Plan handles: the drawn dot plus the mode's reach, never less than a fingertip.
-    val handleReachPx = with(LocalDensity.current) { maxOf(24.dp, LocalTouch.current.pressRadius + 12.dp).toPx() }
+    val handleReach = maxOf(24.dp, LocalTouch.current.pressRadius + 12.dp)
+    val handleReachPx = with(LocalDensity.current) { handleReach.toPx() }
     val touchSlopPx = with(LocalDensity.current) { 8.dp.toPx() }
     val currentPlan by rememberUpdatedState(plan)
+    val currentLegs by rememberUpdatedState(planLegs)
     val planGestures = remember(handleReachPx) {
         PlanGestures(
             hitPx = handleReachPx,
@@ -155,11 +159,11 @@ fun MapScreen(
             onTap = { handle ->
                 when (handle) {
                     is PlanHandle.Point -> planner.select(handle.index.takeIf { it != currentPlan.selected })
-                    is PlanHandle.Mid -> planner.insert(handle.index, PlanGeometry.midpoints(currentPlan.points)[handle.index])
+                    is PlanHandle.Mid -> currentLegs.getOrNull(handle.index)?.let { planner.insert(handle.index, it.middle) }
                 }
             },
             onDrag = { handle, at ->
-                planPreview = currentPlan.points.toMutableList().apply {
+                planPreview = currentPlan.positions.toMutableList().apply {
                     when (handle) {
                         is PlanHandle.Point -> set(handle.index, at)
                         is PlanHandle.Mid -> add(handle.index + 1, at)
@@ -178,7 +182,8 @@ fun MapScreen(
         )
     }
     planGestures.map = map
-    planGestures.points = if (plan.active) plan.points else emptyList()
+    planGestures.points = if (plan.active) plan.positions else emptyList()
+    planGestures.midpoints = if (plan.active) planLegs.map { it.middle } else emptyList()
 
     // The user may grant or revoke location in system settings while we're in the background.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { hasLocation = viewModel.hasLocationPermission() }
@@ -258,7 +263,14 @@ fun MapScreen(
                     .padding(end = 12.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                if (!plan.active) {
+                if (plan.active) {
+                    MapButton(
+                        icon = SentrekIcons.Tracks,
+                        contentDescription = stringResource(PlannerR.string.plan_follow_trails),
+                        onClick = planner::toggleTrails,
+                        active = plan.followTrails,
+                    )
+                } else {
                     MapButton(
                         icon = SentrekIcons.Plan,
                         contentDescription = stringResource(PlannerR.string.plan_start),
@@ -430,6 +442,7 @@ fun MapScreen(
                     viewModel.hideTrack(track.id)
                 },
                 onDismiss = { pressed = null },
+                loadProfile = viewModel::trackProfile,
             )
         }
     }
@@ -498,9 +511,32 @@ fun MapScreen(
         style?.let { MapOverlays.sync(it, rasters, overlays, showDifficulty) }
     }
 
-    LaunchedEffect(style, plan, planPreview) {
+    LaunchedEffect(style, plan, planLegs, planPreview) {
         val s = style ?: return@LaunchedEffect
-        if (plan.active) PlanLayers.sync(s, planPreview ?: plan.points, plan.selected) else PlanLayers.clear(s)
+        if (!plan.active) {
+            PlanLayers.clear(s)
+            return@LaunchedEffect
+        }
+        // While dragging, legs that changed are straight until the finger lifts.
+        val preview = planPreview
+        if (preview != null) {
+            PlanLayers.sync(s, preview, preview.zipWithNext { a, b -> planner.knownLeg(a, b, onTrails = true) }, plan.selected)
+        } else {
+            PlanLayers.sync(s, plan.positions, planLegs, plan.selected)
+        }
+    }
+
+    // Paths to follow come from the map's own tiles, around what is on screen.
+    LaunchedEffect(map, style) {
+        val m = map ?: return@LaunchedEffect
+        val s = style ?: return@LaunchedEffect
+        planner.trails = object : TrailSource {
+            override suspend fun lines(box: BoundingBox) = MapTrails.lines(s, box)
+
+            // MapLibre's "pixels" here are density-independent: the same unit as dp.
+            override fun snapRadiusM() =
+                m.projection.getMetersPerPixelAtLatitude(m.cameraPosition.target?.latitude ?: 0.0) * handleReach.value
+        }
     }
 
     if (askPlanName) {

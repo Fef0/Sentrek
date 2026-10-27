@@ -6,6 +6,7 @@ import android.provider.OpenableColumns
 import android.util.Log
 import app.sentrek.feature.record.R
 import app.sentrek.geo.BoundingBox
+import app.sentrek.geo.Geo
 import app.sentrek.geo.LatLon
 import app.sentrek.geo.gpx.Gpx
 import app.sentrek.geo.gpx.GpxFile
@@ -92,6 +93,7 @@ sealed interface ImportResult {
 class TrackRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val places: PlaceRepository,
+    private val elevation: ElevationRepository,
 ) {
     private val dir = File(context.filesDir, "tracks").apply { mkdirs() }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -103,6 +105,9 @@ class TrackRepository @Inject constructor(
     private val _shown = MutableStateFlow<Map<String, TrackShape>>(emptyMap())
     val shown: StateFlow<Map<String, TrackShape>> = _shown.asStateFlow()
     private val shownFile = File(context.filesDir, "shown.txt")
+
+    /** Elevation profiles already read, by track id. */
+    private val profiles = HashMap<String, List<Pair<Double, Double>>>()
 
     /** One write at a time, in order: parallel writes could finish out of order and save an old list. */
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -183,7 +188,9 @@ class TrackRepository @Inject constructor(
                     val added = withContext(Dispatchers.Main) { places.addAll(file.waypoints, fallback) }
                     return@runCatching ImportResult.ImportedPlaces(added.size, bounds(added.map { it.position }))
                 }
-                val track = save(segments, name, file.waypoints, imported = true)
+                // Files from some planners have no heights: take them from the terrain while we can.
+                val filled = if (segments.flatten().none { it.position.ele != null }) withTerrain(segments) else null
+                val track = save(filled ?: segments, name, file.waypoints, imported = true, smoothElevation = filled != null)
                 ImportResult.Imported(track, bounds(segments.flatten().map(TrackPoint::position)))
             }.getOrElse {
                 Log.w(TAG, "Import of $uri failed", it)
@@ -219,6 +226,7 @@ class TrackRepository @Inject constructor(
 
     suspend fun delete(track: SavedTrack) {
         hide(track)
+        profiles -= track.id
         withContext(Dispatchers.IO) {
             gpxFile(track).delete()
             File(dir, track.id + SUMMARY).delete()
@@ -257,6 +265,36 @@ class TrackRepository @Inject constructor(
             val points = read(track).tracks.flatMap { it.segments }.flatten().map(TrackPoint::position)
             Route(points)
         }.onFailure { Log.w(TAG, "Cannot load route ${track.id}", it) }.getOrNull()
+    }
+
+    /**
+     * Elevation against distance along [track], for its profile. Read from the track's own file,
+     * so it works offline. A track without any heights gets them from the terrain once (online,
+     * or from cached terrain), and they are kept in its file. Empty when there are none.
+     */
+    suspend fun profile(track: SavedTrack): List<Pair<Double, Double>> {
+        profiles[track.id]?.let { return it }
+        val gpx = withContext(Dispatchers.IO) { runCatching { read(track) }.getOrNull() } ?: return emptyList()
+        var segments = gpx.tracks.flatMap { it.segments }
+        if (segments.flatten().none { it.position.ele != null }) {
+            segments = withTerrain(segments) ?: return emptyList()
+            val stats = TrackStats.of(segments, TrackStats.SMOOTH_CLIMB_THRESHOLD_M)
+            val updated = track.copy(ascent = stats.ascent, descent = stats.descent)
+            val saved = withContext(Dispatchers.IO) {
+                runCatching { write(updated, segments, gpx.waypoints) }
+                    .onFailure { Log.w(TAG, "Cannot add heights to ${track.id}", it) }.isSuccess
+            }
+            if (saved) _tracks.update { all -> all.map { if (it.id == track.id) updated else it } }
+        }
+        return profileOf(segments).also { profiles[track.id] = it }
+    }
+
+    /** [segments] with terrain heights, or null if the terrain isn't there for all of them. */
+    private suspend fun withTerrain(segments: List<List<TrackPoint>>): List<List<TrackPoint>>? {
+        val heights = elevation.withElevation(segments.flatten().map { it.position })
+        if (heights.isEmpty() || heights.any { it.ele == null }) return null
+        var i = 0
+        return segments.map { segment -> segment.map { TrackPoint(heights[i++], it.time) } }
     }
 
     fun find(id: String): SavedTrack? = _tracks.value.firstOrNull { it.id == id }
@@ -346,6 +384,24 @@ class TrackRepository @Inject constructor(
         /** "<name>.gpx", without characters that file systems reject (dates contain some). */
         fun fileName(track: SavedTrack): String =
             track.name.replace(Regex("""[\\/:*?"<>|,]+"""), "-").trim('-', ' ').ifEmpty { track.id } + ".gpx"
+
+        /** Points kept for a profile: enough for a phone-wide chart. */
+        private const val PROFILE_POINTS = 400
+
+        /** Distance along to height, for the points with a height; pauses between segments add no distance. */
+        fun profileOf(segments: List<List<TrackPoint>>): List<Pair<Double, Double>> {
+            val all = ArrayList<Pair<Double, Double>>()
+            var along = 0.0
+            for (segment in segments) {
+                segment.forEachIndexed { i, p ->
+                    if (i > 0) along += Geo.distance(segment[i - 1].position, p.position)
+                    p.position.ele?.let { all += along to it }
+                }
+            }
+            if (all.size <= PROFILE_POINTS) return all
+            val step = all.size.toDouble() / PROFILE_POINTS
+            return List(PROFILE_POINTS) { all[(it * step).toInt()] } + all.last()
+        }
 
         fun bounds(points: List<LatLon>): BoundingBox? {
             if (points.isEmpty()) return null

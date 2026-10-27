@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -36,6 +37,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -52,6 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sentrek.feature.record.R
 import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.route.HikingTime
+import app.sentrek.ui.ElevationProfile
 import app.sentrek.ui.Format
 import app.sentrek.ui.TouchTarget
 import app.sentrek.ui.MapButton
@@ -173,6 +176,7 @@ fun TracksScreen(
                         onDelete = { deleting = track },
                         onRename = { renaming = track },
                         onColor = { coloring = track },
+                        loadProfile = viewModel::profile,
                     )
                 }
                 item { Box(Modifier.navigationBarsPadding()) }
@@ -257,7 +261,10 @@ private fun TrackCard(
     onDelete: () -> Unit,
     onRename: () -> Unit,
     onColor: () -> Unit,
+    loadProfile: suspend (SavedTrack) -> List<Pair<Double, Double>>,
 ) {
+    // Keyed on the climb too: it changes when heights are added to an imported track.
+    val profile by produceState(emptyList<Pair<Double, Double>>(), track.id, track.ascent) { value = loadProfile(track) }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
@@ -293,6 +300,7 @@ private fun TrackCard(
                 ),
                 style = MaterialTheme.typography.bodyLarge,
             )
+            ElevationProfile(profile, Modifier.fillMaxWidth().height(56.dp))
             val buttonModifier = Modifier.weight(1f).heightIn(min = TouchTarget)
             val padding = PaddingValues(horizontal = 4.dp)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

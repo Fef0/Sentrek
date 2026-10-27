@@ -3,7 +3,6 @@ package app.sentrek.planner
 import android.graphics.PointF
 import android.view.MotionEvent
 import app.sentrek.geo.LatLon
-import app.sentrek.geo.plan.PlanGeometry
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import kotlin.math.hypot
@@ -30,6 +29,9 @@ class PlanGestures(
 ) {
     var map: MapLibreMap? = null
     var points: List<LatLon> = emptyList()
+
+    /** The handles in the middle of each leg. */
+    var midpoints: List<LatLon> = emptyList()
 
     private var handle: PlanHandle? = null
     private var downX = 0f
@@ -78,7 +80,7 @@ class PlanGestures(
             .minByOrNull { (_, d) -> d }
             ?.first
         nearest(points)?.let { return PlanHandle.Point(it) }
-        nearest(PlanGeometry.midpoints(points))?.let { return PlanHandle.Mid(it) }
+        nearest(midpoints)?.let { return PlanHandle.Mid(it) }
         return null
     }
 

@@ -16,7 +16,7 @@ class PlanTest {
 
     @Test
     fun `undo and redo walk the history, a new change drops the redo steps`() {
-        val plan = PlanEditor()
+        val plan = PlanEditor<LatLon>()
         assertFalse(plan.canUndo)
         plan.add(a)
         plan.add(b)
@@ -42,7 +42,7 @@ class PlanTest {
 
     @Test
     fun `out of range edits change nothing`() {
-        val plan = PlanEditor()
+        val plan = PlanEditor<LatLon>()
         plan.add(a)
         plan.move(3, b)
         plan.remove(-1)
@@ -59,6 +59,25 @@ class PlanTest {
         assertEquals(Math.ceil(legAB / 100).toInt() + 1, dense.indexOf(b) + 1)
         dense.zipWithNext().forEach { (p, q) -> assertTrue(Geo.distance(p, q) <= 100.0) }
         assertEquals(Geo.length(listOf(a, b, c)), Geo.length(dense), 0.5)
+    }
+
+    @Test
+    fun `halfway is in the middle by distance`() {
+        // a-b is 1112 m north, b-c 772 m east: the middle is on a-b, 942 m from a.
+        val half = PlanGeometry.halfway(listOf(a, b, c))
+        assertEquals(Geo.length(listOf(a, b, c)) / 2, Geo.distance(a, half), 0.5)
+        assertEquals(7.0, half.lon, 1e-9)
+    }
+
+    @Test
+    fun `a leg joining a path from off it is drawn in pieces`() {
+        val d = LatLon(46.02, 7.01)
+        val both = PlanLeg(listOf(a, b, c, d), onTrails = true, offPathStart = true, offPathEnd = true)
+        assertEquals(listOf(listOf(a, b) to false, listOf(b, c) to true, listOf(c, d) to false), both.pieces)
+        assertEquals(listOf(listOf(a, b, c) to true), PlanLeg(listOf(a, b, c), onTrails = true).pieces)
+        assertEquals(listOf(listOf(a, c) to false), PlanLeg(listOf(a, c), onTrails = false).pieces)
+        // Off the path at the start only, straight onto the path's first point.
+        assertEquals(listOf(listOf(a, b) to false, listOf(b, c) to true), PlanLeg(listOf(a, b, c), true, offPathStart = true).pieces)
     }
 
     @Test

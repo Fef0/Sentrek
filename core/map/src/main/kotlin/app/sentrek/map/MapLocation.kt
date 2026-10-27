@@ -19,6 +19,7 @@ object MapLocation {
     /** Zoom used when starting to follow from far out. */
     private const val FOLLOW_ZOOM = 15.0
     private const val TRANSITION_MS = 750L
+    private const val MAX_ANIMATION_FPS = 20
 
     @SuppressLint("MissingPermission") // No engine: MapLibre never touches the GPS itself.
     fun activate(context: Context, map: MapLibreMap, style: Style) {
@@ -32,6 +33,9 @@ object MapLocation {
         }
         component.isLocationComponentEnabled = true
         component.renderMode = RenderMode.COMPASS
+        // The compass turns the arrow on every sensor reading, which redraws the whole map:
+        // capped, a phone held still in the hand doesn't burn through the battery.
+        component.setMaxAnimationFps(MAX_ANIMATION_FPS)
     }
 
     fun update(map: MapLibreMap, location: Location) {

@@ -25,3 +25,4 @@ include(":feature:maps")
 
 include(":feature:record")
 include(":feature:planner")
+include(":baselineprofile")

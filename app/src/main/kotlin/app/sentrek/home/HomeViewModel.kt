@@ -83,6 +83,8 @@ class HomeViewModel @Inject constructor(
 
     fun track(id: String): SavedTrack? = tracks.find(id)
 
+    suspend fun trackProfile(track: SavedTrack) = tracks.profile(track)
+
     fun hideTrack(id: String) = tracks.hide(id)
 
     fun setTrackColor(track: SavedTrack, color: Int) {

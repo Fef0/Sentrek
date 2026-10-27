@@ -442,6 +442,7 @@ fun MapScreen(
                     viewModel.hideTrack(track.id)
                 },
                 onDismiss = { pressed = null },
+                loadProfile = viewModel::trackProfile,
             )
         }
     }

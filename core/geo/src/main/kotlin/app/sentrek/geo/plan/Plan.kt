@@ -51,8 +51,30 @@ class PlanEditor<T> {
     }
 }
 
-/** A leg as drawn: along the paths, or straight ([onTrails] false, also when no way was found). */
-data class PlanLeg(val points: List<LatLon>, val onTrails: Boolean) {
+/**
+ * A leg as drawn: along the paths, or straight ([onTrails] false, also when no way was found).
+ * [offPathStart] / [offPathEnd]: the first / last stretch is a straight link between an
+ * off-path point and the path.
+ */
+data class PlanLeg(
+    val points: List<LatLon>,
+    val onTrails: Boolean,
+    val offPathStart: Boolean = false,
+    val offPathEnd: Boolean = false,
+) {
+    /** Stretches to draw: along a path (true) or straight across country (false). */
+    val pieces: List<Pair<List<LatLon>, Boolean>>
+        get() {
+            if (!onTrails || points.size < 2) return listOf(points to false)
+            val from = if (offPathStart) 1 else 0
+            val to = if (offPathEnd) points.lastIndex - 1 else points.lastIndex
+            return listOfNotNull(
+                if (offPathStart) points.subList(0, 2) to false else null,
+                if (to > from) points.subList(from, to + 1) to true else null,
+                if (offPathEnd) points.subList(points.size - 2, points.size) to false else null,
+            )
+        }
+
     /** Where the handle that inserts a point on this leg goes. */
     val middle: LatLon get() = PlanGeometry.halfway(points)
 }

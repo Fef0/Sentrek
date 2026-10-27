@@ -1,4 +1,4 @@
-package app.sentrek.planner
+package app.sentrek.record
 
 import android.content.Context
 import android.graphics.BitmapFactory

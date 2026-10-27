@@ -41,9 +41,9 @@ object PlanLayers {
     private const val COLOR = 0xFFD81B60.toInt()
 
     fun sync(style: Style, points: List<LatLon>, legs: List<PlanLeg>, selected: Int?) {
-        val line = legs.filter { it.points.size >= 2 }.map { leg ->
-            Feature.fromGeometry(LineString.fromLngLats(leg.points.map { Point.fromLngLat(it.lon, it.lat) })).apply {
-                addBooleanProperty("t", leg.onTrails)
+        val line = legs.flatMap { it.pieces }.filter { (points, _) -> points.size >= 2 }.map { (points, onPath) ->
+            Feature.fromGeometry(LineString.fromLngLats(points.map { Point.fromLngLat(it.lon, it.lat) })).apply {
+                addBooleanProperty("t", onPath)
             }
         }
         val handles = points.mapIndexed { i, p ->

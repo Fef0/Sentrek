@@ -14,6 +14,7 @@ import app.sentrek.geo.route.HikingTime
 import app.sentrek.geo.route.Route
 import app.sentrek.geo.track.TrackPoint
 import app.sentrek.record.SavedTrack
+import app.sentrek.record.ElevationRepository
 import app.sentrek.record.TrackRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -95,7 +96,7 @@ class PlannerViewModel @Inject constructor(
     private val edits = Mutex()
 
     /** Routed legs by their ends; null: no way along the paths. */
-    private val routes = HashMap<Pair<LatLon, LatLon>, List<LatLon>?>()
+    private val routes = HashMap<Pair<LatLon, LatLon>, PlanLeg?>()
 
     /** Straight or already known legs at once, then the routed ones. */
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -222,8 +223,7 @@ class PlannerViewModel @Inject constructor(
 
     private fun knownLeg(a: PlanPoint, b: PlanPoint): PlanLeg {
         if (!b.onTrails) return PlanLeg(listOf(a.position, b.position), false)
-        val route = routes[a.position to b.position]
-        return if (route != null) PlanLeg(route, true) else PlanLeg(listOf(a.position, b.position), false)
+        return routes[a.position to b.position] ?: PlanLeg(listOf(a.position, b.position), false)
     }
 
     private suspend fun leg(a: PlanPoint, b: PlanPoint): PlanLeg {
@@ -234,12 +234,19 @@ class PlannerViewModel @Inject constructor(
         return knownLeg(a, b)
     }
 
-    /** The way along the paths between two points already on them. */
-    private suspend fun route(a: LatLon, b: LatLon): List<LatLon>? {
+    /**
+     * The way along the paths from [a] to [b]. An end off the paths (dropped where there is
+     * none) joins the nearest one within [CONNECT_M] in a straight line.
+     */
+    private suspend fun route(a: LatLon, b: LatLon): PlanLeg? {
         val source = trails ?: return null
         val span = Geo.distance(a, b)
         val lines = source.lines(box(listOf(a, b), max(MIN_MARGIN_M, span * 0.5)))
-        return withContext(Dispatchers.Default) { TrailGraph(lines).route(a, b, ON_PATH_M) }
+        val path = withContext(Dispatchers.Default) { TrailGraph(lines).route(a, b, CONNECT_M) } ?: return null
+        val offStart = Geo.distance(a, path.first()) > ON_PATH_M
+        val offEnd = Geo.distance(b, path.last()) > ON_PATH_M
+        val points = listOfNotNull(a.takeIf { offStart }) + path + listOfNotNull(b.takeIf { offEnd })
+        return PlanLeg(points, onTrails = true, offPathStart = offStart, offPathEnd = offEnd)
     }
 
     /** [p] moved onto the nearest path within reach, or [p] itself. */
@@ -278,6 +285,9 @@ class PlannerViewModel @Inject constructor(
     companion object {
         /** Points are on a path already; this only absorbs rounding. */
         private const val ON_PATH_M = 5.0
+
+        /** How far an off-path point looks for a path to join. */
+        private const val CONNECT_M = 300.0
         private const val MIN_MARGIN_M = 500.0
 
         /** The legs end to end, without repeating the shared points. */

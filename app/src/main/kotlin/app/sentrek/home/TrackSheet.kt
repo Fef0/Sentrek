@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
@@ -16,6 +17,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -28,6 +30,7 @@ import app.sentrek.geo.route.HikingTime
 import app.sentrek.record.ColorSwatch
 import app.sentrek.record.SavedTrack
 import app.sentrek.record.TrackColorDialog
+import app.sentrek.ui.ElevationProfile
 import app.sentrek.ui.Format
 import app.sentrek.ui.TouchTarget
 
@@ -42,8 +45,11 @@ fun TrackSheet(
     onColor: (Int) -> Unit,
     onHide: () -> Unit,
     onDismiss: () -> Unit,
+    /** Elevation profile of the track (see TrackRepository.profile). */
+    loadProfile: suspend (SavedTrack) -> List<Pair<Double, Double>>,
 ) {
     var choosingColor by remember { mutableStateOf(false) }
+    val profile by produceState(emptyList<Pair<Double, Double>>(), track.id) { value = loadProfile(track) }
     val wide = Modifier.fillMaxWidth().heightIn(min = TouchTarget)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(
@@ -63,6 +69,7 @@ fun TrackSheet(
                 "${Format.distance(track.distance)} · $time · ↑ ${Format.meters(track.ascent)} ↓ ${Format.meters(track.descent)}",
                 style = MaterialTheme.typography.bodyLarge,
             )
+            ElevationProfile(profile, Modifier.fillMaxWidth().height(72.dp))
             if (isFollowed) {
                 Button(onClick = onStopFollowing, modifier = wide) { Text(stringResource(R.string.track_stop_following)) }
             } else {

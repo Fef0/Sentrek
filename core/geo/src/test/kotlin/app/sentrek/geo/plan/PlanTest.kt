@@ -70,6 +70,17 @@ class PlanTest {
     }
 
     @Test
+    fun `a leg joining a path from off it is drawn in pieces`() {
+        val d = LatLon(46.02, 7.01)
+        val both = PlanLeg(listOf(a, b, c, d), onTrails = true, offPathStart = true, offPathEnd = true)
+        assertEquals(listOf(listOf(a, b) to false, listOf(b, c) to true, listOf(c, d) to false), both.pieces)
+        assertEquals(listOf(listOf(a, b, c) to true), PlanLeg(listOf(a, b, c), onTrails = true).pieces)
+        assertEquals(listOf(listOf(a, c) to false), PlanLeg(listOf(a, c), onTrails = false).pieces)
+        // Off the path at the start only, straight onto the path's first point.
+        assertEquals(listOf(listOf(a, b) to false, listOf(b, c) to true), PlanLeg(listOf(a, b, c), true, offPathStart = true).pieces)
+    }
+
+    @Test
     fun `terrarium decoding and bilinear sampling`() {
         // 0x80 0x00 0x00 is sea level; each unit of green is a metre.
         assertEquals(0f, Terrarium.decode(0xFF800000.toInt()), 0f)

@@ -54,6 +54,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sentrek.feature.record.R
 import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.route.HikingTime
+import app.sentrek.ui.Confirmation
+import app.sentrek.ui.ConfirmDialog
 import app.sentrek.ui.ElevationProfile
 import app.sentrek.ui.Format
 import app.sentrek.ui.TouchTarget
@@ -65,6 +67,8 @@ import app.sentrek.ui.SentrekIcons
 fun TracksScreen(
     onBack: () -> Unit,
     onShowOnMap: (BoundingBox?) -> Unit,
+    /** Opens a planned or imported route in the planner. */
+    onEditRoute: (SavedTrack) -> Unit,
     viewModel: TracksViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -72,21 +76,25 @@ fun TracksScreen(
     val shown by viewModel.shown.collectAsStateWithLifecycle()
     val following by viewModel.following.collectAsStateWithLifecycle()
     var exporting by remember { mutableStateOf<SavedTrack?>(null) }
+    var choosingFormat by remember { mutableStateOf<SavedTrack?>(null) }
+    var confirm by remember { mutableStateOf<Confirmation?>(null) }
     var deleting by remember { mutableStateOf<SavedTrack?>(null) }
     var renaming by remember { mutableStateOf<SavedTrack?>(null) }
     var toFollow by remember { mutableStateOf<SavedTrack?>(null) }
     var importing by remember { mutableStateOf(false) }
     var coloring by remember { mutableStateOf<SavedTrack?>(null) }
 
-    val saveAs = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(GPX_MIME)) { uri ->
-        val track = exporting ?: return@rememberLauncherForActivityResult
+    val exportTo = { uri: android.net.Uri?, kml: Boolean ->
+        val track = exporting
         exporting = null
-        if (uri != null) {
-            viewModel.export(track, uri) { ok ->
+        if (track != null && uri != null) {
+            viewModel.export(track, uri, kml) { ok ->
                 Toast.makeText(context, if (ok) R.string.tracks_saved else R.string.tracks_save_failed, Toast.LENGTH_SHORT).show()
             }
         }
     }
+    val saveGpx = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(GPX_MIME)) { exportTo(it, false) }
+    val saveKml = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(KML_MIME)) { exportTo(it, true) }
     val pickFiles = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isEmpty()) return@rememberLauncherForActivityResult
         importing = true
@@ -145,18 +153,33 @@ fun TracksScreen(
                         isFollowed = track.id == following,
                         onFollow = {
                             when {
-                                track.id == following -> viewModel.stopFollowing()
-                                hasLocation(context) -> startFollowing(track)
+                                track.id == following ->
+                                    confirm = FollowConfirmations.stop(context, track.name, viewModel::stopFollowing)
                                 else -> {
-                                    toFollow = track
-                                    locationPermission.launch(
-                                        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-                                    )
+                                    val start = {
+                                        if (hasLocation(context)) {
+                                            startFollowing(track)
+                                        } else {
+                                            toFollow = track
+                                            locationPermission.launch(
+                                                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                                            )
+                                        }
+                                    }
+                                    val current = tracks.firstOrNull { it.id == following }
+                                    if (current != null) confirm = FollowConfirmations.switch(context, current.name, track.name, start) else start()
                                 }
                             }
                         },
                         onToggleMap = {
-                            if (track.id in shown) viewModel.hide(track) else viewModel.show(track, onShowOnMap)
+                            when {
+                                track.id !in shown -> viewModel.show(track, onShowOnMap)
+                                track.id == following -> confirm = FollowConfirmations.hideFollowed(context, track.name) {
+                                    viewModel.stopFollowing()
+                                    viewModel.hide(track)
+                                }
+                                else -> viewModel.hide(track)
+                            }
                         },
                         onShare = {
                             viewModel.shareCopy(track) { file ->
@@ -169,10 +192,8 @@ fun TracksScreen(
                                 context.startActivity(Intent.createChooser(send, track.name))
                             }
                         },
-                        onSave = {
-                            exporting = track
-                            saveAs.launch(TrackRepository.fileName(track))
-                        },
+                        onSave = { choosingFormat = track },
+                        onEdit = if (track.imported) ({ onEditRoute(track) }) else null,
                         onDelete = { deleting = track },
                         onRename = { renaming = track },
                         onColor = { coloring = track },
@@ -182,6 +203,41 @@ fun TracksScreen(
                 item { Box(Modifier.navigationBarsPadding()) }
             }
         }
+    }
+
+    confirm?.let { ConfirmDialog(it) { confirm = null } }
+
+    choosingFormat?.let { track ->
+        AlertDialog(
+            onDismissRequest = { choosingFormat = null },
+            title = { Text(stringResource(R.string.tracks_save_as)) },
+            text = { Text(stringResource(R.string.tracks_save_as_text)) },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            choosingFormat = null
+                            exporting = track
+                            saveKml.launch(TrackRepository.fileName(track, "kml"))
+                        },
+                        modifier = Modifier.heightIn(min = TouchTarget),
+                    ) { Text(stringResource(R.string.tracks_format_kml)) }
+                    Button(
+                        onClick = {
+                            choosingFormat = null
+                            exporting = track
+                            saveGpx.launch(TrackRepository.fileName(track))
+                        },
+                        modifier = Modifier.heightIn(min = TouchTarget),
+                    ) { Text(stringResource(R.string.tracks_format_gpx)) }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { choosingFormat = null }, modifier = Modifier.heightIn(min = TouchTarget)) {
+                    Text(stringResource(R.string.tracks_cancel))
+                }
+            },
+        )
     }
 
     coloring?.let { track ->
@@ -261,6 +317,8 @@ private fun TrackCard(
     onDelete: () -> Unit,
     onRename: () -> Unit,
     onColor: () -> Unit,
+    /** Null for recorded tracks, which can't be edited. */
+    onEdit: (() -> Unit)?,
     loadProfile: suspend (SavedTrack) -> List<Pair<Double, Double>>,
 ) {
     // Keyed on the climb too: it changes when heights are added to an imported track.
@@ -324,6 +382,11 @@ private fun TrackCard(
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                onEdit?.let {
+                    OutlinedButton(onClick = it, modifier = buttonModifier, contentPadding = padding) {
+                        Text(stringResource(R.string.tracks_edit))
+                    }
+                }
                 OutlinedButton(onClick = onShare, modifier = buttonModifier, contentPadding = padding) {
                     Text(stringResource(R.string.tracks_share))
                 }
@@ -339,3 +402,4 @@ private fun TrackCard(
 }
 
 private const val GPX_MIME = "application/gpx+xml"
+private const val KML_MIME = "application/vnd.google-earth.kml+xml"

@@ -62,6 +62,17 @@ class Route(val points: List<LatLon>) {
     fun reversed(): Route = Route(points.reversed())
 
     /**
+     * Distance from the start to height, at most [maxPoints] of them (evenly picked): what an
+     * elevation profile of the route needs. Empty without heights.
+     */
+    fun profile(maxPoints: Int = 400): List<Pair<Double, Double>> {
+        val all = points.indices.mapNotNull { i -> points[i].ele?.let { cumulative[i] to it } }
+        if (all.size <= maxPoints) return all
+        val step = all.size.toDouble() / maxPoints
+        return List(maxPoints) { all[(it * step).toInt()] } + all.last()
+    }
+
+    /**
      * Nearest point on the route. Where the route passes near itself (out-and-back, loops), the
      * candidate closest to [previousAlong] wins, so the position doesn't jump to the other leg.
      */
@@ -145,11 +156,16 @@ object HikingTime {
  * on route once within [backM]. The two thresholds stop GPS jitter from toggling the alert.
  */
 class OffRouteDetector(
-    private val offM: Double = 50.0,
+    private val offM: Double = OFF_ROUTE_M,
     private val backM: Double = 30.0,
     private val delayMs: Long = 20_000,
 ) {
     enum class Event { OffRoute, BackOnRoute }
+
+    companion object {
+        /** Farther than this from the route is off it. */
+        const val OFF_ROUTE_M = 50.0
+    }
 
     var isOff = false
         private set

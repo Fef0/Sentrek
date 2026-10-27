@@ -59,8 +59,8 @@ class TracksViewModel @Inject constructor(
         viewModelScope.launch { repository.delete(track) }
     }
 
-    fun export(track: SavedTrack, target: Uri, onDone: (Boolean) -> Unit) {
-        viewModelScope.launch { onDone(repository.export(track, target)) }
+    fun export(track: SavedTrack, target: Uri, kml: Boolean, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch { onDone(repository.export(track, target, kml)) }
     }
 
     fun import(uris: List<Uri>, onDone: (ImportResult) -> Unit) {

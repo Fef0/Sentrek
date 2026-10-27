@@ -37,9 +37,18 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[OFF_ROUTE_VIBRATION] = on }
     }
 
+    /** The elevation profile in the follow panel; hidden for more map. */
+    val followProfile: Flow<Boolean> =
+        context.settings.data.map { it[FOLLOW_PROFILE] ?: true }
+
+    suspend fun setFollowProfile(show: Boolean) {
+        context.settings.edit { it[FOLLOW_PROFILE] = show }
+    }
+
     private companion object {
         val SHOW_TRAIL_DIFFICULTY = booleanPreferencesKey("show_trail_difficulty")
         val GLOVE_MODE = booleanPreferencesKey("glove_mode")
         val OFF_ROUTE_VIBRATION = booleanPreferencesKey("off_route_vibration")
+        val FOLLOW_PROFILE = booleanPreferencesKey("follow_profile")
     }
 }

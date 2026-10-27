@@ -11,6 +11,10 @@ import app.sentrek.geo.LatLon
 import app.sentrek.geo.gpx.Gpx
 import app.sentrek.geo.gpx.GpxFile
 import app.sentrek.geo.gpx.GpxWaypoint
+import app.sentrek.geo.gpx.Kml
+import app.sentrek.geo.plan.PlanLeg
+import app.sentrek.geo.plan.PlanPoint
+import app.sentrek.geo.plan.SavedPlan
 import app.sentrek.geo.gpx.TrackFiles
 import app.sentrek.geo.route.Route
 import app.sentrek.geo.track.TrackPoint
@@ -26,6 +30,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.text.DateFormat
@@ -129,7 +134,8 @@ class TrackRepository @Inject constructor(
 
     /**
      * [name]: blank or null uses [defaultName]. [smoothElevation]: heights come from the terrain
-     * model (a planned route), not GPS, so small climbs are real.
+     * model (a planned route), not GPS, so small climbs are real. [plan]: the planner's points
+     * and legs, kept to edit the route again.
      */
     suspend fun save(
         segments: List<List<TrackPoint>>,
@@ -137,6 +143,7 @@ class TrackRepository @Inject constructor(
         waypoints: List<GpxWaypoint> = emptyList(),
         imported: Boolean = false,
         smoothElevation: Boolean = false,
+        plan: SavedPlan? = null,
     ): SavedTrack = withContext(Dispatchers.IO) {
         val threshold = if (smoothElevation) TrackStats.SMOOTH_CLIMB_THRESHOLD_M else TrackStats.CLIMB_THRESHOLD_M
         val stats = TrackStats.of(segments, threshold)
@@ -150,6 +157,7 @@ class TrackRepository @Inject constructor(
             stats.activeMillis, imported, color,
         )
         write(track, segments, waypoints)
+        plan?.let { writePlan(track, it) }
         _tracks.update { (listOf(track) + it).sortedByDescending { t -> t.startTime } }
         track
     }
@@ -230,8 +238,85 @@ class TrackRepository @Inject constructor(
         withContext(Dispatchers.IO) {
             gpxFile(track).delete()
             File(dir, track.id + SUMMARY).delete()
+            File(dir, track.id + PLAN).delete()
         }
         _tracks.update { it - track }
+    }
+
+    /**
+     * Puts an edited route in place of [track]: same id, name and colour, new line and numbers.
+     * Its waypoints stay. Returns the updated track, or null when it couldn't be written.
+     */
+    suspend fun replace(track: SavedTrack, segments: List<List<TrackPoint>>, plan: SavedPlan): SavedTrack? {
+        val updated = withContext(Dispatchers.IO) {
+            runCatching {
+                val waypoints = runCatching { read(track).waypoints }.getOrDefault(emptyList())
+                val stats = TrackStats.of(segments, TrackStats.SMOOTH_CLIMB_THRESHOLD_M)
+                val edited = track.copy(distance = stats.distance, ascent = stats.ascent, descent = stats.descent, duration = 0)
+                write(edited, segments, waypoints)
+                writePlan(edited, plan)
+                edited
+            }.onFailure { Log.w(TAG, "Cannot save edited ${track.id}", it) }.getOrNull()
+        } ?: return null
+        profiles -= track.id
+        _tracks.update { all -> all.map { if (it.id == track.id) updated else it } }
+        if (track.id in _shown.value) show(updated)
+        return updated
+    }
+
+    /**
+     * The route as the planner edits it: the plan saved with it, or one made from its line
+     * (points where it bends). Null for recorded tracks and unreadable files.
+     */
+    suspend fun plan(track: SavedTrack): SavedPlan? {
+        if (!track.imported) return null
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                File(dir, track.id + PLAN).takeIf { it.exists() }?.let { parsePlan(it.readText()) }
+                    ?: SavedPlan.fromLine(read(track).tracks.flatMap { it.segments }.flatten().map(TrackPoint::position))
+            }.onFailure { Log.w(TAG, "Cannot load plan of ${track.id}", it) }.getOrNull()
+        }
+    }
+
+    private fun writePlan(track: SavedTrack, plan: SavedPlan) {
+        val json = JSONObject()
+            .put("points", JSONArray(plan.points.map { JSONArray(listOf(it.position.lat, it.position.lon, it.onTrails)) }))
+            .put(
+                "legs",
+                JSONArray(
+                    plan.legs.map { leg ->
+                        JSONObject()
+                            .put("t", leg.onTrails)
+                            .put("s", leg.offPathStart)
+                            .put("e", leg.offPathEnd)
+                            .put("p", JSONArray(leg.points.map { JSONArray(listOf(it.lat, it.lon)) }))
+                    },
+                ),
+            )
+        File(dir, track.id + PLAN).writeText(json.toString())
+    }
+
+    private fun parsePlan(text: String): SavedPlan {
+        val json = JSONObject(text)
+        val points = json.getJSONArray("points").let { a ->
+            (0 until a.length()).map { i ->
+                val p = a.getJSONArray(i)
+                PlanPoint(LatLon(p.getDouble(0), p.getDouble(1)), p.getBoolean(2))
+            }
+        }
+        val legs = json.getJSONArray("legs").let { a ->
+            (0 until a.length()).map { i ->
+                val leg = a.getJSONObject(i)
+                val p = leg.getJSONArray("p")
+                PlanLeg(
+                    points = (0 until p.length()).map { j -> p.getJSONArray(j).let { LatLon(it.getDouble(0), it.getDouble(1)) } },
+                    onTrails = leg.getBoolean("t"),
+                    offPathStart = leg.optBoolean("s"),
+                    offPathEnd = leg.optBoolean("e"),
+                )
+            }
+        }
+        return SavedPlan(points, legs)
     }
 
     /** Draws [track] on the map; returns its bounds to fly to. */
@@ -310,11 +395,16 @@ class TrackRepository @Inject constructor(
         }.onFailure { Log.w(TAG, "Cannot prepare ${track.id} for sharing", it) }.getOrNull()
     }
 
-    /** Copies the GPX to a user-chosen document (Storage Access Framework). */
-    suspend fun export(track: SavedTrack, target: Uri): Boolean = withContext(Dispatchers.IO) {
+    /** Writes the track to a user-chosen document (Storage Access Framework), as GPX or KML. */
+    suspend fun export(track: SavedTrack, target: Uri, kml: Boolean = false): Boolean = withContext(Dispatchers.IO) {
         runCatching {
             context.contentResolver.openOutputStream(target)?.use { out ->
-                gpxFile(track).inputStream().use { it.copyTo(out) }
+                if (kml) {
+                    val gpx = read(track)
+                    out.bufferedWriter().let { Kml.write(it, track.name, gpx.tracks.flatMap { t -> t.segments }, gpx.waypoints) }
+                } else {
+                    gpxFile(track).inputStream().use { it.copyTo(out) }
+                }
             } ?: error("No output stream")
         }.onFailure { Log.w(TAG, "Export of ${track.id} failed", it) }.isSuccess
     }
@@ -379,11 +469,12 @@ class TrackRepository @Inject constructor(
         private const val TAG = "TrackRepository"
         private const val GPX = ".gpx"
         private const val SUMMARY = ".json"
+        private const val PLAN = ".plan"
         private const val CREATOR = "Sentrek"
 
-        /** "<name>.gpx", without characters that file systems reject (dates contain some). */
-        fun fileName(track: SavedTrack): String =
-            track.name.replace(Regex("""[\\/:*?"<>|,]+"""), "-").trim('-', ' ').ifEmpty { track.id } + ".gpx"
+        /** "<name>.gpx" (or [extension]), without characters that file systems reject (dates contain some). */
+        fun fileName(track: SavedTrack, extension: String = "gpx"): String =
+            track.name.replace(Regex("""[\\/:*?"<>|,]+"""), "-").trim('-', ' ').ifEmpty { track.id } + "." + extension
 
         /** Points kept for a profile: enough for a phone-wide chart. */
         private const val PROFILE_POINTS = 400

@@ -55,6 +55,8 @@ import app.sentrek.map.CellLook
 import app.sentrek.map.MapStyle
 import app.sentrek.map.RegionGridLayer
 import app.sentrek.map.SentrekMap
+import app.sentrek.ui.Confirmation
+import app.sentrek.ui.ConfirmDialog
 import app.sentrek.ui.TouchTarget
 import app.sentrek.ui.MapButton
 import app.sentrek.ui.SentrekIcons
@@ -81,6 +83,7 @@ fun RegionsScreen(
     var style by remember { mutableStateOf<Style?>(null) }
     var view by remember { mutableStateOf<BoundingBox?>(null) }
     var showImported by remember { mutableStateOf(false) }
+    var confirm by remember { mutableStateOf<Confirmation?>(null) }
 
     val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::import)
@@ -157,7 +160,16 @@ fun RegionsScreen(
             importing = importing,
             message = message,
             onDownload = download,
-            onDelete = viewModel::deleteSelected,
+            onDelete = {
+                val count = selection.count { it in regions }
+                confirm = Confirmation(
+                    title = context.resources.getQuantityString(R.plurals.confirm_delete_regions_title, count, count),
+                    text = context.getString(R.string.confirm_delete_regions_text),
+                    confirmLabel = context.getString(R.string.confirm_delete),
+                    destructive = true,
+                    onConfirm = viewModel::deleteSelected,
+                )
+            },
             onClear = viewModel::clearSelection,
             onRetryTrails = viewModel::retryTrails,
             onImport = { pickFile.launch(arrayOf("*/*")) },
@@ -170,10 +182,19 @@ fun RegionsScreen(
         ImportedMapsDialog(
             maps = imported,
             onShow = { viewModel.showImported(it); showImported = false },
-            onDelete = viewModel::deleteImported,
+            onDelete = { map ->
+                confirm = Confirmation(
+                    title = context.getString(R.string.confirm_delete_imported_title),
+                    text = context.getString(R.string.confirm_delete_imported_text, map.name),
+                    confirmLabel = context.getString(R.string.confirm_delete),
+                    destructive = true,
+                    onConfirm = { viewModel.deleteImported(map) },
+                )
+            },
             onDismiss = { showImported = false },
         )
     }
+    confirm?.let { ConfirmDialog(it) { confirm = null } }
 }
 
 /** Visible area, or null when zoomed out too far for the grid to be usable. */

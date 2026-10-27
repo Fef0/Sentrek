@@ -81,6 +81,32 @@ class PlanTest {
     }
 
     @Test
+    fun `an imported line becomes points where it bends, legs keep its shape`() {
+        // North 1.1 km in small steps, then east: one bend.
+        val north = (0..10).map { LatLon(46.0 + it * 0.001, 7.0, 2000.0 + it) }
+        val east = (1..10).map { LatLon(46.01, 7.0 + it * 0.001, 2010.0) }
+        val plan = SavedPlan.fromLine(north + east)
+        assertEquals(listOf(LatLon(46.0, 7.0), LatLon(46.01, 7.0), LatLon(46.01, 7.01)), plan.points.map { it.position })
+        assertEquals(2, plan.legs.size)
+        assertEquals(11, plan.legs[0].points.size)
+        // Heights come from the terrain again when the plan is edited.
+        assertTrue(plan.legs.flatMap { it.points }.all { it.ele == null })
+        assertEquals(plan.points[1].position, plan.legs[1].points.first())
+    }
+
+    @Test
+    fun `reset starts a fresh history`() {
+        val plan = PlanEditor<LatLon>()
+        plan.add(a)
+        plan.reset(listOf(b, c))
+        assertEquals(listOf(b, c), plan.points)
+        assertFalse(plan.canUndo)
+        plan.add(a)
+        plan.undo()
+        assertEquals(listOf(b, c), plan.points)
+    }
+
+    @Test
     fun `terrarium decoding and bilinear sampling`() {
         // 0x80 0x00 0x00 is sea level; each unit of green is a metre.
         assertEquals(0f, Terrarium.decode(0xFF800000.toInt()), 0f)

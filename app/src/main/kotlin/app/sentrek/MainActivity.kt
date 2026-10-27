@@ -13,15 +13,20 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import android.widget.Toast
 import app.sentrek.data.SettingsRepository
 import app.sentrek.geo.BoundingBox
 import app.sentrek.home.DefaultCamera
 import app.sentrek.home.MapScreen
+import app.sentrek.planner.PlannerViewModel
+import app.sentrek.feature.planner.R as PlannerR
 import app.sentrek.maps.RegionsScreen
 import app.sentrek.record.PlacesScreen
 import app.sentrek.record.TrackRepository
@@ -61,6 +66,9 @@ class MainActivity : ComponentActivity() {
                 var camera by rememberSaveable { mutableStateOf(DefaultCamera) }
                 // Area to show once back on the map (e.g. a track chosen in the list).
                 var focus by remember { mutableStateOf<BoundingBox?>(null) }
+                // The planner the map screen uses (same activity-wide instance), to open a route for editing.
+                val planner: PlannerViewModel = hiltViewModel()
+                val scope = rememberCoroutineScope()
                 val toMap = { screen = Screen.Map }
                 SideEffect { volumeKeysZoom = gloves && screen == Screen.Map }
 
@@ -89,6 +97,18 @@ class MainActivity : ComponentActivity() {
                     Screen.Tracks -> TracksScreen(
                         onBack = toMap,
                         onShowOnMap = { box -> focus = box; screen = Screen.Map },
+                        onEditRoute = { track ->
+                            planner.editRoute(track) { opened ->
+                                if (opened) {
+                                    scope.launch {
+                                        focus = tracks.show(track)
+                                        screen = Screen.Map
+                                    }
+                                } else {
+                                    Toast.makeText(this, PlannerR.string.plan_busy, Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        },
                     )
                     Screen.Places -> PlacesScreen(
                         onBack = toMap,

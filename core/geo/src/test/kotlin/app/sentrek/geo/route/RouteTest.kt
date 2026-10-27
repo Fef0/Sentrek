@@ -16,6 +16,21 @@ class RouteTest {
     private fun north(lat: Double, ele: Double? = null) = LatLon(lat, 7.0, ele)
 
     @Test
+    fun `profile runs in the walking direction and is thinned out`() {
+        val route = Route(listOf(north(46.0, 1000.0), north(46.001, 1100.0), north(46.002, 1050.0)))
+        val profile = route.profile()
+        assertEquals(listOf(1000.0, 1100.0, 1050.0), profile.map { it.second })
+        assertEquals(0.0, profile.first().first, 0.0)
+        assertEquals(route.length, profile.last().first, 0.01)
+        assertEquals(listOf(1050.0, 1100.0, 1000.0), route.reversed().profile().map { it.second })
+
+        val long = Route((0..1000).map { north(46.0 + it * 0.0001, it.toDouble()) })
+        assertTrue(long.profile(maxPoints = 100).size <= 101)
+        assertEquals(1000.0, long.profile(maxPoints = 100).last().second, 0.0)
+        assertTrue(Route(listOf(north(46.0), north(46.001))).profile().isEmpty())
+    }
+
+    @Test
     fun `locates along a straight route`() {
         val route = Route(listOf(north(46.0), north(46.001), north(46.002)))
         assertEquals(222.4, route.length, 0.5)

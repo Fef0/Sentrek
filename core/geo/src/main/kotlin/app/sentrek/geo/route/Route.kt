@@ -98,10 +98,11 @@ class Route(val points: List<LatLon>) {
             candidates += RoutePosition(along, offset)
             best = min(best, offset)
         }
-        if (previousAlong == null) return candidates.minBy { it.offset }
-        return candidates
-            .filter { it.offset <= best + SAME_PLACE_M }
-            .minBy { abs(it.along - previousAlong) }
+        val near = candidates.filter { it.offset <= best + SAME_PLACE_M }
+        // No history: where the route passes twice (a loop's start and end, an out-and-back),
+        // assume the walk is just beginning rather than over.
+        if (previousAlong == null) return near.minBy { it.along }
+        return near.minBy { abs(it.along - previousAlong) }
     }
 
     /** Distance, climb and walking time left from [along] to the end. */

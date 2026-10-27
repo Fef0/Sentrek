@@ -53,6 +53,14 @@ class RouteTest {
     }
 
     @Test
+    fun `on a loop, the start wins over the end`() {
+        // North, east, back south-west to the start.
+        val loop = Route(listOf(north(46.0), north(46.002), LatLon(46.002, 7.002), north(46.0)))
+        assertEquals(0.0, loop.locate(LatLon(46.0, 7.00001)).along, 2.0)
+        assertEquals(loop.length, loop.locate(LatLon(46.0, 7.00001), previousAlong = loop.length - 50).along, 2.0)
+    }
+
+    @Test
     fun `remaining distance, climb and time`() {
         // 2 km north climbing 600 m.
         val route = Route(listOf(north(46.0, 1000.0), north(46.009, 1300.0), north(46.018, 1600.0)))

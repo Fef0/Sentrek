@@ -314,7 +314,9 @@ fun MapScreen(
                     BarItem(SentrekIcons.Delete, stringResource(PlannerR.string.plan_remove), planner::removePoint, enabled = plan.points.isNotEmpty()),
                     BarItem(SentrekIcons.Check, stringResource(PlannerR.string.plan_save), { askPlanName = true }, enabled = plan.points.size >= 2),
                     BarItem(SentrekIcons.Close, stringResource(PlannerR.string.plan_close), {
-                        if (plan.points.isEmpty()) planner.close() else askPlanDiscard = true
+                        // Nothing to lose: an empty plan, or a saved route opened and left as it was.
+                        val unchanged = plan.editing != null && !plan.canUndo
+                        if (plan.points.isEmpty() || unchanged) planner.close() else askPlanDiscard = true
                     }),
                 ),
             )

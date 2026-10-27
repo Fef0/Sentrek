@@ -44,6 +44,8 @@ fun TrackSheet(
     onStopFollowing: () -> Unit,
     onColor: (Int) -> Unit,
     onHide: () -> Unit,
+    /** Null for recorded tracks, which can't be edited. */
+    onEdit: (() -> Unit)?,
     onDismiss: () -> Unit,
     /** Elevation profile of the track (see TrackRepository.profile). */
     loadProfile: suspend (SavedTrack) -> List<Pair<Double, Double>>,
@@ -75,6 +77,7 @@ fun TrackSheet(
             } else {
                 Button(onClick = onFollow, modifier = wide) { Text(stringResource(R.string.track_follow)) }
             }
+            onEdit?.let { OutlinedButton(onClick = it, modifier = wide) { Text(stringResource(R.string.track_edit)) } }
             OutlinedButton(onClick = { choosingColor = true }, modifier = wide) { Text(stringResource(R.string.track_color)) }
             OutlinedButton(onClick = onHide, modifier = wide) { Text(stringResource(R.string.track_hide)) }
         }

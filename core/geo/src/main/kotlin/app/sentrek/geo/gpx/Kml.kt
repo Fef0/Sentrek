@@ -5,6 +5,8 @@ import app.sentrek.geo.track.TrackPoint
 import org.xml.sax.Attributes
 import org.xml.sax.helpers.DefaultHandler
 import java.io.InputStream
+import java.io.Writer
+import java.util.Locale
 import javax.xml.parsers.SAXParserFactory
 
 /**
@@ -12,6 +14,37 @@ import javax.xml.parsers.SAXParserFactory
  * become tracks, `Point` placemarks become waypoints; styles and everything else are ignored.
  */
 object Kml {
+    /** A track as KML: one placemark with a line per segment, plus one per waypoint. */
+    fun write(out: Writer, name: String, segments: List<List<TrackPoint>>, waypoints: List<GpxWaypoint> = emptyList()) {
+        out.write("""<?xml version="1.0" encoding="UTF-8"?>""")
+        out.write("\n<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n<Document>\n")
+        out.write("  <name>${escape(name)}</name>\n")
+        out.write("  <Style id=\"route\"><LineStyle><color>ff2f6be8</color><width>4</width></LineStyle></Style>\n")
+        for (w in waypoints) {
+            out.write("  <Placemark>")
+            w.name?.let { out.write("<name>${escape(it)}</name>") }
+            w.note?.takeIf { it.isNotEmpty() }?.let { out.write("<description>${escape(it)}</description>") }
+            out.write("<Point><coordinates>${coordinates(w.position)}</coordinates></Point></Placemark>\n")
+        }
+        out.write("  <Placemark>\n    <name>${escape(name)}</name>\n    <styleUrl>#route</styleUrl>\n    <MultiGeometry>\n")
+        for (segment in segments.filter { it.size >= 2 }) {
+            out.write("      <LineString><tessellate>1</tessellate><coordinates>\n")
+            for (p in segment) out.write("        ${coordinates(p.position)}\n")
+            out.write("      </coordinates></LineString>\n")
+        }
+        out.write("    </MultiGeometry>\n  </Placemark>\n</Document>\n</kml>\n")
+        out.flush()
+    }
+
+    /** `lon,lat[,ele]`, as KML wants them. */
+    private fun coordinates(p: LatLon): String {
+        val ele = p.ele?.let { "," + String.format(Locale.ROOT, "%.1f", it) }.orEmpty()
+        return Gpx.coordinate(p.lon) + "," + Gpx.coordinate(p.lat) + ele
+    }
+
+    private fun escape(s: String): String =
+        s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+
     fun read(input: InputStream): GpxFile {
         val handler = Handler()
         SAXParserFactory.newInstance().apply { isNamespaceAware = true }.newSAXParser().parse(input, handler)

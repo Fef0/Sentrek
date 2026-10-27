@@ -35,7 +35,7 @@ import javax.inject.Inject
 class HomeViewModel @Inject constructor(
     regions: RegionRepository,
     importedMaps: ImportedMapsRepository,
-    settings: SettingsRepository,
+    private val settings: SettingsRepository,
     private val tracks: TrackRepository,
     private val location: LocationRepository,
     private val recorder: RecordingRepository,
@@ -68,6 +68,13 @@ class HomeViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val following: StateFlow<Following?> = follower.state
+
+    val followProfile: StateFlow<Boolean> =
+        settings.followProfile.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setFollowProfile(show: Boolean) {
+        viewModelScope.launch { settings.setFollowProfile(show) }
+    }
 
     val places: StateFlow<List<Place>> = placeRepository.places
 

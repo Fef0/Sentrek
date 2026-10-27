@@ -8,6 +8,8 @@ import app.sentrek.geo.LatLon
 import app.sentrek.geo.plan.PlanEditor
 import app.sentrek.geo.plan.PlanGeometry
 import app.sentrek.geo.plan.PlanLeg
+import app.sentrek.geo.plan.PlanPoint
+import app.sentrek.geo.plan.SavedPlan
 import app.sentrek.geo.plan.TrailGraph
 import app.sentrek.geo.plan.TrailLine
 import app.sentrek.geo.route.HikingTime
@@ -38,9 +40,6 @@ import javax.inject.Inject
 import kotlin.math.cos
 import kotlin.math.max
 
-/** A planned point. [onTrails]: the leg arriving here follows the paths on the map. */
-data class PlanPoint(val position: LatLon, val onTrails: Boolean)
-
 /** Where the planner finds paths to follow: the lines of the map around a box. */
 interface TrailSource {
     suspend fun lines(box: BoundingBox): List<TrailLine>
@@ -60,6 +59,8 @@ data class PlanState(
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
     val followTrails: Boolean = true,
+    /** The saved route being edited; null for a new one. */
+    val editing: SavedTrack? = null,
 ) {
     val positions: List<LatLon> get() = points.map { it.position }
 }
@@ -128,8 +129,37 @@ class PlannerViewModel @Inject constructor(
     }
 
     fun discard() {
-        editor.clear()
+        editor.reset(emptyList())
+        _state.value = _state.value.copy(editing = null)
         publish(selected = null, active = false)
+    }
+
+    /**
+     * Opens a saved route in the planner, with its points and legs as they were. False (and
+     * nothing changes) while another plan with points is open, or for a recorded track.
+     */
+    fun editRoute(track: SavedTrack, onOpened: (Boolean) -> Unit) {
+        if (_state.value.active && _state.value.points.isNotEmpty()) {
+            onOpened(false)
+            return
+        }
+        viewModelScope.launch {
+            val plan = tracks.plan(track)
+            if (plan == null || plan.points.size < 2) {
+                onOpened(false)
+                return@launch
+            }
+            // Legs keep their saved shape until a point at either end moves.
+            plan.points.zipWithNext().zip(plan.legs) { (a, b), leg ->
+                if (b.onTrails && leg.onTrails) routes[a.position to b.position] = leg
+            }
+            edits.withLock {
+                editor.reset(plan.points)
+                _state.value = _state.value.copy(active = true, editing = track, followTrails = true)
+                publish(selected = null)
+            }
+            onOpened(true)
+        }
     }
 
     fun add(p: LatLon) = edit {
@@ -190,19 +220,30 @@ class PlannerViewModel @Inject constructor(
     fun knownLeg(a: LatLon, b: LatLon, onTrails: Boolean): PlanLeg = knownLeg(PlanPoint(a, false), PlanPoint(b, onTrails))
 
     /** Saves the plan as a route in the track list and leaves the planner. */
+    /** Saves the plan as a route (or over the route being edited) and leaves the planner. */
     fun save(name: String, onSaved: (SavedTrack) -> Unit) {
         viewModelScope.launch {
             val legs = legs.value
             if (legs.isEmpty()) return@launch
             val dense = stats.value?.dense?.takeIf { it.size >= 2 } ?: PlanGeometry.densify(join(legs))
-            val track = tracks.save(listOf(dense.map { TrackPoint(it, 0) }), name, imported = true, smoothElevation = true)
-            tracks.show(track)
+            val segments = listOf(dense.map { TrackPoint(it, 0) })
+            val plan = SavedPlan(_state.value.points, legs)
+            val editing = _state.value.editing
+            val track = if (editing != null) {
+                val replaced = tracks.replace(editing, segments, plan) ?: return@launch
+                if (name.isNotBlank() && name.trim() != replaced.name) tracks.rename(replaced, name)
+                tracks.find(replaced.id) ?: replaced
+            } else {
+                tracks.save(segments, name, imported = true, smoothElevation = true, plan = plan).also { tracks.show(it) }
+            }
             discard()
             onSaved(track)
         }
     }
 
-    fun defaultName(): String = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date())
+    /** The name the save dialog starts with: the edited route's, or today's date. */
+    fun defaultName(): String =
+        _state.value.editing?.name ?: DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date())
 
     /** Runs [change] after earlier edits; it returns the point to select afterwards. */
     private fun edit(change: suspend () -> Int?) {

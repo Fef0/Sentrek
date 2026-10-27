@@ -77,6 +77,11 @@ object SentrekIcons {
         icon("Sentrek.Close", "M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z")
     }
 
+    /** Mountains in profile: the elevation profile. */
+    val Profile: ImageVector by lazy {
+        icon("Sentrek.Profile", "M14,6l-3.75,5 2.85,3.8 -1.6,1.2C9.81,13.75 7,10 7,10l-6,8h22L14,6z")
+    }
+
     /** Builds a 24dp Material-style icon from SVG path data. */
     private fun icon(name: String, pathData: String): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f)

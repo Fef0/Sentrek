@@ -37,6 +37,10 @@ data class Following(
     val offset: Double?,
     val offRoute: Boolean,
     val hasElevation: Boolean,
+    /** Distance from the start to height, in the walking direction; empty without heights. */
+    val profile: List<Pair<Double, Double>> = emptyList(),
+    /** Metres along the route to where the user is, or null before the first fix. */
+    val along: Double? = null,
 )
 
 /**
@@ -91,6 +95,7 @@ class FollowRepository @Inject constructor(
             offset = null,
             offRoute = false,
             hasElevation = route!!.hasElevation,
+            profile = route!!.profile(),
         )
         ensureService()
         return true
@@ -140,6 +145,7 @@ class FollowRepository @Inject constructor(
             remaining = r.remaining(position.along),
             offset = position.offset,
             offRoute = detector.isOff,
+            along = position.along,
         )
     }
 

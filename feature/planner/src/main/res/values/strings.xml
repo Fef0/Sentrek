@@ -3,6 +3,8 @@
     <string name="plan_start">Plan a route</string>
     <string name="plan_hint">Tap the map to add points: the route follows the paths between them. Drag a point to move it, or the small dot in the middle of a leg to add one. The path button switches to straight lines (dashed) for off-trail parts.</string>
     <string name="plan_follow_trails">Follow paths</string>
+    <string name="plan_editing">Editing: %s</string>
+    <string name="plan_busy">Finish or close the route you are planning first.</string>
     <string name="plan_distance">Distance</string>
     <string name="plan_ascent">Ascent</string>
     <string name="plan_descent">Descent</string>

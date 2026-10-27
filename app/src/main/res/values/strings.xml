@@ -31,12 +31,15 @@
     <string name="track_stop_following">Stop following</string>
     <string name="track_color">Colour</string>
     <string name="track_hide">Hide from map</string>
+    <string name="track_edit">Edit route</string>
     <string name="follow_off_route">Off route · %s</string>
     <string name="follow_reverse">Reverse</string>
     <string name="follow_stop">Stop</string>
     <string name="follow_distance_left">Left</string>
     <string name="follow_ascent_left">Climb left</string>
     <string name="follow_time_left">Time left</string>
+    <string name="follow_profile">Elevation profile</string>
+    <string name="follow_you_are_here">You are here</string>
     <string name="feature_unnamed">Map feature</string>
     <string name="feature_elevation">Elevation</string>
     <string name="feature_difficulty">Difficulty (SAC)</string>

@@ -26,14 +26,14 @@ import app.sentrek.ui.Format
 
 /** Totals of the route being planned and its elevation profile; a hint until there are two points. */
 @Composable
-fun PlanPanel(stats: PlanStats?, modifier: Modifier = Modifier) {
+fun PlanPanel(stats: PlanStats?, editing: String?, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
         shadowElevation = 4.dp,
     ) {
-        if (stats == null) {
+        if (stats == null && editing == null) {
             Text(
                 stringResource(R.string.plan_hint),
                 style = MaterialTheme.typography.bodyLarge,
@@ -42,6 +42,15 @@ fun PlanPanel(stats: PlanStats?, modifier: Modifier = Modifier) {
             return@Surface
         }
         Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            editing?.let {
+                Text(
+                    stringResource(R.string.plan_editing, it),
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
+            }
+            if (stats == null) return@Column
             Row {
                 Stat(stringResource(R.string.plan_distance), Format.distance(stats.distance), Modifier.weight(1f))
                 Stat(stringResource(R.string.plan_ascent), if (stats.hasElevation) "↑ " + Format.meters(stats.ascent) else "–", Modifier.weight(1f))

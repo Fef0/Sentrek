@@ -118,6 +118,7 @@ fun MapScreen(
     val recording by viewModel.recording.collectAsStateWithLifecycle()
     val shownTracks by viewModel.shownTracks.collectAsStateWithLifecycle()
     val followedRoute by viewModel.following.collectAsStateWithLifecycle()
+    val followProfile by viewModel.followProfile.collectAsStateWithLifecycle()
     val places by viewModel.places.collectAsStateWithLifecycle()
     val plan by planner.state.collectAsStateWithLifecycle()
     val planStats by planner.stats.collectAsStateWithLifecycle()
@@ -244,11 +245,13 @@ fun MapScreen(
                     .padding(end = TouchTarget), // Keep clear of the compass.
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (plan.active) PlanPanel(planStats, Modifier.fillMaxWidth())
+                if (plan.active) PlanPanel(planStats, plan.editing?.name, Modifier.fillMaxWidth())
                 recording?.let { RecordingStats(recording = it, modifier = Modifier.fillMaxWidth()) }
                 followedRoute?.let {
                     FollowPanel(
                         following = it,
+                        showProfile = followProfile,
+                        onToggleProfile = { viewModel.setFollowProfile(!followProfile) },
                         onReverse = viewModel::reverseRoute,
                         onStop = viewModel::stopFollowing,
                         modifier = Modifier.fillMaxWidth(),
@@ -440,6 +443,16 @@ fun MapScreen(
                     pressed = null
                     if (followedRoute?.trackId == track.id) viewModel.stopFollowing()
                     viewModel.hideTrack(track.id)
+                },
+                onEdit = if (track.imported) {
+                    {
+                        pressed = null
+                        planner.editRoute(track) { opened ->
+                            if (!opened) Toast.makeText(context, PlannerR.string.plan_busy, Toast.LENGTH_LONG).show()
+                        }
+                    }
+                } else {
+                    null
                 },
                 onDismiss = { pressed = null },
                 loadProfile = viewModel::trackProfile,

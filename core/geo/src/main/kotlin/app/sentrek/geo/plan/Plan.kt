@@ -2,6 +2,7 @@ package app.sentrek.geo.plan
 
 import app.sentrek.geo.Geo
 import app.sentrek.geo.LatLon
+import app.sentrek.geo.Simplify
 import kotlin.math.ceil
 
 /**
@@ -33,6 +34,13 @@ class PlanEditor<T> {
 
     fun clear() {
         if (points.isNotEmpty()) push(emptyList())
+    }
+
+    /** Starts over from [start] (an existing plan to edit), with nothing to undo. */
+    fun reset(start: List<T>) {
+        history.clear()
+        history += start
+        current = 0
     }
 
     fun undo() {
@@ -77,6 +85,32 @@ data class PlanLeg(
 
     /** Where the handle that inserts a point on this leg goes. */
     val middle: LatLon get() = PlanGeometry.halfway(points)
+}
+
+/** A planned point. [onTrails]: the leg arriving here follows the paths on the map. */
+data class PlanPoint(val position: LatLon, val onTrails: Boolean)
+
+/** A plan as saved with its route, to edit it again: its points and the legs as drawn. */
+data class SavedPlan(val points: List<PlanPoint>, val legs: List<PlanLeg>) {
+    companion object {
+        /**
+         * A plan to edit any line (e.g. an imported route): points where it bends by more
+         * than [toleranceM], and legs that keep the line's exact shape until they are changed.
+         */
+        fun fromLine(line: List<LatLon>, toleranceM: Double = 40.0): SavedPlan {
+            val flat = line.map { it.copy(ele = null) }
+            if (flat.size < 2) return SavedPlan(flat.map { PlanPoint(it, true) }, emptyList())
+            val kept = Simplify.douglasPeucker(
+                DoubleArray(flat.size) { flat[it].lon },
+                DoubleArray(flat.size) { flat[it].lat },
+                toleranceM,
+            )
+            return SavedPlan(
+                points = kept.map { PlanPoint(flat[it], onTrails = true) },
+                legs = kept.toList().zipWithNext { from, to -> PlanLeg(flat.subList(from, to + 1), onTrails = true) },
+            )
+        }
+    }
 }
 
 object PlanGeometry {

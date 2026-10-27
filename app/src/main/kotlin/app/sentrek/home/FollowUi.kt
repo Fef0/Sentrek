@@ -2,9 +2,15 @@ package app.sentrek.home
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -18,12 +24,24 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.sentrek.R
 import app.sentrek.record.Following
+import app.sentrek.ui.ElevationProfile
 import app.sentrek.ui.Format
+import app.sentrek.ui.SentrekIcons
 import app.sentrek.ui.TouchTarget
 
-/** What's left of the followed route; turns red when off route. */
+/**
+ * What's left of the followed route; turns red when off route. With [showProfile], the route's
+ * elevation profile with the user's position on it ([onToggleProfile] hides it for more map).
+ */
 @Composable
-fun FollowPanel(following: Following, onReverse: () -> Unit, onStop: () -> Unit, modifier: Modifier = Modifier) {
+fun FollowPanel(
+    following: Following,
+    showProfile: Boolean,
+    onToggleProfile: () -> Unit,
+    onReverse: () -> Unit,
+    onStop: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val colors = MaterialTheme.colorScheme
     val off = following.offRoute
     Surface(
@@ -43,6 +61,18 @@ fun FollowPanel(following: Following, onReverse: () -> Unit, onStop: () -> Unit,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
+                if (following.profile.size >= 2) {
+                    IconToggleButton(
+                        checked = showProfile,
+                        onCheckedChange = { onToggleProfile() },
+                        modifier = Modifier.size(TouchTarget),
+                        colors = IconButtonDefaults.iconToggleButtonColors(
+                            checkedContainerColor = if (off) colors.onError.copy(alpha = 0.2f) else colors.primaryContainer,
+                        ),
+                    ) {
+                        Icon(SentrekIcons.Profile, contentDescription = stringResource(R.string.follow_profile))
+                    }
+                }
                 TextButton(onClick = onReverse, modifier = Modifier.heightIn(min = TouchTarget)) {
                     Text(stringResource(R.string.follow_reverse), color = if (off) colors.onError else colors.primary)
                 }
@@ -57,6 +87,15 @@ fun FollowPanel(following: Following, onReverse: () -> Unit, onStop: () -> Unit,
                     FollowStat(stringResource(R.string.follow_ascent_left), "↑ " + Format.meters(left.ascent), Modifier.weight(1f))
                 }
                 FollowStat(stringResource(R.string.follow_time_left), Format.duration(left.millis), Modifier.weight(1f))
+            }
+            if (showProfile && following.profile.size >= 2) {
+                ElevationProfile(
+                    profile = following.profile,
+                    here = following.along,
+                    hereLabel = stringResource(R.string.follow_you_are_here),
+                    color = if (off) colors.onError else colors.primary,
+                    modifier = Modifier.fillMaxWidth().height(88.dp).padding(bottom = 8.dp),
+                )
             }
         }
     }

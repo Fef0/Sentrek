@@ -16,11 +16,18 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 
 /** [highlighted]: an ongoing action (e.g. recording), filled with the signal colour. */
-data class BarItem(val icon: ImageVector, val label: String, val onClick: () -> Unit, val highlighted: Boolean = false)
+data class BarItem(
+    val icon: ImageVector,
+    val label: String,
+    val onClick: () -> Unit,
+    val highlighted: Boolean = false,
+    val enabled: Boolean = true,
+)
 
 /**
  * Trekarta-style action bar along the bottom edge: the thumb's natural reach. Every item
@@ -40,7 +47,8 @@ fun BottomBar(items: List<BarItem>, modifier: Modifier = Modifier) {
             for (item in items) {
                 Surface(
                     onClick = item.onClick,
-                    modifier = Modifier.weight(1f).heightIn(min = TouchTarget + 8.dp),
+                    enabled = item.enabled,
+                    modifier = Modifier.weight(1f).heightIn(min = TouchTarget + 8.dp).alpha(if (item.enabled) 1f else 0.38f),
                     shape = RoundedCornerShape(12.dp),
                     color = if (item.highlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
                     contentColor = if (item.highlighted) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,

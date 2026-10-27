@@ -2,6 +2,7 @@ package app.sentrek.geo.route
 
 import app.sentrek.geo.Geo
 import app.sentrek.geo.LatLon
+import app.sentrek.geo.track.TrackStats
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -119,7 +120,7 @@ class Route(val points: List<LatLon>) {
     data class Remaining(val distance: Double, val ascent: Double, val descent: Double, val millis: Long)
 
     private companion object {
-        const val CLIMB_THRESHOLD_M = 3.0
+        const val CLIMB_THRESHOLD_M = TrackStats.SMOOTH_CLIMB_THRESHOLD_M
 
         /** Candidates this much farther than the nearest one still count as "here". */
         const val SAME_PLACE_M = 25.0

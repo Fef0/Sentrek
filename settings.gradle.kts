@@ -24,3 +24,4 @@ include(":core:ui")
 include(":feature:maps")
 
 include(":feature:record")
+include(":feature:planner")

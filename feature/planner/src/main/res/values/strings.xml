@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="plan_start">Plan a route</string>
+    <string name="plan_hint">Tap the map to add points. Drag a point to move it, or the small dot in the middle of a leg to add one.</string>
+    <string name="plan_distance">Distance</string>
+    <string name="plan_ascent">Ascent</string>
+    <string name="plan_descent">Descent</string>
+    <string name="plan_time">Time</string>
+    <string name="plan_no_terrain">No terrain data here yet (offline?): climb and time count distance only.</string>
+    <string name="plan_undo">Undo</string>
+    <string name="plan_redo">Redo</string>
+    <string name="plan_remove">Remove</string>
+    <string name="plan_save">Save</string>
+    <string name="plan_close">Close</string>
+    <string name="plan_save_title">Save route</string>
+    <string name="plan_saved">Saved: %s</string>
+    <string name="plan_discard_title">Discard this route?</string>
+    <string name="plan_discard_text">The points you placed will be lost.</string>
+    <string name="plan_discard">Discard</string>
+    <string name="plan_keep">Keep planning</string>
+</resources>

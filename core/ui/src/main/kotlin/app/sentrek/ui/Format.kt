@@ -21,4 +21,10 @@ object Format {
         val s = total % 60
         return if (h > 0) String.format(Locale.ROOT, "%d:%02d:%02d", h, m, s) else String.format(Locale.ROOT, "%d:%02d", m, s)
     }
+
+    /** An estimated walking time, to the minute: "≈ 3:25 h". Seconds would be false precision. */
+    fun estimate(millis: Long): String {
+        val minutes = ((millis + 30_000) / 60_000).coerceAtLeast(0)
+        return String.format(Locale.ROOT, "≈ %d:%02d h", minutes / 60, minutes % 60)
+    }
 }

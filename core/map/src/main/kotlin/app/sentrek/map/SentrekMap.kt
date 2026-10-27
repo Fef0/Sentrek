@@ -1,5 +1,7 @@
 package app.sentrek.map
 
+import android.annotation.SuppressLint
+import android.view.MotionEvent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -16,20 +18,25 @@ import org.maplibre.android.maps.Style
 
 /**
  * MapLibre map bound to the composition's lifecycle. [onMapReady] runs once the style has loaded.
+ * [onTouch] sees every touch first; returning true keeps it from the map (e.g. to drag a point).
  */
+@SuppressLint("ClickableViewAccessibility") // Taps still reach the map unless onTouch takes them.
 @Composable
 fun SentrekMap(
     style: MapStyle,
     modifier: Modifier = Modifier,
     onMapReady: (MapLibreMap, Style) -> Unit = { _, _ -> },
+    onTouch: ((MotionEvent) -> Boolean)? = null,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val currentOnMapReady = rememberUpdatedState(onMapReady)
+    val currentOnTouch = rememberUpdatedState(onTouch)
 
     val mapView = remember {
         MapView(context).apply {
             onCreate(null)
+            setOnTouchListener { _, event -> currentOnTouch.value?.invoke(event) ?: false }
             getMapAsync { map ->
                 map.uiSettings.apply {
                     // One-finger zoom (double-tap and drag): pinching with gloves is hard.

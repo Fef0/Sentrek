@@ -122,14 +122,19 @@ class TrackRepository @Inject constructor(
 
     fun gpxFile(track: SavedTrack) = File(dir, track.id + GPX)
 
-    /** [name]: blank or null uses [defaultName]. */
+    /**
+     * [name]: blank or null uses [defaultName]. [smoothElevation]: heights come from the terrain
+     * model (a planned route), not GPS, so small climbs are real.
+     */
     suspend fun save(
         segments: List<List<TrackPoint>>,
         name: String?,
         waypoints: List<GpxWaypoint> = emptyList(),
         imported: Boolean = false,
+        smoothElevation: Boolean = false,
     ): SavedTrack = withContext(Dispatchers.IO) {
-        val stats = TrackStats.of(segments)
+        val threshold = if (smoothElevation) TrackStats.SMOOTH_CLIMB_THRESHOLD_M else TrackStats.CLIMB_THRESHOLD_M
+        val stats = TrackStats.of(segments, threshold)
         val start = stats.startTime.takeIf { it > 0 } ?: System.currentTimeMillis()
         val id = uniqueId(start)
         val title = name?.trim()?.takeIf { it.isNotEmpty() } ?: defaultName(start)

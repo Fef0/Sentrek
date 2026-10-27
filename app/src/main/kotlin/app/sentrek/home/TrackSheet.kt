@@ -57,7 +57,7 @@ fun TrackSheet(
             val time = if (track.duration > 0) {
                 Format.duration(track.duration)
             } else {
-                "≈ " + Format.duration(HikingTime.millis(track.distance, track.ascent, track.descent))
+                Format.estimate(HikingTime.millis(track.distance, track.ascent, track.descent))
             }
             Text(
                 "${Format.distance(track.distance)} · $time · ↑ ${Format.meters(track.ascent)} ↓ ${Format.meters(track.descent)}",

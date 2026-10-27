@@ -43,11 +43,13 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import app.sentrek.R
+import app.sentrek.feature.planner.R as PlannerR
 import app.sentrek.feature.record.R as RecordR
 import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.Geo
 import app.sentrek.geo.LatLon
 import app.sentrek.geo.place.Place
+import app.sentrek.geo.plan.PlanGeometry
 import app.sentrek.geo.place.PlaceKind
 import app.sentrek.map.MapFeatureInfo
 import app.sentrek.map.MapFeatures
@@ -55,6 +57,12 @@ import app.sentrek.map.MapLocation
 import app.sentrek.map.MapOverlays
 import app.sentrek.map.MapStyle
 import app.sentrek.map.PlaceLayers
+import app.sentrek.map.PlanLayers
+import app.sentrek.planner.DiscardPlanDialog
+import app.sentrek.planner.PlanGestures
+import app.sentrek.planner.PlanHandle
+import app.sentrek.planner.PlanPanel
+import app.sentrek.planner.PlannerViewModel
 import app.sentrek.map.SentrekMap
 import app.sentrek.map.TrackLayers
 import app.sentrek.record.DeletePlaceDialog
@@ -99,6 +107,7 @@ fun MapScreen(
     /** +1 / -1 zoom steps from the volume keys (glove mode). */
     zoomKeys: Flow<Int>,
     viewModel: HomeViewModel = hiltViewModel(),
+    planner: PlannerViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -109,6 +118,13 @@ fun MapScreen(
     val shownTracks by viewModel.shownTracks.collectAsStateWithLifecycle()
     val followedRoute by viewModel.following.collectAsStateWithLifecycle()
     val places by viewModel.places.collectAsStateWithLifecycle()
+    val plan by planner.state.collectAsStateWithLifecycle()
+    val planStats by planner.stats.collectAsStateWithLifecycle()
+    val planning by rememberUpdatedState(plan.active)
+    // Points while a handle is dragged, before the drop commits them.
+    var planPreview by remember { mutableStateOf<List<LatLon>?>(null) }
+    var askPlanName by remember { mutableStateOf(false) }
+    var askPlanDiscard by remember { mutableStateOf(false) }
     val currentOnCameraChange by rememberUpdatedState(onCameraChange)
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var style by remember { mutableStateOf<Style?>(null) }
@@ -128,6 +144,41 @@ fun MapScreen(
     val pressRadiusPx = with(LocalDensity.current) { LocalTouch.current.pressRadius.toPx() }
     // "Right under the finger": what a fingertip covers, but never wider than the mode's reach.
     val exactPressPx = with(LocalDensity.current) { minOf(LocalTouch.current.pressRadius, 10.dp).toPx() }
+    // Plan handles: the drawn dot plus the mode's reach, never less than a fingertip.
+    val handleReachPx = with(LocalDensity.current) { maxOf(24.dp, LocalTouch.current.pressRadius + 12.dp).toPx() }
+    val touchSlopPx = with(LocalDensity.current) { 8.dp.toPx() }
+    val currentPlan by rememberUpdatedState(plan)
+    val planGestures = remember(handleReachPx) {
+        PlanGestures(
+            hitPx = handleReachPx,
+            slopPx = touchSlopPx,
+            onTap = { handle ->
+                when (handle) {
+                    is PlanHandle.Point -> planner.select(handle.index.takeIf { it != currentPlan.selected })
+                    is PlanHandle.Mid -> planner.insert(handle.index, PlanGeometry.midpoints(currentPlan.points)[handle.index])
+                }
+            },
+            onDrag = { handle, at ->
+                planPreview = currentPlan.points.toMutableList().apply {
+                    when (handle) {
+                        is PlanHandle.Point -> set(handle.index, at)
+                        is PlanHandle.Mid -> add(handle.index + 1, at)
+                    }
+                }
+            },
+            onDrop = { handle, at ->
+                planPreview = null
+                if (at != null) {
+                    when (handle) {
+                        is PlanHandle.Point -> planner.move(handle.index, at)
+                        is PlanHandle.Mid -> planner.insert(handle.index, at)
+                    }
+                }
+            },
+        )
+    }
+    planGestures.map = map
+    planGestures.points = if (plan.active) plan.points else emptyList()
 
     // The user may grant or revoke location in system settings while we're in the background.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { hasLocation = viewModel.hasLocationPermission() }
@@ -177,6 +228,7 @@ fun MapScreen(
                     map = m
                     style = s
                 },
+                onTouch = planGestures::onTouch,
             )
 
             Column(
@@ -187,6 +239,7 @@ fun MapScreen(
                     .padding(end = TouchTarget), // Keep clear of the compass.
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                if (plan.active) PlanPanel(planStats, Modifier.fillMaxWidth())
                 recording?.let { RecordingStats(recording = it, modifier = Modifier.fillMaxWidth()) }
                 followedRoute?.let {
                     FollowPanel(
@@ -205,6 +258,13 @@ fun MapScreen(
                     .padding(end = 12.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                if (!plan.active) {
+                    MapButton(
+                        icon = SentrekIcons.Plan,
+                        contentDescription = stringResource(PlannerR.string.plan_start),
+                        onClick = planner::start,
+                    )
+                }
                 MapButton(
                     icon = SentrekIcons.MyLocation,
                     contentDescription = stringResource(R.string.my_location),
@@ -224,7 +284,19 @@ fun MapScreen(
             }
         }
 
-        BottomBar(
+        if (plan.active) {
+            BottomBar(
+                items = listOf(
+                    BarItem(SentrekIcons.Undo, stringResource(PlannerR.string.plan_undo), planner::undo, enabled = plan.canUndo),
+                    BarItem(SentrekIcons.Redo, stringResource(PlannerR.string.plan_redo), planner::redo, enabled = plan.canRedo),
+                    BarItem(SentrekIcons.Delete, stringResource(PlannerR.string.plan_remove), planner::removePoint, enabled = plan.points.isNotEmpty()),
+                    BarItem(SentrekIcons.Check, stringResource(PlannerR.string.plan_save), { askPlanName = true }, enabled = plan.points.size >= 2),
+                    BarItem(SentrekIcons.Close, stringResource(PlannerR.string.plan_close), {
+                        if (plan.points.isEmpty()) planner.close() else askPlanDiscard = true
+                    }),
+                ),
+            )
+        } else BottomBar(
             items = listOf(
                 BarItem(SentrekIcons.Layers, stringResource(R.string.bar_maps), onOpenMaps),
                 BarItem(SentrekIcons.Tracks, stringResource(R.string.bar_tracks), onOpenTracks),
@@ -253,6 +325,8 @@ fun MapScreen(
     DisposableEffect(map) {
         val m = map ?: return@DisposableEffect onDispose {}
         val onLongPress = MapLibreMap.OnMapLongClickListener { pressedAt ->
+            // While planning, taps add points and long presses do nothing.
+            if (planning) return@OnMapLongClickListener true
             val latLng = pressedAt.wrap()
             val info = MapFeatures.at(m, m.projection.toScreenLocation(pressedAt), latLng, pressRadiusPx, exactPressPx)
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -265,7 +339,17 @@ fun MapScreen(
             true
         }
         m.addOnMapLongClickListener(onLongPress)
-        onDispose { m.removeOnMapLongClickListener(onLongPress) }
+        val onClick = MapLibreMap.OnMapClickListener { at ->
+            if (!planning) return@OnMapClickListener false
+            val p = at.wrap()
+            planner.add(LatLon(p.latitude, p.longitude))
+            true
+        }
+        m.addOnMapClickListener(onClick)
+        onDispose {
+            m.removeOnMapLongClickListener(onLongPress)
+            m.removeOnMapClickListener(onClick)
+        }
     }
 
     // Position on the map while the app is visible; the GPS is off otherwise (unless recording).
@@ -412,6 +496,32 @@ fun MapScreen(
 
     LaunchedEffect(style, rasters, overlays, showDifficulty) {
         style?.let { MapOverlays.sync(it, rasters, overlays, showDifficulty) }
+    }
+
+    LaunchedEffect(style, plan, planPreview) {
+        val s = style ?: return@LaunchedEffect
+        if (plan.active) PlanLayers.sync(s, planPreview ?: plan.points, plan.selected) else PlanLayers.clear(s)
+    }
+
+    if (askPlanName) {
+        TrackNameDialog(
+            title = stringResource(PlannerR.string.plan_save_title),
+            confirmLabel = stringResource(PlannerR.string.plan_save),
+            initial = planner.defaultName(),
+            onConfirm = { name ->
+                askPlanName = false
+                planner.save(name) { saved ->
+                    Toast.makeText(context, context.getString(PlannerR.string.plan_saved, saved.name), Toast.LENGTH_LONG).show()
+                }
+            },
+            onDismiss = { askPlanName = false },
+        )
+    }
+    if (askPlanDiscard) {
+        DiscardPlanDialog(
+            onDiscard = { askPlanDiscard = false; planner.discard() },
+            onDismiss = { askPlanDiscard = false },
+        )
     }
 
     LaunchedEffect(style, places) {

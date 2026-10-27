@@ -12,9 +12,10 @@ data class TrackPoint(val position: LatLon, val time: Long)
  *
  * GPS altitude jitters by ±10 m, so climb is counted with hysteresis: elevation changes only
  * count once they exceed [CLIMB_THRESHOLD_M] from the last reference, which filters the noise
- * without losing real climbs.
+ * without losing real climbs. Terrain-model heights (planned routes) are smooth and use
+ * [SMOOTH_CLIMB_THRESHOLD_M].
  */
-class TrackStats {
+class TrackStats(private val climbThreshold: Double = CLIMB_THRESHOLD_M) {
     var distance = 0.0
         private set
     var ascent = 0.0
@@ -46,7 +47,7 @@ class TrackStats {
             val ref = eleRef
             when {
                 ref == null -> eleRef = ele
-                abs(ele - ref) >= CLIMB_THRESHOLD_M -> {
+                abs(ele - ref) >= climbThreshold -> {
                     if (ele > ref) ascent += ele - ref else descent += ref - ele
                     eleRef = ele
                 }
@@ -62,9 +63,11 @@ class TrackStats {
 
     companion object {
         const val CLIMB_THRESHOLD_M = 8.0
+        const val SMOOTH_CLIMB_THRESHOLD_M = 3.0
 
-        fun of(segments: List<List<TrackPoint>>): TrackStats = TrackStats().apply {
-            for (segment in segments) segment.forEachIndexed { i, p -> add(p, newSegment = i == 0) }
-        }
+        fun of(segments: List<List<TrackPoint>>, climbThreshold: Double = CLIMB_THRESHOLD_M): TrackStats =
+            TrackStats(climbThreshold).apply {
+                for (segment in segments) segment.forEachIndexed { i, p -> add(p, newSegment = i == 0) }
+            }
     }
 }

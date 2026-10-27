@@ -11,7 +11,6 @@ import app.sentrek.maps.TrailsDownload
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.io.File
@@ -23,13 +22,16 @@ class HomeViewModel @Inject constructor(
     importedMaps: ImportedMapsRepository,
     settings: SettingsRepository,
 ) : ViewModel() {
-    /** Trail overlay files to draw, by cell id; empty when the user turned them off. */
-    val trailFiles: StateFlow<Map<String, File>> =
-        combine(regions.state, settings.showTrailDifficulty) { all, show ->
-            if (!show) return@combine emptyMap()
+    /** Hiking overlay files to draw (trail difficulty + points), by cell id. */
+    val overlays: StateFlow<Map<String, File>> = regions.state
+        .map { all ->
             all.values.filter { it.trails == TrailsDownload.Ready }
                 .associate { it.cell.id to regions.trailFile(it.cell) }
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    val showDifficulty: StateFlow<Boolean> =
+        settings.showTrailDifficulty.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     val rasters: StateFlow<List<RasterOverlay>> = importedMaps.maps
         .map { maps -> maps.map(ImportedMap::overlay) }

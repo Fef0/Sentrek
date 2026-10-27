@@ -131,7 +131,7 @@ fun RegionsScreen(
         }
 
         LaunchedEffect(style, imported) {
-            style?.let { MapOverlays.sync(it, imported.map(ImportedMap::overlay), emptyMap()) }
+            style?.let { MapOverlays.sync(it, imported.map(ImportedMap::overlay), emptyMap(), showDifficulty = false) }
         }
 
         LaunchedEffect(map, flyTo) {

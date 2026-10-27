@@ -1,7 +1,7 @@
 package app.sentrek.maps
 
 import app.sentrek.geo.BoundingBox
-import app.sentrek.geo.trails.OverpassTrails
+import app.sentrek.geo.overlay.OverpassOverlay
 import app.sentrek.map.MapEngine
 import dagger.Binds
 import dagger.Module
@@ -17,9 +17,9 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
-/** Where trail difficulty data comes from. Swapped for our own static files before public release. */
+/** Where the hiking overlay (trail difficulty + points) comes from. Swapped for our own static files before public release. */
 interface TrailOverlaySource {
-    /** Writes the trail overlay GeoJSON for [box] to [out]. */
+    /** Writes the overlay GeoJSON for [box] to [out]. */
     suspend fun fetch(box: BoundingBox, out: File)
 }
 
@@ -53,12 +53,12 @@ class OverpassTrailSource @Inject constructor() : TrailOverlaySource {
     private fun request(endpoint: String, box: BoundingBox, out: File) {
         val request = Request.Builder()
             .url(endpoint)
-            .post(FormBody.Builder().add("data", OverpassTrails.query(box)).build())
+            .post(FormBody.Builder().add("data", OverpassOverlay.query(box)).build())
             .build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw IOException("$endpoint: HTTP ${response.code}")
             val tmp = File(out.path + ".tmp")
-            tmp.bufferedWriter().use { writer -> OverpassTrails.convert(response.body!!.charStream(), writer) }
+            tmp.bufferedWriter().use { writer -> OverpassOverlay.convert(response.body!!.charStream(), writer) }
             if (!tmp.renameTo(out)) throw IOException("Cannot write ${out.name}")
         }
     }

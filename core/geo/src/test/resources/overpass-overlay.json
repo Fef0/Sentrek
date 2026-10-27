@@ -7,7 +7,7 @@
  },
  "elements": [
   {
-   "type": "way",
+   "type": "trail",
    "id": 8233525,
    "geometry": {
     "type": "LineString",
@@ -44,7 +44,7 @@
    }
   },
   {
-   "type": "way",
+   "type": "trail",
    "id": 23400013,
    "geometry": {
     "type": "LineString",
@@ -65,7 +65,7 @@
    }
   },
   {
-   "type": "way",
+   "type": "trail",
    "id": 26115564,
    "geometry": {
     "type": "LineString",
@@ -99,6 +99,46 @@
    "tags": {
     "sac": "mountain_hiking",
     "vis": "good"
+   }
+  },
+  {
+   "type": "poi",
+   "id": 1,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     7.70001,
+     45.95001
+    ]
+   },
+   "tags": {
+    "natural": "cave_entrance",
+    "tourism": "",
+    "historic": "",
+    "man_made": "",
+    "amenity": "",
+    "emergency": "",
+    "name": "Grotta \"del\" Lupo"
+   }
+  },
+  {
+   "type": "poi",
+   "id": 2,
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     7.658591,
+     45.976331
+    ]
+   },
+   "tags": {
+    "natural": "peak",
+    "tourism": "",
+    "historic": "",
+    "man_made": "cross",
+    "amenity": "",
+    "emergency": "",
+    "name": ""
    }
   }
  ]

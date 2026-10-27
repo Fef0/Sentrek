@@ -25,6 +25,7 @@ dependencies {
     api(project(":core:geo"))
     api(libs.maplibre.android)
     implementation(libs.okhttp)
+    implementation(libs.androidx.core.ktx)
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.androidx.lifecycle.runtime.compose)

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- From OpenStreetMap Carto symbols/historic/shrine.svg (CC0 1.0). Generated; do not edit by hand. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="14"
+    android:viewportHeight="14">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M 7 0 L 5 3 L 5 12 L 9 12 L 9 3 L 7 0 z M 7 3.9980469 A 1 1 0 0 1 8 4.9980469 A 1 1 0 0 0 8 5 L 8 8 L 6 8 L 6 5 A 1 1 0 0 0 6 4.9980469 A 1 1 0 0 1 7 3.9980469 z M 4 13 L 4 14 L 10 14 L 10 13 L 4 13 z" />
+</vector>

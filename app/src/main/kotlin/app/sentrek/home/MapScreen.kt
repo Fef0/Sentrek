@@ -49,7 +49,8 @@ fun MapScreen(
     onOpenSettings: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
-    val trailFiles by viewModel.trailFiles.collectAsStateWithLifecycle()
+    val overlays by viewModel.overlays.collectAsStateWithLifecycle()
+    val showDifficulty by viewModel.showDifficulty.collectAsStateWithLifecycle()
     val rasters by viewModel.rasters.collectAsStateWithLifecycle()
     val currentOnCameraChange by rememberUpdatedState(onCameraChange)
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
@@ -102,7 +103,7 @@ fun MapScreen(
         onDispose { m.removeOnCameraIdleListener(onIdle) }
     }
 
-    LaunchedEffect(style, rasters, trailFiles) {
-        style?.let { MapOverlays.sync(it, rasters, trailFiles) }
+    LaunchedEffect(style, rasters, overlays, showDifficulty) {
+        style?.let { MapOverlays.sync(it, rasters, overlays, showDifficulty) }
     }
 }

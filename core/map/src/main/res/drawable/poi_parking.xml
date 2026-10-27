@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- From OpenStreetMap Carto symbols/amenity/parking.svg (CC0 1.0). Generated; do not edit by hand. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="12"
+    android:viewportHeight="12">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="m2,0 v12 h1.75 v-5 h4.25 a3,3.5 0 0 0 0,-7 z m1.75,1.75 h3.75 a1.58,1.75 0 0 1 0,3.5 h-3.75 z" />
+</vector>

@@ -694,115 +694,11 @@
    }
   },
   {
-   "id": "poi-other-dot",
-   "type": "circle",
-   "source": "openmaptiles",
-   "source-layer": "poi",
-   "filter": [
-    "match",
-    [
-     "get",
-     "subclass"
-    ],
-    [
-     "restaurant",
-     "bar",
-     "cafe",
-     "hotel",
-     "hostel",
-     "guest_house",
-     "station",
-     "parking",
-     "toilets",
-     "picnic_site",
-     "guidepost",
-     "chalet"
-    ],
-    true,
-    false
-   ],
-   "minzoom": 14,
-   "paint": {
-    "circle-radius": 3.5,
-    "circle-color": [
-     "match",
-     [
-      "get",
-      "subclass"
-     ],
-     "guidepost",
-     "#c0262d",
-     "station",
-     "#333333",
-     "#6d6d6d"
-    ],
-    "circle-stroke-color": "#ffffff",
-    "circle-stroke-width": 1
-   }
-  },
-  {
-   "id": "poi-other-label",
+   "id": "poi-hiking",
    "type": "symbol",
    "source": "openmaptiles",
    "source-layer": "poi",
-   "filter": [
-    "all",
-    [
-     "match",
-     [
-      "get",
-      "subclass"
-     ],
-     [
-      "restaurant",
-      "bar",
-      "cafe",
-      "hotel",
-      "hostel",
-      "guest_house",
-      "station",
-      "parking",
-      "toilets",
-      "picnic_site",
-      "guidepost",
-      "chalet"
-     ],
-     true,
-     false
-    ],
-    [
-     "has",
-     "name"
-    ]
-   ],
-   "minzoom": 15,
-   "layout": {
-    "text-field": [
-     "get",
-     "name"
-    ],
-    "text-font": [
-     "Noto Sans Regular"
-    ],
-    "text-size": 11,
-    "text-anchor": "top",
-    "text-offset": [
-     0,
-     0.5
-    ],
-    "text-optional": true
-   },
-   "paint": {
-    "text-color": "#444444",
-    "text-halo-color": "#ffffff",
-    "text-halo-width": 1.5
-   }
-  },
-  {
-   "id": "poi-outdoor-dot",
-   "type": "circle",
-   "source": "openmaptiles",
-   "source-layer": "poi",
+   "minzoom": 12,
    "filter": [
     "match",
     [
@@ -813,67 +709,52 @@
      "alpine_hut",
      "wilderness_hut",
      "shelter",
-     "drinking_water",
-     "spring",
-     "viewpoint",
      "camp_site",
-     "information"
-    ],
-    true,
-    false
-   ],
-   "paint": {
-    "circle-radius": 5,
-    "circle-color": [
-     "match",
-     [
-      "get",
-      "subclass"
-     ],
-     [
-      "alpine_hut",
-      "wilderness_hut",
-      "shelter"
-     ],
-     "#b5462b",
-     [
-      "drinking_water",
-      "spring"
-     ],
-     "#1f78c8",
-     "viewpoint",
-     "#2e7d32",
-     "#5b3a12"
-    ],
-    "circle-stroke-color": "#ffffff",
-    "circle-stroke-width": 1.5
-   }
-  },
-  {
-   "id": "poi-outdoor-label",
-   "type": "symbol",
-   "source": "openmaptiles",
-   "source-layer": "poi",
-   "filter": [
-    "match",
-    [
-     "get",
-     "subclass"
-    ],
-    [
-     "alpine_hut",
-     "wilderness_hut",
-     "shelter",
      "drinking_water",
-     "spring",
      "viewpoint",
-     "camp_site",
-     "information"
+     "castle",
+     "ruins",
+     "monument",
+     "guidepost",
+     "board",
+     "map"
     ],
     true,
     false
    ],
    "layout": {
+    "icon-image": [
+     "match",
+     [
+      "get",
+      "subclass"
+     ],
+     "alpine_hut",
+     "poi-alpine_hut",
+     "wilderness_hut",
+     "poi-wilderness_hut",
+     "shelter",
+     "poi-shelter",
+     "camp_site",
+     "poi-camping",
+     "drinking_water",
+     "poi-drinking_water",
+     "viewpoint",
+     "poi-viewpoint",
+     "castle",
+     "poi-castle",
+     "ruins",
+     "poi-archaeological_site",
+     "monument",
+     "poi-monument",
+     "guidepost",
+     "poi-guidepost",
+     "board",
+     "poi-board",
+     "map",
+     "poi-board",
+     ""
+    ],
     "text-field": [
      "coalesce",
      [
@@ -885,47 +766,166 @@
     "text-font": [
      "Noto Sans Bold"
     ],
-    "text-size": 13,
+    "text-size": 12,
     "text-anchor": "top",
     "text-offset": [
      0,
-     0.6
+     1.1
     ],
     "text-optional": true
    },
    "paint": {
-    "text-color": "#5b3a12",
+    "text-color": "#3b2a1a",
     "text-halo-color": "#ffffff",
     "text-halo-width": 1.8
    }
   },
   {
-   "id": "peak-dot",
-   "type": "circle",
+   "id": "poi-landmarks",
+   "type": "symbol",
    "source": "openmaptiles",
-   "source-layer": "mountain_peak",
+   "source-layer": "poi",
+   "minzoom": 14,
    "filter": [
     "match",
     [
      "get",
-     "class"
+     "subclass"
     ],
     [
-     "peak",
-     "volcano"
+     "place_of_worship",
+     "chalet",
+     "picnic_site"
     ],
     true,
     false
    ],
+   "layout": {
+    "icon-image": [
+     "match",
+     [
+      "get",
+      "subclass"
+     ],
+     "place_of_worship",
+     "poi-place_of_worship",
+     "chalet",
+     "poi-chalet",
+     "picnic_site",
+     "poi-picnic",
+     ""
+    ],
+    "text-field": [
+     "coalesce",
+     [
+      "get",
+      "name"
+     ],
+     ""
+    ],
+    "text-font": [
+     "Noto Sans Bold"
+    ],
+    "text-size": 12,
+    "text-anchor": "top",
+    "text-offset": [
+     0,
+     1.1
+    ],
+    "text-optional": true
+   },
    "paint": {
-    "circle-radius": 4,
-    "circle-color": "#3b2a1a",
-    "circle-stroke-color": "#ffffff",
-    "circle-stroke-width": 1.5
+    "text-color": "#3b2a1a",
+    "text-halo-color": "#ffffff",
+    "text-halo-width": 1.8
    }
   },
   {
-   "id": "peak-label",
+   "id": "poi-detail",
+   "type": "symbol",
+   "source": "openmaptiles",
+   "source-layer": "poi",
+   "minzoom": 15,
+   "filter": [
+    "match",
+    [
+     "get",
+     "subclass"
+    ],
+    [
+     "restaurant",
+     "cafe",
+     "bar",
+     "pub",
+     "biergarten",
+     "hotel",
+     "hostel",
+     "guest_house",
+     "motel",
+     "parking",
+     "toilets"
+    ],
+    true,
+    false
+   ],
+   "layout": {
+    "icon-image": [
+     "match",
+     [
+      "get",
+      "subclass"
+     ],
+     "restaurant",
+     "poi-restaurant",
+     "cafe",
+     "poi-cafe",
+     "bar",
+     "poi-bar",
+     "pub",
+     "poi-bar",
+     "biergarten",
+     "poi-bar",
+     "hotel",
+     "poi-hotel",
+     "hostel",
+     "poi-hotel",
+     "guest_house",
+     "poi-hotel",
+     "motel",
+     "poi-hotel",
+     "parking",
+     "poi-parking",
+     "toilets",
+     "poi-toilets",
+     ""
+    ],
+    "text-field": [
+     "coalesce",
+     [
+      "get",
+      "name"
+     ],
+     ""
+    ],
+    "text-font": [
+     "Noto Sans Bold"
+    ],
+    "text-size": 12,
+    "text-anchor": "top",
+    "text-offset": [
+     0,
+     1.1
+    ],
+    "text-optional": true
+   },
+   "paint": {
+    "text-color": "#3b2a1a",
+    "text-halo-color": "#ffffff",
+    "text-halo-width": 1.8
+   }
+  },
+  {
+   "id": "peak",
    "type": "symbol",
    "source": "openmaptiles",
    "source-layer": "mountain_peak",
@@ -937,12 +937,24 @@
     ],
     [
      "peak",
-     "volcano"
+     "volcano",
+     "saddle"
     ],
     true,
     false
    ],
    "layout": {
+    "icon-image": [
+     "match",
+     [
+      "get",
+      "class"
+     ],
+     "saddle",
+     "poi-saddle",
+     "poi-peak"
+    ],
+    "icon-size": 0.85,
     "text-field": [
      "concat",
      [
@@ -981,8 +993,9 @@
     "text-anchor": "top",
     "text-offset": [
      0,
-     0.5
-    ]
+     1.0
+    ],
+    "text-optional": true
    },
    "paint": {
     "text-color": "#3b2a1a",

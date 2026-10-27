@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- From OpenStreetMap Carto symbols/tourism/camping.svg (CC0 1.0). Generated; do not edit by hand. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="14"
+    android:viewportHeight="14">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M 14,14 8.000001,2.9999992 9.000001,0 l -1,0 -1,1.9999995 L 6,0 5,0 6,2.9999992 0,14 z m -6.999999,-7.0000008 3,6.0000018 -6.000001,0 z" />
+</vector>

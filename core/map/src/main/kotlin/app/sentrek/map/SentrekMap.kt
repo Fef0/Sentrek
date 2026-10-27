@@ -38,6 +38,7 @@ fun SentrekMap(
                     isLogoEnabled = false
                 }
                 map.setStyle(Style.Builder().fromUri(style.uri)) { loaded ->
+                    MapIcons.install(context, loaded)
                     currentOnMapReady.value(map, loaded)
                 }
             }

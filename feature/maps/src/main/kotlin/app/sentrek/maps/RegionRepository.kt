@@ -51,7 +51,11 @@ class RegionRepository @Inject constructor(
 ) {
     private val offline = OfflineManager.getInstance(context)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val trailsDir = File(context.filesDir, "trails").apply { mkdirs() }
+    private val trailsDir = File(context.filesDir, "trails").apply {
+        mkdirs()
+        // Older formats are refetched: restore() treats a missing file as "to download".
+        listFiles { f -> !f.name.endsWith(OVERLAY_SUFFIX) }?.forEach { it.delete() }
+    }
     private val trailsLock = Mutex()
 
     private val regions = HashMap<RegionCell, OfflineRegion>()
@@ -70,7 +74,7 @@ class RegionRepository @Inject constructor(
         })
     }
 
-    fun trailFile(cell: RegionCell): File = File(trailsDir, "${cell.id}.geojson")
+    fun trailFile(cell: RegionCell): File = File(trailsDir, cell.id + OVERLAY_SUFFIX)
 
     fun download(cells: Collection<RegionCell>) {
         for (cell in cells) {
@@ -231,5 +235,8 @@ class RegionRepository @Inject constructor(
 
     private companion object {
         const val TAG = "RegionRepository"
+
+        /** Bump when the overlay file format changes (v2: points, v3: huts, v4: all hiking points). */
+        const val OVERLAY_SUFFIX = ".v4.geojson"
     }
 }

@@ -1,6 +1,20 @@
 package app.sentrek.maps
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.text.format.Formatter
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.core.content.ContextCompat
+import app.sentrek.map.MapOverlays
+import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLngBounds
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,18 +63,38 @@ import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
 import kotlin.math.roundToInt
 
-/** Trekarta-style picker: tap grid squares, then download or delete them. */
+/** Trekarta-style picker: tap grid squares, then download or delete them; import map files. */
 @Composable
 fun RegionsScreen(
     initialCamera: CameraPosition?,
     onBack: () -> Unit,
     viewModel: RegionsViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val regions by viewModel.regions.collectAsStateWithLifecycle()
     val selection by viewModel.selection.collectAsStateWithLifecycle()
+    val imported by viewModel.imported.collectAsStateWithLifecycle()
+    val importing by viewModel.importing.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
+    val flyTo by viewModel.flyTo.collectAsStateWithLifecycle()
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var style by remember { mutableStateOf<Style?>(null) }
     var view by remember { mutableStateOf<BoundingBox?>(null) }
+    var showImported by remember { mutableStateOf(false) }
+
+    val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::import)
+    }
+    // Without it the download still runs, only the progress notification is hidden.
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    val download = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        viewModel.downloadSelected()
+    }
 
     Box(Modifier.fillMaxSize()) {
         SentrekMap(
@@ -96,6 +130,17 @@ fun RegionsScreen(
             RegionGridLayer.update(s, view, cellLooks(regions, selection))
         }
 
+        LaunchedEffect(style, imported) {
+            style?.let { MapOverlays.sync(it, imported.map(ImportedMap::overlay), emptyMap()) }
+        }
+
+        LaunchedEffect(map, flyTo) {
+            val m = map ?: return@LaunchedEffect
+            val box = flyTo ?: return@LaunchedEffect
+            m.animateCamera(CameraUpdateFactory.newLatLngBounds(LatLngBounds.from(box.north, box.east, box.south, box.west), 80))
+            viewModel.flyToHandled()
+        }
+
         MapButton(
             icon = SentrekIcons.Back,
             contentDescription = stringResource(R.string.regions_back),
@@ -107,11 +152,25 @@ fun RegionsScreen(
             regions = regions,
             selection = selection,
             zoomedIn = view != null,
-            onDownload = viewModel::downloadSelected,
+            importedCount = imported.size,
+            importing = importing,
+            message = message,
+            onDownload = download,
             onDelete = viewModel::deleteSelected,
             onClear = viewModel::clearSelection,
             onRetryTrails = viewModel::retryTrails,
+            onImport = { pickFile.launch(arrayOf("*/*")) },
+            onShowImported = { showImported = true },
             modifier = Modifier.align(Alignment.BottomCenter),
+        )
+    }
+
+    if (showImported) {
+        ImportedMapsDialog(
+            maps = imported,
+            onShow = { viewModel.showImported(it); showImported = false },
+            onDelete = viewModel::deleteImported,
+            onDismiss = { showImported = false },
         )
     }
 }
@@ -150,10 +209,15 @@ private fun RegionsPanel(
     regions: Map<RegionCell, RegionState>,
     selection: Set<RegionCell>,
     zoomedIn: Boolean,
+    importedCount: Int,
+    importing: Boolean,
+    @StringRes message: Int?,
     onDownload: () -> Unit,
     onDelete: () -> Unit,
     onClear: () -> Unit,
     onRetryTrails: () -> Unit,
+    onImport: () -> Unit,
+    onShowImported: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -174,6 +238,7 @@ private fun RegionsPanel(
         ) {
             val status = when {
                 selection.isNotEmpty() -> pluralStringResource(R.plurals.regions_selected, selection.size, selection.size)
+                importing -> stringResource(R.string.import_running)
                 !zoomedIn -> stringResource(R.string.regions_zoom_in)
                 pending > 0 -> pluralStringResource(R.plurals.regions_downloading, regions.size, regions.size - pending, regions.size)
                 regions.isNotEmpty() ->
@@ -181,6 +246,10 @@ private fun RegionsPanel(
                 else -> stringResource(R.string.regions_hint)
             }
             Text(status, style = MaterialTheme.typography.titleMedium)
+
+            message?.let {
+                Text(stringResource(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
+            }
 
             if (selection.isNotEmpty()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -196,7 +265,10 @@ private fun RegionsPanel(
                         Text(stringResource(R.string.regions_clear))
                     }
                 }
-            } else if (trailsFailed > 0) {
+                return@Column
+            }
+
+            if (trailsFailed > 0) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
                         pluralStringResource(R.plurals.regions_trails_failed, trailsFailed, trailsFailed),
@@ -208,8 +280,74 @@ private fun RegionsPanel(
                     }
                 }
             }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(
+                    onClick = onImport,
+                    enabled = !importing,
+                    modifier = Modifier.weight(1f).heightIn(min = GloveTarget),
+                ) {
+                    Text(stringResource(R.string.regions_import))
+                }
+                if (importedCount > 0) {
+                    OutlinedButton(
+                        onClick = onShowImported,
+                        modifier = Modifier.weight(1f).heightIn(min = GloveTarget),
+                    ) {
+                        Text(pluralStringResource(R.plurals.regions_imported, importedCount, importedCount))
+                    }
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun ImportedMapsDialog(
+    maps: List<ImportedMap>,
+    onShow: (ImportedMap) -> Unit,
+    onDelete: (ImportedMap) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.imported_title)) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                for (map in maps) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(map.name, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(
+                                R.string.imported_zooms, map.info.minZoom, map.info.maxZoom,
+                                Formatter.formatShortFileSize(context, map.file.length()),
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            if (map.info.bounds != null) {
+                                OutlinedButton(onClick = { onShow(map) }, modifier = Modifier.heightIn(min = GloveTarget)) {
+                                    Text(stringResource(R.string.imported_show))
+                                }
+                            }
+                            OutlinedButton(onClick = { onDelete(map) }, modifier = Modifier.heightIn(min = GloveTarget)) {
+                                Text(stringResource(R.string.imported_delete), color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = GloveTarget)) {
+                Text(stringResource(R.string.imported_close))
+            }
+        },
+    )
 }
 
 @Composable

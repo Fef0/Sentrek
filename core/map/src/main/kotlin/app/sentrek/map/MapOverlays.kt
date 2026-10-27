@@ -17,36 +17,51 @@ import org.maplibre.android.style.layers.PropertyFactory.lineCap
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
 import org.maplibre.android.style.layers.PropertyFactory.lineDasharray
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
+import org.maplibre.android.style.layers.RasterLayer
 import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.android.style.sources.RasterSource
 import java.io.File
 import java.net.URI
 
+/** A raster map file imported by the user, e.g. `mbtiles:///…` or `pmtiles://file:///…`. */
+data class RasterOverlay(val id: String, val url: String)
+
 /**
- * Trail difficulty overlay: one GeoJSON file per downloaded region cell, drawn over the
- * base `path` layer. Colours follow Swiss waymarking: T1 yellow, T2–T3 red-white-red,
- * T4–T6 blue-white-blue. Faint trails get sparser dashes.
+ * Layers Sentrek adds on top of the base style, always in this order (bottom to top),
+ * and all below the base labels so names stay readable:
+ * 1. imported raster maps,
+ * 2. trail difficulty, one GeoJSON file per downloaded cell. Colours follow Swiss waymarking:
+ *    T1 yellow, T2–T3 red-white-red, T4–T6 blue-white-blue. Faint trails get sparser dashes.
  */
-object TrailOverlay {
-    private const val PREFIX = "trails-"
+object MapOverlays {
+    private const val RASTER = "import-"
+    private const val TRAILS = "trails-"
     private const val CLEAR = "-clear"
     private const val FAINT = "-faint"
 
-    /** First label layer of the hiking style: overlays go below it so names stay readable. */
+    /** First label layer of the hiking style. */
     private const val BELOW_LAYER = "water-name"
 
-    /** Makes the style show exactly the overlays in [files] (cell id → GeoJSON file). */
-    fun sync(style: Style, files: Map<String, File>) {
-        val present = style.sources.map { it.id }.filter { it.startsWith(PREFIX) }.map { it.removePrefix(PREFIX) }.toSet()
-        for (id in present - files.keys) {
-            style.removeLayer(PREFIX + id + CLEAR)
-            style.removeLayer(PREFIX + id + FAINT)
-            style.removeSource(PREFIX + id)
+    fun sync(style: Style, rasters: List<RasterOverlay>, trails: Map<String, File>) {
+        // Layers are cheap to rebuild and that keeps the order right; sources (parsed
+        // GeoJSON, open tile files) are kept whenever possible.
+        style.layers.filter { it.id.startsWith(RASTER) || it.id.startsWith(TRAILS) }.forEach { style.removeLayer(it) }
+
+        val wanted = rasters.map { RASTER + it.id }.toSet() + trails.keys.map { TRAILS + it }
+        style.sources.filter { (it.id.startsWith(RASTER) || it.id.startsWith(TRAILS)) && it.id !in wanted }
+            .forEach { style.removeSource(it) }
+
+        for (raster in rasters) {
+            val sourceId = RASTER + raster.id
+            if (style.getSource(sourceId) == null) style.addSource(RasterSource(sourceId, raster.url, 256))
+            style.addLayerBelow(RasterLayer(sourceId, sourceId), BELOW_LAYER)
         }
-        for ((id, file) in files) {
-            if (id in present) continue
-            val sourceId = PREFIX + id
-            // MapLibre needs "file://" + absolute path; File.toURI() yields "file:/..." which it rejects.
-            style.addSource(GeoJsonSource(sourceId, URI("file://${file.absolutePath}")))
+        for ((id, file) in trails) {
+            val sourceId = TRAILS + id
+            if (style.getSource(sourceId) == null) {
+                // MapLibre needs "file://" + absolute path; File.toURI() yields "file:/…", which it rejects.
+                style.addSource(GeoJsonSource(sourceId, URI("file://${file.absolutePath}")))
+            }
             // Visibility 0 (unknown) to 3 (intermediate) is a trail you can follow.
             style.addLayerBelow(trailLayer(sourceId, sourceId + CLEAR, faint = false), BELOW_LAYER)
             style.addLayerBelow(trailLayer(sourceId, sourceId + FAINT, faint = true), BELOW_LAYER)

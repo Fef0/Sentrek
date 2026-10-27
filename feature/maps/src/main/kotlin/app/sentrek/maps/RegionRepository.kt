@@ -97,6 +97,7 @@ class RegionRepository @Inject constructor(
             })
             if (!trailFile(cell).exists()) fetchTrails(cell)
         }
+        ensureService()
     }
 
     fun delete(cells: Collection<RegionCell>) {
@@ -135,7 +136,10 @@ class RegionRepository @Inject constructor(
             }
             regions[cell] = region
             put(RegionState(cell, MapDownload.Queued, trailsStateOnDisk(cell)))
-            if (!trailFile(cell).exists()) fetchTrails(cell)
+            if (!trailFile(cell).exists()) {
+                fetchTrails(cell)
+                ensureService()
+            }
             region.getStatus(object : OfflineRegion.OfflineRegionStatusCallback {
                 override fun onStatus(status: OfflineRegionStatus?) {
                     if (status?.isComplete == true) {
@@ -144,6 +148,7 @@ class RegionRepository @Inject constructor(
                         // Interrupted last time (app killed): resume.
                         queue.addLast(cell)
                         pump()
+                        ensureService()
                     }
                 }
 
@@ -200,6 +205,15 @@ class RegionRepository @Inject constructor(
                 }
             }
         }
+    }
+
+    /**
+     * Called only right after user actions or app launch: Android forbids starting a
+     * foreground service from the background. The service stops itself when idle.
+     */
+    private fun ensureService() {
+        runCatching { DownloadService.start(context) }
+            .onFailure { Log.w(TAG, "Cannot start download service", it) }
     }
 
     private fun trailsStateOnDisk(cell: RegionCell) =

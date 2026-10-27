@@ -37,6 +37,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:data"))
     implementation(project(":core:geo"))
     implementation(project(":core:map"))
     implementation(project(":core:ui"))

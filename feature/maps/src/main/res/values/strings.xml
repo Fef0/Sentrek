@@ -23,4 +23,22 @@
         <item quantity="other">Trail details failed for %d areas</item>
     </plurals>
     <string name="regions_retry">Retry</string>
+    <string name="regions_import">Import map file</string>
+    <plurals name="regions_imported">
+        <item quantity="one">%d imported map</item>
+        <item quantity="other">%d imported maps</item>
+    </plurals>
+    <string name="imported_title">Imported maps</string>
+    <string name="imported_show">Show on map</string>
+    <string name="imported_delete">Delete</string>
+    <string name="imported_close">Close</string>
+    <string name="imported_zooms">Zoom %1$d–%2$d · %3$s</string>
+    <string name="import_running">Importing…</string>
+    <string name="import_vector">Vector map files aren\'t supported yet. Import a raster (image) map in MBTiles or PMTiles format.</string>
+    <string name="import_unknown">Choose an .mbtiles or .pmtiles file.</string>
+    <string name="import_failed">Couldn\'t import this file.</string>
+    <string name="download_channel">Map downloads</string>
+    <string name="download_notification_title">Downloading maps</string>
+    <string name="download_notification_area">Areas left: %1$d · current %2$d%%</string>
+    <string name="download_notification_trails">Fetching trail details…</string>
 </resources>

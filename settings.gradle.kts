@@ -17,6 +17,7 @@ dependencyResolutionManagement {
 rootProject.name = "Sentrek"
 
 include(":app")
+include(":core:data")
 include(":core:geo")
 include(":core:map")
 include(":core:ui")

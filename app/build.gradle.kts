@@ -40,11 +40,13 @@ dependencies {
     implementation(project(":core:geo"))
     implementation(project(":core:map"))
     implementation(project(":core:ui"))
+    implementation(project(":feature:maps"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

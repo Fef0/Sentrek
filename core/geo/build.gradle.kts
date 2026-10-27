@@ -16,5 +16,7 @@ kotlin {
 }
 
 dependencies {
+    // Streaming JsonReader only; works on the JVM for tests, unlike android.util.JsonReader.
+    implementation(libs.gson)
     testImplementation(libs.junit)
 }

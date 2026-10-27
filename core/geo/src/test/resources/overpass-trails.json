@@ -1,0 +1,105 @@
+{
+ "version": 0.6,
+ "generator": "Overpass API 0.7.62.11 87bfad18",
+ "osm3s": {
+  "timestamp_osm_base": "2026-10-27T10:20:51Z",
+  "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+ },
+ "elements": [
+  {
+   "type": "way",
+   "id": 8233525,
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      8.0061393,
+      45.6219866
+     ],
+     [
+      8.0058894,
+      45.6219397
+     ],
+     [
+      8.0057334,
+      45.621927
+     ],
+     [
+      8.0054835,
+      45.6220409
+     ],
+     [
+      8.0052805,
+      45.6221474
+     ],
+     [
+      8.005116,
+      45.6222619
+     ]
+    ]
+   },
+   "tags": {
+    "sac": "hiking",
+    "vis": "good"
+   }
+  },
+  {
+   "type": "way",
+   "id": 23400013,
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      7.7226877,
+      45.9712365
+     ],
+     [
+      7.722745,
+      45.9709328
+     ]
+    ]
+   },
+   "tags": {
+    "sac": "mountain_hiking",
+    "vis": ""
+   }
+  },
+  {
+   "type": "way",
+   "id": 26115564,
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      7.5058293,
+      45.5995703
+     ],
+     [
+      7.5057681,
+      45.5995578
+     ],
+     [
+      7.5056663,
+      45.599537
+     ],
+     [
+      7.5054517,
+      45.5994529
+     ],
+     [
+      7.5053058,
+      45.5993628
+     ],
+     [
+      7.5047565,
+      45.5993628
+     ]
+    ]
+   },
+   "tags": {
+    "sac": "mountain_hiking",
+    "vis": "good"
+   }
+  }
+ ]
+}

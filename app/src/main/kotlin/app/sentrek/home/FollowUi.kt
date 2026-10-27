@@ -42,7 +42,8 @@ fun FollowPanel(
     onToggleProfile: () -> Unit,
     /** Opens the route's sheet (reverse direction and the rest). */
     onOpen: () -> Unit,
-    onStop: () -> Unit,
+    /** Asks first (see FollowConfirmations): a stray tap mustn't end navigation. */
+    onStop: (Following) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -81,7 +82,7 @@ fun FollowPanel(
                         Icon(SentrekIcons.Profile, contentDescription = stringResource(R.string.follow_profile))
                     }
                 }
-                TextButton(onClick = onStop, modifier = Modifier.heightIn(min = TouchTarget)) {
+                TextButton(onClick = { onStop(following) }, modifier = Modifier.heightIn(min = TouchTarget)) {
                     Text(stringResource(R.string.follow_stop), color = if (off) colors.onError else colors.primary)
                 }
             }

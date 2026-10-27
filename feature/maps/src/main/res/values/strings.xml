@@ -33,6 +33,14 @@
     <string name="imported_title">Imported maps</string>
     <string name="imported_show">Show on map</string>
     <string name="imported_delete">Delete</string>
+    <plurals name="confirm_delete_regions_title">
+        <item quantity="one">Delete %d downloaded area?</item>
+        <item quantity="other">Delete %d downloaded areas?</item>
+    </plurals>
+    <string name="confirm_delete_regions_text">Their map and trail details are removed from the phone. Downloading them again needs a connection.</string>
+    <string name="confirm_delete_imported_title">Delete this map file?</string>
+    <string name="confirm_delete_imported_text">%s is removed from the phone. To use it again, import the file again.</string>
+    <string name="confirm_delete">Delete</string>
     <string name="imported_close">Close</string>
     <string name="imported_zooms">Zoom %1$d–%2$d · %3$s</string>
     <string name="import_running">Importing…</string>

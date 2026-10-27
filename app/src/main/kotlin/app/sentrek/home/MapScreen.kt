@@ -67,6 +67,9 @@ import app.sentrek.planner.TrailSource
 import app.sentrek.map.SentrekMap
 import app.sentrek.map.TrackLayers
 import app.sentrek.record.DeletePlaceDialog
+import app.sentrek.record.FollowConfirmations
+import app.sentrek.ui.Confirmation
+import app.sentrek.ui.ConfirmDialog
 import app.sentrek.record.PlaceDialog
 import app.sentrek.record.PlaceSheet
 import app.sentrek.record.SavedTrack
@@ -128,6 +131,8 @@ fun MapScreen(
     var planPreview by remember { mutableStateOf<List<LatLon>?>(null) }
     var askPlanName by remember { mutableStateOf(false) }
     var askPlanDiscard by remember { mutableStateOf(false) }
+    // An action waiting for "are you sure?".
+    var confirm by remember { mutableStateOf<Confirmation?>(null) }
     val currentOnCameraChange by rememberUpdatedState(onCameraChange)
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var style by remember { mutableStateOf<Style?>(null) }
@@ -255,7 +260,7 @@ fun MapScreen(
                         onOpen = {
                             pressed = MapFeatureInfo(name = null, kind = "track", position = LatLng(0.0, 0.0), osmId = null, trackId = it.trackId)
                         },
-                        onStop = viewModel::stopFollowing,
+                        onStop = { confirm = FollowConfirmations.stop(context, it.name, viewModel::stopFollowing) },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -436,16 +441,29 @@ fun MapScreen(
                 isFollowed = followedRoute?.trackId == track.id,
                 onFollow = {
                     pressed = null
-                    routeToFollow = track
-                    withLocation(AfterPermission.FollowRoute) { viewModel.followTrack(track); routeToFollow = null }
+                    val start = {
+                        routeToFollow = track
+                        withLocation(AfterPermission.FollowRoute) { viewModel.followTrack(track); routeToFollow = null }
+                    }
+                    val current = followedRoute
+                    if (current != null) confirm = FollowConfirmations.switch(context, current.name, track.name, start) else start()
                 },
-                onStopFollowing = { pressed = null; viewModel.stopFollowing() },
+                onStopFollowing = {
+                    pressed = null
+                    confirm = FollowConfirmations.stop(context, track.name, viewModel::stopFollowing)
+                },
                 onReverse = { pressed = null; viewModel.reverseRoute() },
                 onColor = { viewModel.setTrackColor(track, it) },
                 onHide = {
                     pressed = null
-                    if (followedRoute?.trackId == track.id) viewModel.stopFollowing()
-                    viewModel.hideTrack(track.id)
+                    if (followedRoute?.trackId == track.id) {
+                        confirm = FollowConfirmations.hideFollowed(context, track.name) {
+                            viewModel.stopFollowing()
+                            viewModel.hideTrack(track.id)
+                        }
+                    } else {
+                        viewModel.hideTrack(track.id)
+                    }
                 },
                 onEdit = if (track.imported) {
                     {
@@ -569,6 +587,8 @@ fun MapScreen(
             onDismiss = { askPlanName = false },
         )
     }
+    confirm?.let { ConfirmDialog(it) { confirm = null } }
+
     if (askPlanDiscard) {
         DiscardPlanDialog(
             onDiscard = { askPlanDiscard = false; planner.discard() },

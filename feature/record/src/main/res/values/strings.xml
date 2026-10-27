@@ -56,6 +56,16 @@
     <string name="tracks_saved">Track saved</string>
     <string name="tracks_save_failed">Could not save the track</string>
     <string name="tracks_edit">Edit</string>
+    <string name="confirm_stop_following_title">Stop following this route?</string>
+    <string name="confirm_stop_following_text">%s. You can follow it again from Tracks.</string>
+    <string name="confirm_stop_following">Stop following</string>
+    <string name="confirm_switch_title">Follow this route instead?</string>
+    <!-- Route being followed, then the new one. -->
+    <string name="confirm_switch_text">You are following %1$s. Following %2$s stops it.</string>
+    <string name="confirm_switch">Follow</string>
+    <string name="confirm_hide_followed_title">Hide and stop following?</string>
+    <string name="confirm_hide_followed_text">%s is the route you are following. Hiding it stops following.</string>
+    <string name="confirm_hide">Hide</string>
     <string name="tracks_save_as">Save as</string>
     <string name="tracks_save_as_text">GPX works in most hiking apps and GPS devices. KML opens in Google Earth and Google My Maps.</string>
     <string name="tracks_format_gpx">GPX</string>

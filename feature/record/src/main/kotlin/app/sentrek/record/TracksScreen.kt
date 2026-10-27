@@ -54,6 +54,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sentrek.feature.record.R
 import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.route.HikingTime
+import app.sentrek.ui.Confirmation
+import app.sentrek.ui.ConfirmDialog
 import app.sentrek.ui.ElevationProfile
 import app.sentrek.ui.Format
 import app.sentrek.ui.TouchTarget
@@ -75,6 +77,7 @@ fun TracksScreen(
     val following by viewModel.following.collectAsStateWithLifecycle()
     var exporting by remember { mutableStateOf<SavedTrack?>(null) }
     var choosingFormat by remember { mutableStateOf<SavedTrack?>(null) }
+    var confirm by remember { mutableStateOf<Confirmation?>(null) }
     var deleting by remember { mutableStateOf<SavedTrack?>(null) }
     var renaming by remember { mutableStateOf<SavedTrack?>(null) }
     var toFollow by remember { mutableStateOf<SavedTrack?>(null) }
@@ -150,18 +153,33 @@ fun TracksScreen(
                         isFollowed = track.id == following,
                         onFollow = {
                             when {
-                                track.id == following -> viewModel.stopFollowing()
-                                hasLocation(context) -> startFollowing(track)
+                                track.id == following ->
+                                    confirm = FollowConfirmations.stop(context, track.name, viewModel::stopFollowing)
                                 else -> {
-                                    toFollow = track
-                                    locationPermission.launch(
-                                        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-                                    )
+                                    val start = {
+                                        if (hasLocation(context)) {
+                                            startFollowing(track)
+                                        } else {
+                                            toFollow = track
+                                            locationPermission.launch(
+                                                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                                            )
+                                        }
+                                    }
+                                    val current = tracks.firstOrNull { it.id == following }
+                                    if (current != null) confirm = FollowConfirmations.switch(context, current.name, track.name, start) else start()
                                 }
                             }
                         },
                         onToggleMap = {
-                            if (track.id in shown) viewModel.hide(track) else viewModel.show(track, onShowOnMap)
+                            when {
+                                track.id !in shown -> viewModel.show(track, onShowOnMap)
+                                track.id == following -> confirm = FollowConfirmations.hideFollowed(context, track.name) {
+                                    viewModel.stopFollowing()
+                                    viewModel.hide(track)
+                                }
+                                else -> viewModel.hide(track)
+                            }
                         },
                         onShare = {
                             viewModel.shareCopy(track) { file ->
@@ -186,6 +204,8 @@ fun TracksScreen(
             }
         }
     }
+
+    confirm?.let { ConfirmDialog(it) { confirm = null } }
 
     choosingFormat?.let { track ->
         AlertDialog(
@@ -360,13 +380,13 @@ private fun TrackCard(
                         Text(stringResource(R.string.tracks_show))
                     }
                 }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 onEdit?.let {
                     OutlinedButton(onClick = it, modifier = buttonModifier, contentPadding = padding) {
                         Text(stringResource(R.string.tracks_edit))
                     }
                 }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onShare, modifier = buttonModifier, contentPadding = padding) {
                     Text(stringResource(R.string.tracks_share))
                 }

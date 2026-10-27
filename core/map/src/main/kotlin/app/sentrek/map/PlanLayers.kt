@@ -1,7 +1,8 @@
 package app.sentrek.map
 
 import app.sentrek.geo.LatLon
-import app.sentrek.geo.plan.PlanGeometry
+import app.sentrek.geo.plan.PlanLeg
+import org.maplibre.android.style.expressions.Expression.eq
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression.get
 import org.maplibre.android.style.expressions.Expression.literal
@@ -18,6 +19,7 @@ import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
 import org.maplibre.android.style.layers.PropertyFactory.lineCap
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
+import org.maplibre.android.style.layers.PropertyFactory.lineDasharray
 import org.maplibre.android.style.layers.PropertyFactory.lineJoin
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
 import org.maplibre.android.style.sources.GeoJsonSource
@@ -27,20 +29,22 @@ import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 
 /**
- * The route being planned: its legs, a handle on each point (start green, end red, the
- * selected one bigger) and a small one in the middle of each leg to drag out a new point.
+ * The route being planned: its legs (along the paths, or dashed where straight), a handle on
+ * each point (start green, end red, the selected one bigger) and a small one in the middle of
+ * each leg to drag out a new point.
  */
 object PlanLayers {
     private const val LINE = "plan-line"
     private const val POINTS = "plan-points"
     private const val CASING = "-casing"
+    private const val STRAIGHT = "-straight"
     private const val COLOR = 0xFFD81B60.toInt()
 
-    fun sync(style: Style, points: List<LatLon>, selected: Int?) {
-        val line = if (points.size >= 2) {
-            listOf(Feature.fromGeometry(LineString.fromLngLats(points.map { Point.fromLngLat(it.lon, it.lat) })))
-        } else {
-            emptyList()
+    fun sync(style: Style, points: List<LatLon>, legs: List<PlanLeg>, selected: Int?) {
+        val line = legs.filter { it.points.size >= 2 }.map { leg ->
+            Feature.fromGeometry(LineString.fromLngLats(leg.points.map { Point.fromLngLat(it.lon, it.lat) })).apply {
+                addBooleanProperty("t", leg.onTrails)
+            }
         }
         val handles = points.mapIndexed { i, p ->
             Feature.fromGeometry(Point.fromLngLat(p.lon, p.lat)).apply {
@@ -52,7 +56,7 @@ object PlanLayers {
                 }
                 addStringProperty("r", role)
             }
-        } + PlanGeometry.midpoints(points).map { p ->
+        } + legs.map { it.middle }.map { p ->
             Feature.fromGeometry(Point.fromLngLat(p.lon, p.lat)).apply { addStringProperty("r", "mid") }
         }
         setSource(style, LINE, line)
@@ -61,7 +65,7 @@ object PlanLayers {
     }
 
     /** Hides the plan without forgetting the layers (the planner was closed). */
-    fun clear(style: Style) = sync(style, emptyList(), null)
+    fun clear(style: Style) = sync(style, emptyList(), emptyList(), null)
 
     private fun setSource(style: Style, id: String, features: List<Feature>) {
         val collection = FeatureCollection.fromFeatures(features)
@@ -85,7 +89,15 @@ object PlanLayers {
                 lineWidth(4.5f),
                 lineCap(Property.LINE_CAP_ROUND),
                 lineJoin(Property.LINE_JOIN_ROUND),
-            ),
+            ).withFilter(eq(get("t"), true)),
+        )
+        PlaceLayers.addBelow(
+            style,
+            LineLayer(LINE + STRAIGHT, LINE).withProperties(
+                lineColor(COLOR),
+                lineWidth(4.5f),
+                lineDasharray(arrayOf(1.5f, 1.2f)),
+            ).withFilter(eq(get("t"), false)),
         )
         PlaceLayers.addBelow(
             style,

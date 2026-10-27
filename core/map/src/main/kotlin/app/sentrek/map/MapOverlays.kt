@@ -80,6 +80,9 @@ object MapOverlays {
 
     internal fun isPointLayer(id: String) = id.startsWith(TRAILS) && id.contains(POINTS)
 
+    /** A downloaded area's hiking overlay (trails with difficulty, and points). */
+    internal fun isOverlaySource(id: String) = id.startsWith(TRAILS)
+
     internal fun isTrailLayer(id: String) = id.startsWith(TRAILS) && (id.endsWith(CLEAR) || id.endsWith(FAINT))
 
     /** [overlays]: cell id → overlay file. [showDifficulty] hides only the trail colours, not the points. */

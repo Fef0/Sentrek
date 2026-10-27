@@ -21,7 +21,16 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[SHOW_TRAIL_DIFFICULTY] = show }
     }
 
+    /** Larger touch targets, wider long-press area, volume keys zoom the map. */
+    val gloveMode: Flow<Boolean> =
+        context.settings.data.map { it[GLOVE_MODE] ?: false }
+
+    suspend fun setGloveMode(on: Boolean) {
+        context.settings.edit { it[GLOVE_MODE] = on }
+    }
+
     private companion object {
         val SHOW_TRAIL_DIFFICULTY = booleanPreferencesKey("show_trail_difficulty")
+        val GLOVE_MODE = booleanPreferencesKey("glove_mode")
     }
 }

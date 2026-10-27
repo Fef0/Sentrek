@@ -55,7 +55,7 @@ import app.sentrek.map.CellLook
 import app.sentrek.map.MapStyle
 import app.sentrek.map.RegionGridLayer
 import app.sentrek.map.SentrekMap
-import app.sentrek.ui.GloveTarget
+import app.sentrek.ui.TouchTarget
 import app.sentrek.ui.MapButton
 import app.sentrek.ui.SentrekIcons
 import org.maplibre.android.camera.CameraPosition
@@ -267,7 +267,7 @@ private fun RegionsPanel(
                             stringResource(R.string.regions_delete, toDelete), onDelete, Modifier.weight(1f), destructive = true,
                         )
                     }
-                    OutlinedButton(onClick = onClear, modifier = Modifier.heightIn(min = GloveTarget)) {
+                    OutlinedButton(onClick = onClear, modifier = Modifier.heightIn(min = TouchTarget)) {
                         Text(stringResource(R.string.regions_clear))
                     }
                 }
@@ -281,7 +281,7 @@ private fun RegionsPanel(
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyLarge,
                     )
-                    OutlinedButton(onClick = onRetryTrails, modifier = Modifier.heightIn(min = GloveTarget)) {
+                    OutlinedButton(onClick = onRetryTrails, modifier = Modifier.heightIn(min = TouchTarget)) {
                         Text(stringResource(R.string.regions_retry))
                     }
                 }
@@ -291,14 +291,14 @@ private fun RegionsPanel(
                 OutlinedButton(
                     onClick = onImport,
                     enabled = !importing,
-                    modifier = Modifier.weight(1f).heightIn(min = GloveTarget),
+                    modifier = Modifier.weight(1f).heightIn(min = TouchTarget),
                 ) {
                     Text(stringResource(R.string.regions_import))
                 }
                 if (importedCount > 0) {
                     OutlinedButton(
                         onClick = onShowImported,
-                        modifier = Modifier.weight(1f).heightIn(min = GloveTarget),
+                        modifier = Modifier.weight(1f).heightIn(min = TouchTarget),
                     ) {
                         Text(pluralStringResource(R.plurals.regions_imported, importedCount, importedCount))
                     }
@@ -336,11 +336,11 @@ private fun ImportedMapsDialog(
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             if (map.info.bounds != null) {
-                                OutlinedButton(onClick = { onShow(map) }, modifier = Modifier.heightIn(min = GloveTarget)) {
+                                OutlinedButton(onClick = { onShow(map) }, modifier = Modifier.heightIn(min = TouchTarget)) {
                                     Text(stringResource(R.string.imported_show))
                                 }
                             }
-                            OutlinedButton(onClick = { onDelete(map) }, modifier = Modifier.heightIn(min = GloveTarget)) {
+                            OutlinedButton(onClick = { onDelete(map) }, modifier = Modifier.heightIn(min = TouchTarget)) {
                                 Text(stringResource(R.string.imported_delete), color = MaterialTheme.colorScheme.error)
                             }
                         }
@@ -349,7 +349,7 @@ private fun ImportedMapsDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = GloveTarget)) {
+            TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = TouchTarget)) {
                 Text(stringResource(R.string.imported_close))
             }
         },
@@ -360,7 +360,7 @@ private fun ImportedMapsDialog(
 private fun PanelButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, destructive: Boolean = false) {
     Button(
         onClick = onClick,
-        modifier = modifier.heightIn(min = GloveTarget),
+        modifier = modifier.heightIn(min = TouchTarget),
         colors = if (destructive) {
             ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
         } else {

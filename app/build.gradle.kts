@@ -42,6 +42,7 @@ dependencies {
     implementation(project(":core:map"))
     implementation(project(":core:ui"))
     implementation(project(":feature:maps"))
+    implementation(project(":feature:record"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

@@ -30,7 +30,7 @@ import androidx.lifecycle.viewModelScope
 import app.sentrek.BuildConfig
 import app.sentrek.R
 import app.sentrek.data.SettingsRepository
-import app.sentrek.ui.GloveTarget
+import app.sentrek.ui.TouchTarget
 import app.sentrek.ui.MapButton
 import app.sentrek.ui.SentrekIcons
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -45,14 +45,22 @@ class SettingsViewModel @Inject constructor(private val settings: SettingsReposi
     val showTrailDifficulty: StateFlow<Boolean> =
         settings.showTrailDifficulty.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
+    val gloveMode: StateFlow<Boolean> =
+        settings.gloveMode.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     fun setShowTrailDifficulty(show: Boolean) {
         viewModelScope.launch { settings.setShowTrailDifficulty(show) }
+    }
+
+    fun setGloveMode(on: Boolean) {
+        viewModelScope.launch { settings.setGloveMode(on) }
     }
 }
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
     val showTrailDifficulty by viewModel.showTrailDifficulty.collectAsStateWithLifecycle()
+    val gloveMode by viewModel.gloveMode.collectAsStateWithLifecycle()
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
@@ -67,28 +75,46 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 Text(stringResource(R.string.bar_settings), style = MaterialTheme.typography.headlineMedium)
             }
 
+            SectionTitle(stringResource(R.string.settings_controls))
+            ToggleRow(
+                title = stringResource(R.string.settings_glove_mode),
+                hint = stringResource(R.string.settings_glove_mode_hint),
+                checked = gloveMode,
+                onChange = viewModel::setGloveMode,
+            )
+
             SectionTitle(stringResource(R.string.settings_map))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = GloveTarget)
-                    .toggleable(showTrailDifficulty, role = Role.Switch, onValueChange = viewModel::setShowTrailDifficulty)
-                    .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.settings_trail_difficulty), style = MaterialTheme.typography.titleMedium)
-                    Text(stringResource(R.string.settings_trail_difficulty_hint), style = MaterialTheme.typography.bodyMedium)
-                }
-                // The whole row toggles; the switch only shows the state.
-                Switch(checked = showTrailDifficulty, onCheckedChange = null)
-            }
+            ToggleRow(
+                title = stringResource(R.string.settings_trail_difficulty),
+                hint = stringResource(R.string.settings_trail_difficulty_hint),
+                checked = showTrailDifficulty,
+                onChange = viewModel::setShowTrailDifficulty,
+            )
 
             HorizontalDivider()
             SectionTitle(stringResource(R.string.settings_about))
             Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodyLarge)
             Text(stringResource(R.string.settings_credits), style = MaterialTheme.typography.bodyMedium)
         }
+    }
+}
+
+@Composable
+private fun ToggleRow(title: String, hint: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = TouchTarget)
+            .toggleable(checked, role = Role.Switch, onValueChange = onChange)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(hint, style = MaterialTheme.typography.bodyMedium)
+        }
+        // The whole row toggles; the switch only shows the state.
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 

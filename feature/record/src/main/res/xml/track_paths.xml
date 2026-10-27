@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <files-path name="tracks" path="tracks/" />
+    <!-- Copies named after the track, for the share sheet. -->
+    <cache-path name="share" path="share/" />
+</paths>

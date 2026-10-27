@@ -22,3 +22,5 @@ include(":core:geo")
 include(":core:map")
 include(":core:ui")
 include(":feature:maps")
+
+include(":feature:record")

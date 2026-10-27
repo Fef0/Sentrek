@@ -19,11 +19,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 
-data class BarItem(val icon: ImageVector, val label: String, val onClick: () -> Unit)
+/** [highlighted]: an ongoing action (e.g. recording), filled with the signal colour. */
+data class BarItem(val icon: ImageVector, val label: String, val onClick: () -> Unit, val highlighted: Boolean = false)
 
 /**
  * Trekarta-style action bar along the bottom edge: the thumb's natural reach. Every item
- * is a full-height, equal-width target with icon and label, so it works with gloves.
+ * is a full-height, equal-width target with icon and label; taller in glove mode.
  */
 @Composable
 fun BottomBar(items: List<BarItem>, modifier: Modifier = Modifier) {
@@ -39,17 +40,17 @@ fun BottomBar(items: List<BarItem>, modifier: Modifier = Modifier) {
             for (item in items) {
                 Surface(
                     onClick = item.onClick,
-                    modifier = Modifier.weight(1f).heightIn(min = GloveTarget + 8.dp),
+                    modifier = Modifier.weight(1f).heightIn(min = TouchTarget + 8.dp),
                     shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    color = if (item.highlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                    contentColor = if (item.highlighted) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                         modifier = Modifier.padding(vertical = 8.dp),
                     ) {
-                        Icon(item.icon, contentDescription = null, modifier = Modifier.size(28.dp))
+                        Icon(item.icon, contentDescription = null, modifier = Modifier.size(LocalTouch.current.icon - 4.dp))
                         Text(item.label, style = MaterialTheme.typography.labelLarge)
                     }
                 }

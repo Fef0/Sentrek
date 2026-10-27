@@ -27,7 +27,7 @@ import app.sentrek.R
 import app.sentrek.geo.overlay.SacScale
 import app.sentrek.geo.overlay.TrailVisibility
 import app.sentrek.map.MapFeatureInfo
-import app.sentrek.ui.GloveTarget
+import app.sentrek.ui.TouchTarget
 import java.util.Locale
 
 /** Everything we know about a long-pressed map feature. */
@@ -90,12 +90,12 @@ fun FeatureSheet(info: MapFeatureInfo, onDismiss: () -> Unit) {
             info.osmId?.let { id ->
                 OutlinedButton(
                     onClick = { uriHandler.openUri("https://www.openstreetmap.org/$id") },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = GloveTarget),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget),
                 ) { Text(stringResource(R.string.feature_open_osm)) }
             }
             Button(
                 onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth().heightIn(min = GloveTarget),
+                modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget),
             ) { Text(stringResource(R.string.feature_close)) }
         }
     }

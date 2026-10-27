@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="record_channel">Track recording</string>
+    <string name="record_notification_title">Recording track</string>
+    <string name="record_notification_paused">Recording paused</string>
+    <!-- Distance, then ascent, e.g. "3.42 km · ↑ 420 m". -->
+    <string name="record_notification_text">%1$s · ↑ %2$s</string>
+
+    <string name="tracks_title">Tracks</string>
+    <string name="tracks_back">Back to map</string>
+    <string name="tracks_empty">No tracks yet.\nTap Record on the map to record your hike.</string>
+    <!-- Distance, duration, ascent, descent. -->
+    <string name="tracks_stats">%1$s · %2$s · ↑ %3$s ↓ %4$s</string>
+    <string name="tracks_show">Map</string>
+    <string name="tracks_hide">Hide</string>
+    <string name="tracks_share">Share</string>
+    <string name="tracks_save">Save</string>
+    <string name="tracks_delete">Delete</string>
+    <string name="tracks_cancel">Cancel</string>
+    <string name="tracks_name">Name</string>
+    <string name="tracks_rename">Rename track</string>
+    <string name="tracks_rename_confirm">Rename</string>
+    <string name="tracks_delete_title">Delete this track?</string>
+    <string name="tracks_saved">Track saved</string>
+    <string name="tracks_save_failed">Could not save the track</string>
+</resources>

@@ -6,6 +6,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -48,10 +49,16 @@ private val SentrekTypography = Typography().run {
 }
 
 @Composable
-fun SentrekTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = if (darkTheme) DarkColors else LightColors,
-        typography = SentrekTypography,
-        content = content,
-    )
+fun SentrekTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    gloves: Boolean = false,
+    content: @Composable () -> Unit,
+) {
+    CompositionLocalProvider(LocalTouch provides Touch(gloves)) {
+        MaterialTheme(
+            colorScheme = if (darkTheme) DarkColors else LightColors,
+            typography = SentrekTypography,
+            content = content,
+        )
+    }
 }

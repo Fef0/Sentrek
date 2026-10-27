@@ -42,6 +42,8 @@ fun TrackSheet(
     isFollowed: Boolean,
     onFollow: () -> Unit,
     onStopFollowing: () -> Unit,
+    /** Walk the followed route the other way. */
+    onReverse: () -> Unit,
     onColor: (Int) -> Unit,
     onHide: () -> Unit,
     /** Null for recorded tracks, which can't be edited. */
@@ -74,6 +76,7 @@ fun TrackSheet(
             ElevationProfile(profile, Modifier.fillMaxWidth().height(72.dp))
             if (isFollowed) {
                 Button(onClick = onStopFollowing, modifier = wide) { Text(stringResource(R.string.track_stop_following)) }
+                OutlinedButton(onClick = onReverse, modifier = wide) { Text(stringResource(R.string.track_reverse)) }
             } else {
                 Button(onClick = onFollow, modifier = wide) { Text(stringResource(R.string.track_follow)) }
             }

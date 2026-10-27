@@ -156,11 +156,16 @@ object HikingTime {
  * on route once within [backM]. The two thresholds stop GPS jitter from toggling the alert.
  */
 class OffRouteDetector(
-    private val offM: Double = 50.0,
+    private val offM: Double = OFF_ROUTE_M,
     private val backM: Double = 30.0,
     private val delayMs: Long = 20_000,
 ) {
     enum class Event { OffRoute, BackOnRoute }
+
+    companion object {
+        /** Farther than this from the route is off it. */
+        const val OFF_ROUTE_M = 50.0
+    }
 
     var isOff = false
         private set

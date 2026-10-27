@@ -252,7 +252,9 @@ fun MapScreen(
                         following = it,
                         showProfile = followProfile,
                         onToggleProfile = { viewModel.setFollowProfile(!followProfile) },
-                        onReverse = viewModel::reverseRoute,
+                        onOpen = {
+                            pressed = MapFeatureInfo(name = null, kind = "track", position = LatLng(0.0, 0.0), osmId = null, trackId = it.trackId)
+                        },
                         onStop = viewModel::stopFollowing,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -438,6 +440,7 @@ fun MapScreen(
                     withLocation(AfterPermission.FollowRoute) { viewModel.followTrack(track); routeToFollow = null }
                 },
                 onStopFollowing = { pressed = null; viewModel.stopFollowing() },
+                onReverse = { pressed = null; viewModel.reverseRoute() },
                 onColor = { viewModel.setTrackColor(track, it) },
                 onHide = {
                     pressed = null

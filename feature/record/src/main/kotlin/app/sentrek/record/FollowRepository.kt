@@ -39,9 +39,16 @@ data class Following(
     val hasElevation: Boolean,
     /** Distance from the start to height, in the walking direction; empty without heights. */
     val profile: List<Pair<Double, Double>> = emptyList(),
-    /** Metres along the route to where the user is, or null before the first fix. */
+    /** Metres along the route to the point nearest the user, or null before the first fix. */
     val along: Double? = null,
-)
+) {
+    /**
+     * Where the user is along the route, only while actually on it: off it, the nearest
+     * point of the route is not where they are.
+     */
+    val here: Double?
+        get() = along?.takeIf { !offRoute && offset != null && offset <= OffRouteDetector.OFF_ROUTE_M }
+}
 
 /**
  * Follows a saved track: progress along it, what's left, and a vibration when the user

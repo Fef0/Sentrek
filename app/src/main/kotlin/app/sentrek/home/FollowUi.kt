@@ -1,11 +1,13 @@
 package app.sentrek.home
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -38,7 +40,8 @@ fun FollowPanel(
     following: Following,
     showProfile: Boolean,
     onToggleProfile: () -> Unit,
-    onReverse: () -> Unit,
+    /** Opens the route's sheet (reverse direction and the rest). */
+    onOpen: () -> Unit,
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -59,7 +62,12 @@ fun FollowPanel(
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
+                    // The route's sheet: reverse, colour, hide…
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = TouchTarget)
+                        .clickable(onClickLabel = stringResource(R.string.follow_route_options), onClick = onOpen)
+                        .wrapContentHeight(Alignment.CenterVertically),
                 )
                 if (following.profile.size >= 2) {
                     IconToggleButton(
@@ -72,9 +80,6 @@ fun FollowPanel(
                     ) {
                         Icon(SentrekIcons.Profile, contentDescription = stringResource(R.string.follow_profile))
                     }
-                }
-                TextButton(onClick = onReverse, modifier = Modifier.heightIn(min = TouchTarget)) {
-                    Text(stringResource(R.string.follow_reverse), color = if (off) colors.onError else colors.primary)
                 }
                 TextButton(onClick = onStop, modifier = Modifier.heightIn(min = TouchTarget)) {
                     Text(stringResource(R.string.follow_stop), color = if (off) colors.onError else colors.primary)
@@ -91,7 +96,7 @@ fun FollowPanel(
             if (showProfile && following.profile.size >= 2) {
                 ElevationProfile(
                     profile = following.profile,
-                    here = following.along,
+                    here = following.here,
                     hereLabel = stringResource(R.string.follow_you_are_here),
                     color = if (off) colors.onError else colors.primary,
                     modifier = Modifier.fillMaxWidth().height(88.dp).padding(bottom = 8.dp),

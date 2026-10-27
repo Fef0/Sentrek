@@ -32,8 +32,9 @@
     <string name="track_color">Colour</string>
     <string name="track_hide">Hide from map</string>
     <string name="track_edit">Edit route</string>
+    <string name="track_reverse">Reverse direction</string>
+    <string name="follow_route_options">Route options</string>
     <string name="follow_off_route">Off route · %s</string>
-    <string name="follow_reverse">Reverse</string>
     <string name="follow_stop">Stop</string>
     <string name="follow_distance_left">Left</string>
     <string name="follow_ascent_left">Climb left</string>

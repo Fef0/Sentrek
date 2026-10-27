@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Log
+import app.sentrek.feature.record.R
 import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.LatLon
 import app.sentrek.geo.gpx.Gpx
@@ -72,8 +73,15 @@ sealed interface ImportResult {
     val bounds: BoundingBox? get() = null
 
     data class Imported(val track: SavedTrack, override val bounds: BoundingBox?) : ImportResult
+    /** A file with waypoints but no track: they became places. */
+    data class ImportedPlaces(val count: Int, override val bounds: BoundingBox?) : ImportResult
     /** Several files at once: [failed] couldn't be read. */
-    data class ImportedMany(val tracks: List<SavedTrack>, val failed: Int, override val bounds: BoundingBox?) : ImportResult
+    data class ImportedMany(
+        val tracks: List<SavedTrack>,
+        val places: Int,
+        val failed: Int,
+        override val bounds: BoundingBox?,
+    ) : ImportResult
     data object Empty : ImportResult
     data object UnknownFormat : ImportResult
     data object Failed : ImportResult
@@ -81,7 +89,10 @@ sealed interface ImportResult {
 
 /** Saved tracks, and which of them are drawn on the map. */
 @Singleton
-class TrackRepository @Inject constructor(@ApplicationContext private val context: Context) {
+class TrackRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val places: PlaceRepository,
+) {
     private val dir = File(context.filesDir, "tracks").apply { mkdirs() }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -138,22 +149,35 @@ class TrackRepository @Inject constructor(@ApplicationContext private val contex
         if (uris.size == 1) return import(uris.single())
         val results = uris.map { import(it) }
         val imported = results.filterIsInstance<ImportResult.Imported>()
-        if (imported.isEmpty()) return results.firstOrNull() ?: ImportResult.Failed
-        val corners = imported.mapNotNull { it.bounds }.flatMap { listOf(LatLon(it.south, it.west), LatLon(it.north, it.east)) }
-        return ImportResult.ImportedMany(imported.map { it.track }, results.size - imported.size, bounds(corners))
+        val placeFiles = results.filterIsInstance<ImportResult.ImportedPlaces>()
+        val succeeded = imported.size + placeFiles.size
+        if (succeeded == 0) return results.firstOrNull() ?: ImportResult.Failed
+        val corners = (imported + placeFiles).mapNotNull { it.bounds }
+            .flatMap { listOf(LatLon(it.south, it.west), LatLon(it.north, it.east)) }
+        return ImportResult.ImportedMany(
+            imported.map { it.track }, placeFiles.sumOf { it.count }, results.size - succeeded, bounds(corners),
+        )
     }
 
-    /** Imports a GPX, KML or KMZ file; all its tracks become one track, with its waypoints. */
+    /**
+     * Imports a GPX, KML or KMZ file; all its tracks become one track, with its waypoints.
+     * A file with waypoints only (a list of places) adds them to the saved places.
+     */
     suspend fun import(uri: Uri): ImportResult {
         val result = withContext(Dispatchers.IO) {
             runCatching {
                 val file = context.contentResolver.openInputStream(uri)?.use { TrackFiles.read(it.buffered()) }
                     ?: return@runCatching ImportResult.Failed
                 val segments = file.tracks.flatMap { it.segments }.filter { it.size >= 2 }
-                if (segments.isEmpty()) return@runCatching ImportResult.Empty
                 val name = file.name?.takeIf { it.isNotBlank() }
                     ?: file.tracks.firstNotNullOfOrNull { it.name?.takeIf(String::isNotBlank) }
                     ?: displayName(uri)
+                if (segments.isEmpty()) {
+                    if (file.waypoints.isEmpty()) return@runCatching ImportResult.Empty
+                    val fallback = name ?: context.getString(R.string.places_unnamed)
+                    val added = withContext(Dispatchers.Main) { places.addAll(file.waypoints, fallback) }
+                    return@runCatching ImportResult.ImportedPlaces(added.size, bounds(added.map { it.position }))
+                }
                 val track = save(segments, name, file.waypoints, imported = true)
                 ImportResult.Imported(track, bounds(segments.flatten().map(TrackPoint::position)))
             }.getOrElse {

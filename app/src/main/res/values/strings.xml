@@ -6,6 +6,7 @@
     <string name="bar_maps">Maps</string>
     <string name="bar_settings">Settings</string>
     <string name="bar_tracks">Tracks</string>
+    <string name="bar_places">Places</string>
     <string name="bar_record">Record</string>
     <string name="bar_stop">Stop</string>
     <string name="bar_paused">Paused</string>
@@ -44,6 +45,7 @@
     <string name="feature_osm_tags">OpenStreetMap data</string>
     <string name="feature_open_osm">View on openstreetmap.org</string>
     <string name="feature_close">Close</string>
+    <string name="feature_save_place">Save as place</string>
     <string name="settings_back">Back to map</string>
     <string name="settings_controls">Controls</string>
     <string name="settings_glove_mode">Glove mode</string>

@@ -223,8 +223,18 @@ fun TracksScreen(
 fun showImportResult(context: Context, result: ImportResult) {
     val text = when (result) {
         is ImportResult.Imported -> context.getString(R.string.tracks_imported, result.track.name)
-        is ImportResult.ImportedMany -> context.resources.getQuantityString(R.plurals.tracks_imported_many, result.tracks.size, result.tracks.size) +
-            if (result.failed > 0) context.resources.getQuantityString(R.plurals.tracks_import_failed_many, result.failed, result.failed) else ""
+        is ImportResult.ImportedPlaces -> context.resources.getQuantityString(R.plurals.places_imported, result.count, result.count)
+        is ImportResult.ImportedMany -> {
+            val res = context.resources
+            val places = result.places
+            val main = if (result.tracks.isEmpty()) {
+                res.getQuantityString(R.plurals.places_imported, places, places)
+            } else {
+                res.getQuantityString(R.plurals.tracks_imported_many, result.tracks.size, result.tracks.size) +
+                    if (places > 0) res.getQuantityString(R.plurals.places_imported_also, places, places) else ""
+            }
+            main + if (result.failed > 0) res.getQuantityString(R.plurals.tracks_import_failed_many, result.failed, result.failed) else ""
+        }
         ImportResult.Empty -> context.getString(R.string.tracks_import_empty)
         ImportResult.UnknownFormat -> context.getString(R.string.tracks_import_unknown)
         ImportResult.Failed -> context.getString(R.string.tracks_import_failed)

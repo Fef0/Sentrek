@@ -20,7 +20,14 @@ data class GpxFile(
 
 data class GpxTrack(val name: String?, val segments: List<List<TrackPoint>>)
 
-data class GpxWaypoint(val name: String?, val position: LatLon)
+/** [type]: GPX `<type>`, or `<sym>` when there is no type. [time] 0 when unknown. */
+data class GpxWaypoint(
+    val name: String?,
+    val position: LatLon,
+    val note: String? = null,
+    val type: String? = null,
+    val time: Long = 0,
+)
 
 /**
  * GPX 1.1 reading and writing. SAX is streaming and exists both on Android and the JVM,
@@ -43,8 +50,17 @@ object Gpx {
             val p = w.position
             out.write("""  <wpt lat="${coordinate(p.lat)}" lon="${coordinate(p.lon)}">""")
             p.ele?.let { out.write("<ele>${"%.1f".format(Locale.ROOT, it)}</ele>") }
+            if (w.time > 0) out.write("<time>${isoTime(w.time)}</time>")
             w.name?.let { out.write("<name>${escape(it)}</name>") }
+            w.note?.takeIf { it.isNotEmpty() }?.let { out.write("<desc>${escape(it)}</desc>") }
+            w.type?.let { out.write("<type>${escape(it)}</type>") }
             out.write("</wpt>\n")
+        }
+        // No segments: a file of waypoints only (saved places).
+        if (segments.isEmpty()) {
+            out.write("</gpx>\n")
+            out.flush()
+            return
         }
         out.write("  <trk>\n    <name>${escape(name)}</name>\n")
         for (segment in segments) {
@@ -83,6 +99,9 @@ object Gpx {
         private var ele: Double? = null
         private var time = 0L
         private var pointName: String? = null
+        private var pointNote: String? = null
+        private var pointType: String? = null
+        private var pointSymbol: String? = null
 
         override fun startElement(uri: String?, localName: String?, qName: String, attributes: Attributes) {
             val name = localName?.takeIf { it.isNotEmpty() } ?: qName.substringAfter(':')
@@ -97,6 +116,9 @@ object Gpx {
                     ele = null
                     time = 0L
                     pointName = null
+                    pointNote = null
+                    pointType = null
+                    pointSymbol = null
                 }
             }
         }
@@ -119,7 +141,14 @@ object Gpx {
                     in POINTS -> pointName = value
                 }
                 "trkpt", "rtept" -> point()?.let { segment += it }
-                "wpt" -> point()?.let { waypoints += GpxWaypoint(pointName, it.position) }
+                // Most apps put the note in <desc>, some in <cmt>.
+                "desc" -> if (parent == "wpt") pointNote = value.ifEmpty { pointNote }
+                "cmt" -> if (parent == "wpt" && pointNote == null) pointNote = value.ifEmpty { null }
+                "type" -> if (parent == "wpt") pointType = value.ifEmpty { null }
+                "sym" -> if (parent == "wpt") pointSymbol = value.ifEmpty { null }
+                "wpt" -> point()?.let {
+                    waypoints += GpxWaypoint(pointName, it.position, pointNote, pointType ?: pointSymbol, it.time)
+                }
                 "trkseg" -> if (segment.isNotEmpty()) segments += segment
                 "rte" -> { if (segment.isNotEmpty()) segments += segment; finishTrack() }
                 "trk" -> finishTrack()

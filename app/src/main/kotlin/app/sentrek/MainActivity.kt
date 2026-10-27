@@ -23,6 +23,7 @@ import app.sentrek.geo.BoundingBox
 import app.sentrek.home.DefaultCamera
 import app.sentrek.home.MapScreen
 import app.sentrek.maps.RegionsScreen
+import app.sentrek.record.PlacesScreen
 import app.sentrek.record.TrackRepository
 import app.sentrek.record.TracksScreen
 import app.sentrek.record.showImportResult
@@ -34,7 +35,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-private enum class Screen { Map, Maps, Tracks, Settings }
+private enum class Screen { Map, Maps, Tracks, Places, Settings }
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -78,6 +79,7 @@ class MainActivity : ComponentActivity() {
                         onCameraChange = { camera = it },
                         onOpenMaps = { screen = Screen.Maps },
                         onOpenTracks = { screen = Screen.Tracks },
+                        onOpenPlaces = { screen = Screen.Places },
                         onOpenSettings = { screen = Screen.Settings },
                         focus = focus,
                         onFocusDone = { focus = null },
@@ -85,6 +87,10 @@ class MainActivity : ComponentActivity() {
                     )
                     Screen.Maps -> RegionsScreen(initialCamera = camera, onBack = toMap)
                     Screen.Tracks -> TracksScreen(
+                        onBack = toMap,
+                        onShowOnMap = { box -> focus = box; screen = Screen.Map },
+                    )
+                    Screen.Places -> PlacesScreen(
                         onBack = toMap,
                         onShowOnMap = { box -> focus = box; screen = Screen.Map },
                     )

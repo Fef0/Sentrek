@@ -33,7 +33,7 @@ import java.util.Locale
 /** Everything we know about a long-pressed map feature. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FeatureSheet(info: MapFeatureInfo, onDismiss: () -> Unit) {
+fun FeatureSheet(info: MapFeatureInfo, onSaveAsPlace: () -> Unit, onDismiss: () -> Unit) {
     val uriHandler = LocalUriHandler.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -87,6 +87,10 @@ fun FeatureSheet(info: MapFeatureInfo, onDismiss: () -> Unit) {
                 }
             }
 
+            OutlinedButton(
+                onClick = onSaveAsPlace,
+                modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget),
+            ) { Text(stringResource(R.string.feature_save_place)) }
             info.osmId?.let { id ->
                 OutlinedButton(
                     onClick = { uriHandler.openUri("https://www.openstreetmap.org/$id") },
@@ -110,5 +114,5 @@ private fun Fact(label: String, value: String) {
 }
 
 /** "demanding_mountain_hiking" → "Demanding mountain hiking". OSM values aren't translated yet. */
-private fun humanize(osm: String): String =
+fun humanize(osm: String): String =
     osm.replace('_', ' ').replaceFirstChar { it.titlecase(Locale.getDefault()) }

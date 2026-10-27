@@ -43,15 +43,25 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import app.sentrek.R
+import app.sentrek.feature.record.R as RecordR
 import app.sentrek.geo.BoundingBox
+import app.sentrek.geo.Geo
+import app.sentrek.geo.LatLon
+import app.sentrek.geo.place.Place
+import app.sentrek.geo.place.PlaceKind
 import app.sentrek.map.MapFeatureInfo
 import app.sentrek.map.MapFeatures
 import app.sentrek.map.MapLocation
 import app.sentrek.map.MapOverlays
 import app.sentrek.map.MapStyle
+import app.sentrek.map.PlaceLayers
 import app.sentrek.map.SentrekMap
 import app.sentrek.map.TrackLayers
+import app.sentrek.record.DeletePlaceDialog
+import app.sentrek.record.PlaceDialog
+import app.sentrek.record.PlaceSheet
 import app.sentrek.record.SavedTrack
+import app.sentrek.record.sharePlace
 import app.sentrek.record.TrackNameDialog
 import app.sentrek.ui.BarItem
 import app.sentrek.ui.BottomBar
@@ -82,6 +92,7 @@ fun MapScreen(
     onCameraChange: (CameraPosition) -> Unit,
     onOpenMaps: () -> Unit,
     onOpenTracks: () -> Unit,
+    onOpenPlaces: () -> Unit,
     onOpenSettings: () -> Unit,
     focus: BoundingBox?,
     onFocusDone: () -> Unit,
@@ -97,6 +108,7 @@ fun MapScreen(
     val recording by viewModel.recording.collectAsStateWithLifecycle()
     val shownTracks by viewModel.shownTracks.collectAsStateWithLifecycle()
     val followedRoute by viewModel.following.collectAsStateWithLifecycle()
+    val places by viewModel.places.collectAsStateWithLifecycle()
     val currentOnCameraChange by rememberUpdatedState(onCameraChange)
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var style by remember { mutableStateOf<Style?>(null) }
@@ -108,6 +120,10 @@ fun MapScreen(
     var askName by remember { mutableStateOf(false) }
     var afterPermission by remember { mutableStateOf<AfterPermission?>(null) }
     var routeToFollow by remember { mutableStateOf<SavedTrack?>(null) }
+    // A place being created (id "") or edited, and one about to be deleted.
+    var placeDraft by remember { mutableStateOf<Place?>(null) }
+    var deletingPlace by remember { mutableStateOf<Place?>(null) }
+    val unnamedPlace = stringResource(RecordR.string.places_unnamed)
     val haptics = LocalHapticFeedback.current
     val pressRadiusPx = with(LocalDensity.current) { LocalTouch.current.pressRadius.toPx() }
     // "Right under the finger": what a fingertip covers, but never wider than the mode's reach.
@@ -221,6 +237,7 @@ fun MapScreen(
                         withLocation(AfterPermission.Record) { startRecording() }
                     })
                 },
+                BarItem(SentrekIcons.Place, stringResource(R.string.bar_places), onOpenPlaces),
                 BarItem(Icons.Filled.Settings, stringResource(R.string.bar_settings), onOpenSettings),
             ),
         )
@@ -235,11 +252,16 @@ fun MapScreen(
 
     DisposableEffect(map) {
         val m = map ?: return@DisposableEffect onDispose {}
-        val onLongPress = MapLibreMap.OnMapLongClickListener { latLng ->
-            val info = MapFeatures.at(m, m.projection.toScreenLocation(latLng), latLng, pressRadiusPx, exactPressPx)
-                ?: return@OnMapLongClickListener false
+        val onLongPress = MapLibreMap.OnMapLongClickListener { pressedAt ->
+            val latLng = pressedAt.wrap()
+            val info = MapFeatures.at(m, m.projection.toScreenLocation(pressedAt), latLng, pressRadiusPx, exactPressPx)
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-            pressed = info
+            // Nothing there: offer to save the spot as a place.
+            if (info == null) {
+                placeDraft = Place("", unnamedPlace, PlaceKind.Star, LatLon(latLng.latitude, latLng.longitude))
+            } else {
+                pressed = info
+            }
             true
         }
         m.addOnMapLongClickListener(onLongPress)
@@ -281,8 +303,32 @@ fun MapScreen(
 
     pressed?.let { info ->
         val track = info.trackId?.takeIf { info.kind == "track" }?.let(viewModel::track)
-        if (track == null) {
-            FeatureSheet(info, onDismiss = { pressed = null })
+        val place = info.placeId?.let(viewModel::place)
+        if (place != null) {
+            val here = map?.let(MapLocation::lastLocation)
+            PlaceSheet(
+                place = place,
+                distance = here?.let { Geo.distance(LatLon(it.latitude, it.longitude), place.position) },
+                onEdit = { pressed = null; placeDraft = place },
+                onShare = { sharePlace(context, place) },
+                onDelete = { pressed = null; deletingPlace = place },
+                onDismiss = { pressed = null },
+            )
+        } else if (track == null) {
+            FeatureSheet(
+                info,
+                onSaveAsPlace = {
+                    pressed = null
+                    val p = info.position
+                    placeDraft = Place(
+                        id = "",
+                        name = info.name ?: info.kind?.let(::humanize) ?: unnamedPlace,
+                        kind = PlaceKind.guess(info.kind),
+                        position = LatLon(p.latitude, p.longitude, info.tags["ele"]?.toDoubleOrNull()),
+                    )
+                },
+                onDismiss = { pressed = null },
+            )
         } else {
             TrackSheet(
                 track = track,
@@ -302,6 +348,22 @@ fun MapScreen(
                 onDismiss = { pressed = null },
             )
         }
+    }
+
+    placeDraft?.let { draft ->
+        val isNew = draft.id.isEmpty()
+        PlaceDialog(
+            title = stringResource(if (isNew) RecordR.string.places_new else RecordR.string.places_edit),
+            initial = draft,
+            onSave = {
+                if (isNew) viewModel.addPlace(it) else viewModel.updatePlace(it)
+                placeDraft = null
+            },
+            onDismiss = { placeDraft = null },
+        )
+    }
+    deletingPlace?.let { place ->
+        DeletePlaceDialog(place, onDelete = { viewModel.deletePlace(place); deletingPlace = null }, onDismiss = { deletingPlace = null })
     }
 
     val current = recording
@@ -350,6 +412,10 @@ fun MapScreen(
 
     LaunchedEffect(style, rasters, overlays, showDifficulty) {
         style?.let { MapOverlays.sync(it, rasters, overlays, showDifficulty) }
+    }
+
+    LaunchedEffect(style, places) {
+        style?.let { PlaceLayers.sync(context, it, places) }
     }
 
     LaunchedEffect(style, recording?.segments, shownTracks) {

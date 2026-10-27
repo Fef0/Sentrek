@@ -43,6 +43,14 @@ object SentrekIcons {
         )
     }
 
+    /** A map pin. */
+    val Place: ImageVector by lazy {
+        icon(
+            "Sentrek.Place",
+            "M12,2C8.13,2 5,5.13 5,9c0,5.25 7,13 7,13s7,-7.75 7,-13c0,-3.87 -3.13,-7 -7,-7zM12,11.5c-1.38,0 -2.5,-1.12 -2.5,-2.5s1.12,-2.5 2.5,-2.5 2.5,1.12 2.5,2.5 -1.12,2.5 -2.5,2.5z",
+        )
+    }
+
     /** Builds a 24dp Material-style icon from SVG path data. */
     private fun icon(name: String, pathData: String): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f)

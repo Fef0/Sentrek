@@ -36,7 +36,15 @@
     <string name="tracks_color">Track colour</string>
     <string name="tracks_color_custom">Custom colour</string>
     <string name="tracks_color_use">Use colour</string>
-    <string name="tracks_import_empty">No track or route in this file</string>
+    <plurals name="places_imported">
+        <item quantity="one">Imported %d place</item>
+        <item quantity="other">Imported %d places</item>
+    </plurals>
+    <plurals name="places_imported_also">
+        <item quantity="one">, %d place</item>
+        <item quantity="other">, %d places</item>
+    </plurals>
+    <string name="tracks_import_empty">No track, route or waypoint in this file</string>
     <string name="tracks_import_unknown">Not a GPX, KML or KMZ file</string>
     <string name="tracks_import_failed">Could not import the file</string>
 
@@ -47,4 +55,40 @@
     <string name="tracks_delete_title">Delete this track?</string>
     <string name="tracks_saved">Track saved</string>
     <string name="tracks_save_failed">Could not save the track</string>
+
+    <string name="places_title">Places</string>
+    <string name="places_empty">No places yet.\nLong-press the map to save one, or save where you are now.</string>
+    <string name="places_unnamed">Place</string>
+    <string name="places_new">New place</string>
+    <string name="places_edit">Edit place</string>
+    <string name="places_name">Name</string>
+    <string name="places_note">Note</string>
+    <string name="places_category">Category</string>
+    <string name="places_color">Colour</string>
+    <string name="places_color_reset">Category colour</string>
+    <string name="places_save">Save</string>
+    <string name="places_save_here">Save my location</string>
+    <string name="places_waiting_gps">Waiting for GPS…</string>
+    <string name="places_no_gps">No GPS fix yet. Try again under open sky.</string>
+    <string name="places_show">Map</string>
+    <string name="places_edit_short">Edit</string>
+    <string name="places_share">Share</string>
+    <string name="places_delete">Delete</string>
+    <string name="places_delete_title">Delete this place?</string>
+    <string name="places_export">Export</string>
+    <string name="places_exported">Places saved</string>
+    <string name="places_export_failed">Could not save the places</string>
+    <string name="places_coordinates">Coordinates</string>
+    <string name="places_elevation">Elevation</string>
+    <string name="places_distance">Distance</string>
+    <string name="places_close">Close</string>
+    <string name="place_kind_star">Other</string>
+    <string name="place_kind_camp">Camp spot</string>
+    <string name="place_kind_water">Water</string>
+    <string name="place_kind_shelter">Shelter</string>
+    <string name="place_kind_viewpoint">Viewpoint</string>
+    <string name="place_kind_peak">Summit</string>
+    <string name="place_kind_parking">Parking</string>
+    <string name="place_kind_food">Food</string>
+    <string name="place_kind_danger">Danger</string>
 </resources>

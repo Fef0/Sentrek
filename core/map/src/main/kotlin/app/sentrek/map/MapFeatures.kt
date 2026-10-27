@@ -23,6 +23,8 @@ data class MapFeatureInfo(
     val tags: Map<String, String> = emptyMap(),
     /** A saved track shown on the map (its line, or one of its waypoints). */
     val trackId: String? = null,
+    /** One of the user's saved places. */
+    val placeId: String? = null,
 )
 
 /** Finds the map feature under a long press. */
@@ -43,7 +45,7 @@ object MapFeatures {
         val layerIds = map.style?.layers?.map { it.id } ?: return null
         val exact = box(screen, exactPx)
         val near = box(screen, radiusPx)
-        val pointLayers = layerIds.filter { MapOverlays.isPointLayer(it) || it in BASE_POINT_LAYERS || it == TrackLayers.WAYPOINTS }
+        val pointLayers = layerIds.filter { MapOverlays.isPointLayer(it) || it in BASE_POINT_LAYERS || it == TrackLayers.WAYPOINTS || it == PlaceLayers.LAYER }
         val hasTracks = TrackLayers.SHOWN in layerIds
 
         nearestPoint(map, exact, screen, pointLayers)?.let { return it }
@@ -86,6 +88,7 @@ object MapFeatures {
 
     private fun pointInfo(feature: Feature, position: LatLng): MapFeatureInfo {
         val props = properties(feature)
+        props["place"]?.let { id -> return MapFeatureInfo(props["name"], "place", position, osmId = null, placeId = id) }
         return if ("k" in props) {
             // Hiking overlay: k = icon, n = name, id = OSM element, the rest are OSM tags.
             val tags = props - setOf("k", "n", "id")

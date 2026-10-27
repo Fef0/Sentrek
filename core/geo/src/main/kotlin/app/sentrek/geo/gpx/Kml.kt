@@ -26,6 +26,7 @@ object Kml {
         private val path = ArrayDeque<String>()
         private val text = StringBuilder()
         private var placemarkName: String? = null
+        private var placemarkNote: String? = null
         private val lines = mutableListOf<List<TrackPoint>>()
         private val points = mutableListOf<LatLon>()
 
@@ -38,7 +39,7 @@ object Kml {
             path.addLast(name)
             text.setLength(0)
             when (name) {
-                "Placemark" -> { placemarkName = null; lines.clear(); points.clear() }
+                "Placemark" -> { placemarkName = null; placemarkNote = null; lines.clear(); points.clear() }
                 "Track" -> { whens.clear(); coords.clear() }
             }
         }
@@ -57,6 +58,7 @@ object Kml {
                     "Placemark" -> placemarkName = value
                     "Document" -> if (documentName == null) documentName = value
                 }
+                "description" -> if (parent == "Placemark") placemarkNote = value.ifEmpty { null }
                 "coordinates" -> {
                     val parsed = parseCoordinates(value)
                     when (parent) {
@@ -75,7 +77,7 @@ object Kml {
                 }
                 "Placemark" -> {
                     if (lines.isNotEmpty()) tracks += GpxTrack(placemarkName, lines.toList())
-                    points.forEach { waypoints += GpxWaypoint(placemarkName, it) }
+                    points.forEach { waypoints += GpxWaypoint(placemarkName, it, placemarkNote) }
                 }
             }
         }

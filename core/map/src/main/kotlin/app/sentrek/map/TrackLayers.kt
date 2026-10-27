@@ -92,7 +92,8 @@ object TrackLayers {
             return
         }
         style.addSource(GeoJsonSource(id, collection))
-        style.addLayer(
+        PlaceLayers.addBelow(
+            style,
             LineLayer(id + CASING, id).withProperties(
                 lineColor(rgb(255, 255, 255)),
                 lineWidth(8f),
@@ -100,7 +101,8 @@ object TrackLayers {
                 lineJoin(Property.LINE_JOIN_ROUND),
             ),
         )
-        style.addLayer(
+        PlaceLayers.addBelow(
+            style,
             LineLayer(id, id).withProperties(
                 lineColor(toColor(get(COLOR))),
                 lineWidth(4.5f),
@@ -118,7 +120,8 @@ object TrackLayers {
             return
         }
         style.addSource(GeoJsonSource(WAYPOINTS, collection))
-        style.addLayer(
+        PlaceLayers.addBelow(
+            style,
             CircleLayer(WAYPOINTS, WAYPOINTS).withProperties(
                 circleRadius(7f),
                 circleColor(toColor(get(COLOR))),
@@ -126,7 +129,8 @@ object TrackLayers {
                 circleStrokeWidth(2.5f),
             ),
         )
-        style.addLayer(
+        PlaceLayers.addBelow(
+            style,
             SymbolLayer(WAYPOINTS + LABELS, WAYPOINTS).withProperties(
                 textField(coalesce(get("name"), literal(""))),
                 textFont(arrayOf("Noto Sans Bold")),

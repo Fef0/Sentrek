@@ -10,7 +10,9 @@ import app.sentrek.maps.ImportedMap
 import app.sentrek.maps.ImportedMapsRepository
 import app.sentrek.maps.RegionRepository
 import app.sentrek.maps.TrailsDownload
+import app.sentrek.geo.place.Place
 import app.sentrek.record.FollowRepository
+import app.sentrek.record.PlaceRepository
 import app.sentrek.record.Following
 import app.sentrek.record.LocationRepository
 import app.sentrek.record.Recording
@@ -38,6 +40,7 @@ class HomeViewModel @Inject constructor(
     private val location: LocationRepository,
     private val recorder: RecordingRepository,
     private val follower: FollowRepository,
+    private val placeRepository: PlaceRepository,
 ) : ViewModel() {
     /** Hiking overlay files to draw (trail difficulty + points), by cell id. */
     val overlays: StateFlow<Map<String, File>> = regions.state
@@ -65,6 +68,18 @@ class HomeViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val following: StateFlow<Following?> = follower.state
+
+    val places: StateFlow<List<Place>> = placeRepository.places
+
+    fun place(id: String): Place? = placeRepository.find(id)
+
+    fun addPlace(place: Place) {
+        placeRepository.add(place.name, place.kind, place.position, place.note, place.color)
+    }
+
+    fun updatePlace(place: Place) = placeRepository.update(place)
+
+    fun deletePlace(place: Place) = placeRepository.delete(place)
 
     fun track(id: String): SavedTrack? = tracks.find(id)
 

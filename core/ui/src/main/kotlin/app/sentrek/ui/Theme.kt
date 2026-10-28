@@ -11,6 +11,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.sp
 
 /** Signal orange: readable on snow, rock and forest alike. */
@@ -76,14 +78,17 @@ private val SentrekTypography = Typography().run {
 
 /**
  * [darkTheme] picks dark colours; with [black] too, pure black backgrounds for OLED screens.
+ * [textScale] multiplies the phone's own font scale; [touch] sizes the buttons.
  */
 @Composable
 fun SentrekTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     black: Boolean = false,
-    gloves: Boolean = false,
+    touch: Touch = Touch.Standard,
+    textScale: Float = 1f,
     content: @Composable () -> Unit,
 ) {
+    val density = LocalDensity.current
     val colors = when {
         !darkTheme -> LightColors
         black -> BlackColors
@@ -93,7 +98,8 @@ fun SentrekTheme(
         // Text outside any Surface (or on a see-through one) would otherwise default to black,
         // invisible on dark backgrounds.
         CompositionLocalProvider(
-            LocalTouch provides Touch(gloves),
+            LocalTouch provides touch,
+            LocalDensity provides Density(density.density, density.fontScale * textScale),
             LocalContentColor provides colors.onBackground,
             content = content,
         )

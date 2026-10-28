@@ -36,6 +36,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import android.widget.Toast
 import app.sentrek.data.AppTheme
+import app.sentrek.data.ButtonSize
+import app.sentrek.data.TextSize
+import app.sentrek.ui.Touch
 import app.sentrek.data.MapTheme
 import app.sentrek.data.PowerMode
 import org.maplibre.android.MapLibre
@@ -113,7 +116,10 @@ class MainActivity : ComponentActivity() {
         // Not again after a rotation or process restore: the file was imported already.
         if (savedInstanceState == null) importFrom(intent)
         setContent {
+            val textSize by settings.textSize.collectAsStateWithLifecycle(initialValue = TextSize.Default)
+            val buttonSize by settings.buttonSize.collectAsStateWithLifecycle(initialValue = ButtonSize.Standard)
             val gloves by settings.gloveMode.collectAsStateWithLifecycle(initialValue = false)
+            val volumeZoom by settings.volumeKeysZoom.collectAsStateWithLifecycle(initialValue = false)
             val theme by settings.theme.collectAsStateWithLifecycle(initialValue = AppTheme.System)
             val fullScreen by settings.fullScreen.collectAsStateWithLifecycle(initialValue = false)
             val mapTheme by settings.mapTheme.collectAsStateWithLifecycle(initialValue = MapTheme.Day)
@@ -149,7 +155,17 @@ class MainActivity : ComponentActivity() {
                 MapTheme.Night -> true
             }
             CompositionLocalProvider(LocalNightMap provides nightMap, LocalMapMaxFps provides mapFps) {
-                SentrekTheme(darkTheme = dark, black = power.blackScreens || theme == AppTheme.Black, gloves = gloves) {
+                SentrekTheme(
+                    darkTheme = dark,
+                    black = power.blackScreens || theme == AppTheme.Black,
+                    touch = when {
+                        gloves -> Touch.Gloves
+                        buttonSize == ButtonSize.Large -> Touch.Large
+                        buttonSize == ButtonSize.Largest -> Touch.Largest
+                        else -> Touch.Standard
+                    },
+                    textScale = textSize.scale,
+                ) {
                     var screen by rememberSaveable { mutableStateOf(Screen.Map) }
                     // Null until the last saved view is read: the map opens where it was left, not at a default first.
                     var camera by rememberSaveable { mutableStateOf<CameraPosition?>(null) }
@@ -162,7 +178,7 @@ class MainActivity : ComponentActivity() {
                     val planner: PlannerViewModel = hiltViewModel()
                     val scope = rememberCoroutineScope()
                     val toMap = { screen = Screen.Map }
-                    SideEffect { volumeKeysZoom = gloves && screen == Screen.Map }
+                    SideEffect { volumeKeysZoom = (gloves || volumeZoom) && screen == Screen.Map }
 
                     val importedBounds by imported.collectAsStateWithLifecycle()
                     LaunchedEffect(importedBounds) {

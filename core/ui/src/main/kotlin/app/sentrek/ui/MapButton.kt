@@ -22,19 +22,23 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/** Touch sizes: standard Android sizes, or larger ones when glove mode is on. */
+/**
+ * Touch sizes. [target]: minimum height of every button (48 dp is Android's standard).
+ * [pressRadius]: extra distance around an icon (or its label) where a long press still selects it.
+ */
 @Immutable
-data class Touch(val gloves: Boolean) {
-    /** Minimum height of every button. */
-    val target: Dp get() = if (gloves) 64.dp else 48.dp
+data class Touch(val target: Dp, val icon: Dp, val pressRadius: Dp) {
+    companion object {
+        val Standard = Touch(48.dp, 24.dp, 4.dp)
+        val Large = Touch(56.dp, 28.dp, 8.dp)
+        val Largest = Touch(64.dp, 32.dp, 12.dp)
 
-    val icon: Dp get() = if (gloves) 32.dp else 24.dp
-
-    /** Extra distance around an icon (or its label) where a long press still selects it. */
-    val pressRadius: Dp get() = if (gloves) 28.dp else 4.dp
+        /** As big as [Largest], and long presses on the map reach much further. */
+        val Gloves = Touch(64.dp, 32.dp, 28.dp)
+    }
 }
 
-val LocalTouch = staticCompositionLocalOf { Touch(gloves = false) }
+val LocalTouch = staticCompositionLocalOf { Touch.Standard }
 
 /** Minimum touch target for the current mode. */
 val TouchTarget: Dp

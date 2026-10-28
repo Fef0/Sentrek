@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -47,6 +48,8 @@ import androidx.lifecycle.viewModelScope
 import app.sentrek.BuildConfig
 import app.sentrek.R
 import app.sentrek.data.AppTheme
+import app.sentrek.data.ButtonSize
+import app.sentrek.data.TextSize
 import app.sentrek.data.MapTheme
 import app.sentrek.data.SettingsRepository
 import app.sentrek.geo.units.BearingUnit
@@ -62,6 +65,9 @@ import app.sentrek.ui.TouchTarget
 import app.sentrek.data.AutoPower
 import app.sentrek.data.GpsTiming
 import app.sentrek.data.PowerMode
+import app.sentrek.ui.ConfirmDialog
+import app.sentrek.ui.Confirmation
+import app.sentrek.ui.FitText
 import app.sentrek.ui.MapButton
 import app.sentrek.ui.SentrekIcons
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -76,8 +82,21 @@ class SettingsViewModel @Inject constructor(private val settings: SettingsReposi
     val showTrailDifficulty: StateFlow<Boolean> =
         settings.showTrailDifficulty.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
+    val textSize: StateFlow<TextSize> =
+        settings.textSize.stateIn(viewModelScope, SharingStarted.Eagerly, TextSize.Default)
+
+    val buttonSize: StateFlow<ButtonSize> =
+        settings.buttonSize.stateIn(viewModelScope, SharingStarted.Eagerly, ButtonSize.Standard)
+
     val gloveMode: StateFlow<Boolean> =
         settings.gloveMode.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    val volumeKeysZoom: StateFlow<Boolean> =
+        settings.volumeKeysZoom.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setVolumeKeysZoom(on: Boolean) {
+        viewModelScope.launch { settings.setVolumeKeysZoom(on) }
+    }
 
     fun setShowTrailDifficulty(show: Boolean) {
         viewModelScope.launch { settings.setShowTrailDifficulty(show) }
@@ -85,6 +104,14 @@ class SettingsViewModel @Inject constructor(private val settings: SettingsReposi
 
     val offRouteVibration: StateFlow<Boolean> =
         settings.offRouteVibration.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setTextSize(size: TextSize) {
+        viewModelScope.launch { settings.setTextSize(size) }
+    }
+
+    fun setButtonSize(size: ButtonSize) {
+        viewModelScope.launch { settings.setButtonSize(size) }
+    }
 
     fun setGloveMode(on: Boolean) {
         viewModelScope.launch { settings.setGloveMode(on) }
@@ -175,8 +202,8 @@ class SettingsViewModel @Inject constructor(private val settings: SettingsReposi
         viewModelScope.launch { settings.setMapMaxFps(fps) }
     }
 
-    fun resetAdvanced() {
-        viewModelScope.launch { settings.resetAdvanced() }
+    fun resetAll() {
+        viewModelScope.launch { settings.resetAll() }
     }
 
     val showContours: StateFlow<Boolean> =
@@ -216,7 +243,10 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
         return AdvancedSettings(viewModel, onBack = { advanced = false })
     }
     val showTrailDifficulty by viewModel.showTrailDifficulty.collectAsStateWithLifecycle()
+    val textSize by viewModel.textSize.collectAsStateWithLifecycle()
+    val buttonSize by viewModel.buttonSize.collectAsStateWithLifecycle()
     val gloveMode by viewModel.gloveMode.collectAsStateWithLifecycle()
+    val volumeKeysZoom by viewModel.volumeKeysZoom.collectAsStateWithLifecycle()
     val offRouteVibration by viewModel.offRouteVibration.collectAsStateWithLifecycle()
     val theme by viewModel.theme.collectAsStateWithLifecycle()
     val mapTheme by viewModel.mapTheme.collectAsStateWithLifecycle()
@@ -290,6 +320,26 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 checked = gloveMode,
                 onChange = viewModel::setGloveMode,
             )
+            // Glove mode decides these two: greyed out until it's off.
+            ChoiceRow(
+                enabled = !gloveMode,
+                title = stringResource(R.string.settings_button_size),
+                hint = stringResource(if (gloveMode) R.string.settings_button_size_gloves else R.string.settings_button_size_hint),
+                options = listOf(
+                    ButtonSize.Standard to stringResource(R.string.settings_size_standard),
+                    ButtonSize.Large to stringResource(R.string.settings_size_large),
+                    ButtonSize.Largest to stringResource(R.string.settings_size_largest),
+                ),
+                selected = buttonSize,
+                onChange = viewModel::setButtonSize,
+            )
+            ToggleRow(
+                enabled = !gloveMode,
+                title = stringResource(R.string.settings_volume_zoom),
+                hint = if (gloveMode) stringResource(R.string.settings_volume_zoom_gloves) else null,
+                checked = gloveMode || volumeKeysZoom,
+                onChange = viewModel::setVolumeKeysZoom,
+            )
             ToggleRow(
                 title = stringResource(R.string.settings_lock_button),
                 hint = stringResource(R.string.settings_lock_button_hint),
@@ -315,6 +365,18 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
             )
 
             SectionTitle(stringResource(R.string.settings_appearance))
+            ChoiceRow(
+                title = stringResource(R.string.settings_text_size),
+                hint = stringResource(R.string.settings_text_size_hint),
+                options = listOf(
+                    TextSize.Small to stringResource(R.string.settings_size_small),
+                    TextSize.Default to stringResource(R.string.settings_size_default),
+                    TextSize.Large to stringResource(R.string.settings_size_large),
+                    TextSize.Largest to stringResource(R.string.settings_size_largest),
+                ),
+                selected = textSize,
+                onChange = viewModel::setTextSize,
+            )
             ChoiceRow(
                 enabled = !saving,
                 title = stringResource(R.string.settings_app_theme),
@@ -576,11 +638,23 @@ private fun AdvancedSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
                 modifier = Modifier.padding(vertical = 6.dp),
             )
 
+            // Here, a page away from the main settings: out of reach of a stray tap.
+            var askReset by remember { mutableStateOf(false) }
             OutlinedButton(
-                onClick = viewModel::resetAdvanced,
-                enabled = !stamina,
+                onClick = { askReset = true },
                 modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget).padding(vertical = 4.dp),
-            ) { Text(stringResource(R.string.settings_advanced_reset)) }
+            ) { Text(stringResource(R.string.settings_reset), color = MaterialTheme.colorScheme.error) }
+            if (askReset) {
+                ConfirmDialog(
+                    Confirmation(
+                        title = stringResource(R.string.settings_reset_title),
+                        text = stringResource(R.string.settings_reset_text),
+                        confirmLabel = stringResource(R.string.settings_reset_confirm),
+                        destructive = true,
+                        onConfirm = viewModel::resetAll,
+                    ),
+                ) { askReset = false }
+            }
             Spacer(Modifier.height(16.dp))
         }
     }
@@ -651,7 +725,7 @@ private fun <T> ChoiceRow(
                     shape = SegmentedButtonDefaults.itemShape(i, options.size),
                     modifier = Modifier.heightIn(min = TouchTarget),
                     icon = {},
-                ) { Text(label, maxLines = 1) }
+                ) { FitText(label) }
             }
         }
     }

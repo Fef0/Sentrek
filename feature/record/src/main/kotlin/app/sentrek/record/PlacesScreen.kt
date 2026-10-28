@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -47,6 +46,7 @@ import app.sentrek.ui.Format
 import app.sentrek.ui.MapButton
 import app.sentrek.ui.SentrekIcons
 import app.sentrek.ui.TouchTarget
+import app.sentrek.ui.safeTopPadding
 
 /** Saved places, nearest first when we know where the user is: show, edit, share, delete; save the current spot. */
 @Composable
@@ -92,7 +92,7 @@ fun PlacesScreen(
     Column(Modifier.fillMaxSize()) {
         Surface(shadowElevation = 4.dp) {
             Row(
-                modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(12.dp),
+                modifier = Modifier.fillMaxWidth().safeTopPadding().padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {

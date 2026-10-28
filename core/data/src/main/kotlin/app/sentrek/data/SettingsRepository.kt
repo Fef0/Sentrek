@@ -6,9 +6,11 @@ import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import app.sentrek.geo.units.Units
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -86,6 +88,55 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[AUTO_HIDE_CONTROLS] = on }
     }
 
+    /** The map always points north: no turning with two fingers or in heading-up mode. */
+    val rotationLocked: Flow<Boolean> =
+        context.settings.data.map { it[ROTATION_LOCKED] ?: false }
+
+    suspend fun setRotationLocked(locked: Boolean) {
+        context.settings.edit { it[ROTATION_LOCKED] = locked }
+    }
+
+    /** Scale bar at the top left of the map. */
+    val showScaleBar: Flow<Boolean> =
+        context.settings.data.map { it[SHOW_SCALE_BAR] ?: true }
+
+    suspend fun setShowScaleBar(show: Boolean) {
+        context.settings.edit { it[SHOW_SCALE_BAR] = show }
+    }
+
+    /** Back on the map asks for a second press before leaving the app. */
+    val confirmExit: Flow<Boolean> =
+        context.settings.data.map { it[CONFIRM_EXIT] ?: false }
+
+    suspend fun setConfirmExit(on: Boolean) {
+        context.settings.edit { it[CONFIRM_EXIT] = on }
+    }
+
+    /** Units for each quantity; until chosen, those of the phone's country. */
+    val units: Flow<Units> =
+        context.settings.data.map { prefs ->
+            val default = Units.forCountry(Locale.getDefault().country)
+            Units(
+                distance = prefs[DISTANCE_UNIT].toEnum(default.distance),
+                elevation = prefs[ELEVATION_UNIT].toEnum(default.elevation),
+                speed = prefs[SPEED_UNIT].toEnum(default.speed),
+                slope = prefs[SLOPE_UNIT].toEnum(default.slope),
+                bearing = prefs[BEARING_UNIT].toEnum(default.bearing),
+                coordinates = prefs[COORDINATE_FORMAT].toEnum(default.coordinates),
+            )
+        }
+
+    suspend fun setUnits(units: Units) {
+        context.settings.edit {
+            it[DISTANCE_UNIT] = units.distance.name
+            it[ELEVATION_UNIT] = units.elevation.name
+            it[SPEED_UNIT] = units.speed.name
+            it[SLOPE_UNIT] = units.slope.name
+            it[BEARING_UNIT] = units.bearing.name
+            it[COORDINATE_FORMAT] = units.coordinates.name
+        }
+    }
+
     /** Where the map was last left, so the app reopens there (also after a crash). */
     val lastCamera: Flow<SavedCamera?> =
         context.settings.data.map { prefs ->
@@ -114,12 +165,25 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val MAP_THEME = stringPreferencesKey("map_theme")
         val FULL_SCREEN = booleanPreferencesKey("full_screen")
         val AUTO_HIDE_CONTROLS = booleanPreferencesKey("auto_hide_controls")
+        val CONFIRM_EXIT = booleanPreferencesKey("confirm_exit")
+        val SHOW_SCALE_BAR = booleanPreferencesKey("show_scale_bar")
+        val ROTATION_LOCKED = booleanPreferencesKey("rotation_locked")
+        val DISTANCE_UNIT = stringPreferencesKey("distance_unit")
+        val ELEVATION_UNIT = stringPreferencesKey("elevation_unit")
+        val SPEED_UNIT = stringPreferencesKey("speed_unit")
+        val SLOPE_UNIT = stringPreferencesKey("slope_unit")
+        val BEARING_UNIT = stringPreferencesKey("bearing_unit")
+        val COORDINATE_FORMAT = stringPreferencesKey("coordinate_format")
         val CAMERA_LAT = doublePreferencesKey("camera_lat")
         val CAMERA_LON = doublePreferencesKey("camera_lon")
         val CAMERA_ZOOM = doublePreferencesKey("camera_zoom")
         val CAMERA_BEARING = doublePreferencesKey("camera_bearing")
     }
 }
+
+/** The stored enum constant, or [default] when unset or no longer known. */
+private inline fun <reified T : Enum<T>> String?.toEnum(default: T): T =
+    enumValues<T>().firstOrNull { it.name == this } ?: default
 
 /** The app's colours. [Black] is dark with pure black backgrounds: OLED screens switch those pixels off. */
 enum class AppTheme { System, Light, Dark, Black }

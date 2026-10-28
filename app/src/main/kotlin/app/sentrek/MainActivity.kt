@@ -107,6 +107,7 @@ class MainActivity : ComponentActivity() {
             val theme by settings.theme.collectAsStateWithLifecycle(initialValue = AppTheme.Light)
             val fullScreen by settings.fullScreen.collectAsStateWithLifecycle(initialValue = true)
             val mapTheme by settings.mapTheme.collectAsStateWithLifecycle(initialValue = MapTheme.Day)
+            val confirmExit by settings.confirmExit.collectAsStateWithLifecycle(initialValue = false)
             LaunchedEffect(fullScreen) {
                 hideSystemBars = fullScreen
                 applySystemBars()
@@ -154,6 +155,7 @@ class MainActivity : ComponentActivity() {
                     }
 
                     val shownCamera = camera ?: return@SentrekTheme
+                    ExitConfirmation(enabled = confirmExit && screen == Screen.Map)
                     if (screen != Screen.Map) BackHandler(onBack = toMap)
                     // A theme change rebuilds the screens, and with them the map in the right colours.
                     key(dark, nightMap) {

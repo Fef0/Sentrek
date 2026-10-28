@@ -1,7 +1,6 @@
 package app.sentrek.geo.route
 
 import kotlin.math.atan
-import kotlin.math.roundToInt
 
 /** Reading an elevation profile (metres along to metres high, by increasing distance). */
 object ProfileMath {
@@ -28,15 +27,5 @@ object ProfileMath {
         if (to - from < 1.0) return 0.0
         val rise = heightAt(profile, to) - heightAt(profile, from)
         return Math.toDegrees(atan(rise / (to - from)))
-    }
-
-    /** "↗ 12°", "↘ 8°" or "→ 0°": direction and steepness at a glance. */
-    fun slopeLabel(degrees: Double): String {
-        val rounded = degrees.roundToInt()
-        return when {
-            rounded > 0 -> "↗ $rounded°"
-            rounded < 0 -> "↘ ${-rounded}°"
-            else -> "→ 0°"
-        }
     }
 }

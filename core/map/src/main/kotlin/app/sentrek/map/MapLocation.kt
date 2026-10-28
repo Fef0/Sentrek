@@ -43,23 +43,48 @@ object MapLocation {
         if (component.isLocationComponentActivated) component.forceLocationUpdate(location)
     }
 
-    /** Keeps the camera on the user until they pan the map. */
-    fun follow(map: MapLibreMap, onDismissed: () -> Unit) {
+    /**
+     * Keeps the camera on the user: north up, or turned to the direction of travel
+     * ([FollowMode.Heading], from the GPS course). [FollowMode.Off] lets the camera go.
+     */
+    fun follow(map: MapLibreMap, mode: FollowMode) {
         val component = map.locationComponent
         if (!component.isLocationComponentActivated) return
+        if (mode == FollowMode.Off) {
+            if (component.cameraMode != CameraMode.NONE) component.cameraMode = CameraMode.NONE
+            return
+        }
         // A separate zoomWhileTracking() is cancelled by the mode transition, so zoom in the same move.
         val zoom = FOLLOW_ZOOM.takeIf { map.cameraPosition.zoom < FOLLOW_ZOOM - 2 }
-        component.setCameraMode(CameraMode.TRACKING, TRANSITION_MS, zoom, null, null, null)
-        component.addOnCameraTrackingChangedListener(object : OnCameraTrackingChangedListener {
-            override fun onCameraTrackingDismissed() {
-                component.removeOnCameraTrackingChangedListener(this)
-                onDismissed()
-            }
+        val camera = if (mode == FollowMode.Heading) CameraMode.TRACKING_GPS else CameraMode.TRACKING_GPS_NORTH
+        component.setCameraMode(camera, TRANSITION_MS, zoom, null, null, null)
+    }
 
-            override fun onCameraTrackingChanged(currentMode: Int) = Unit
-        })
+    /**
+     * Reports how the camera follows the user, also when that changes without being asked:
+     * panning stops following ([FollowMode.Off]), turning the map keeps only the position
+     * ([FollowMode.North] with the map left as turned). Returns the way to stop listening.
+     */
+    fun observeFollow(map: MapLibreMap, onChange: (FollowMode) -> Unit): () -> Unit {
+        val component = map.locationComponent
+        val listener = object : OnCameraTrackingChangedListener {
+            override fun onCameraTrackingDismissed() = onChange(FollowMode.Off)
+
+            override fun onCameraTrackingChanged(currentMode: Int) = onChange(
+                when (currentMode) {
+                    CameraMode.TRACKING_GPS -> FollowMode.Heading
+                    CameraMode.TRACKING, CameraMode.TRACKING_GPS_NORTH -> FollowMode.North
+                    else -> FollowMode.Off
+                },
+            )
+        }
+        component.addOnCameraTrackingChangedListener(listener)
+        return { component.removeOnCameraTrackingChangedListener(listener) }
     }
 
     fun lastLocation(map: MapLibreMap): Location? =
         map.locationComponent.takeIf { it.isLocationComponentActivated }?.lastKnownLocation
 }
+
+/** How the map follows the user's position. */
+enum class FollowMode { Off, North, Heading }

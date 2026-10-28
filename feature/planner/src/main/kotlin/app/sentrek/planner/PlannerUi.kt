@@ -55,8 +55,8 @@ fun PlanPanel(stats: PlanStats?, editing: String?, modifier: Modifier = Modifier
             if (stats == null) return@Column
             Row {
                 Stat(stringResource(R.string.plan_distance), Format.distance(stats.distance), Modifier.weight(1f))
-                Stat(stringResource(R.string.plan_ascent), if (stats.hasElevation) "↑ " + Format.meters(stats.ascent) else "–", Modifier.weight(1f))
-                Stat(stringResource(R.string.plan_descent), if (stats.hasElevation) "↓ " + Format.meters(stats.descent) else "–", Modifier.weight(1f))
+                Stat(stringResource(R.string.plan_ascent), if (stats.hasElevation) "↑ " + Format.elevation(stats.ascent) else "–", Modifier.weight(1f))
+                Stat(stringResource(R.string.plan_descent), if (stats.hasElevation) "↓ " + Format.elevation(stats.descent) else "–", Modifier.weight(1f))
                 Stat(stringResource(R.string.plan_time), Format.estimate(stats.millis), Modifier.weight(1f))
             }
             if (stats.hasElevation) {

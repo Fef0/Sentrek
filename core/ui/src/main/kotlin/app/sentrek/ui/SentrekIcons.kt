@@ -35,6 +35,9 @@ object SentrekIcons {
         )
     }
 
+    /** An arrow pointing ahead: following the position with the map turned to the direction of travel. */
+    val Heading: ImageVector by lazy { icon("Sentrek.Heading", "M12,2L4.5,20.29l0.71,0.71L12,18l6.79,3 0.71,-0.71z") }
+
     /** A winding route between two points. */
     val Tracks: ImageVector by lazy {
         icon(

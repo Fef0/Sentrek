@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -61,6 +60,7 @@ import app.sentrek.ui.Format
 import app.sentrek.ui.TouchTarget
 import app.sentrek.ui.MapButton
 import app.sentrek.ui.SentrekIcons
+import app.sentrek.ui.safeTopPadding
 
 /** Saved and imported tracks: follow, show on the map, share, save as GPX, rename, delete; import files. */
 @Composable
@@ -114,7 +114,7 @@ fun TracksScreen(
     Column(Modifier.fillMaxSize()) {
         Surface(shadowElevation = 4.dp) {
             Row(
-                modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(12.dp),
+                modifier = Modifier.fillMaxWidth().safeTopPadding().padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
@@ -353,8 +353,8 @@ private fun TrackCard(
                     R.string.tracks_stats,
                     Format.distance(track.distance),
                     time,
-                    Format.meters(track.ascent),
-                    Format.meters(track.descent),
+                    Format.elevation(track.ascent),
+                    Format.elevation(track.descent),
                 ),
                 style = MaterialTheme.typography.bodyLarge,
             )

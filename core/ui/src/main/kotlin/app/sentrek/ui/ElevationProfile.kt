@@ -77,8 +77,8 @@ fun ElevationProfile(
 
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Column(Modifier.fillMaxWidth(0.18f).fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
-            Text(Format.meters(high), style = MaterialTheme.typography.labelMedium, maxLines = 1)
-            Text(Format.meters(low), style = MaterialTheme.typography.labelMedium, maxLines = 1)
+            Text(Format.elevation(high), style = MaterialTheme.typography.labelMedium, maxLines = 1)
+            Text(Format.elevation(low), style = MaterialTheme.typography.labelMedium, maxLines = 1)
         }
         Canvas(
             Modifier
@@ -143,8 +143,8 @@ fun ElevationProfile(
                     pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())),
                 )
                 dot(at(t, ProfileMath.heightAt(profile, t)), ink)
-                val text = ProfileMath.slopeLabel(ProfileMath.slopeDegrees(profile, t)) + " · " +
-                    Format.meters(ProfileMath.heightAt(profile, t)) + " · " + Format.distance(t)
+                val text = Format.slope(ProfileMath.slopeDegrees(profile, t)) + " · " +
+                    Format.elevation(ProfileMath.heightAt(profile, t)) + " · " + Format.distance(t)
                 label(measurer, text, labelStyle, tx, paper)
             } else if (here != null && hereLabel != null) {
                 label(measurer, hereLabel, labelStyle, x(here), paper)

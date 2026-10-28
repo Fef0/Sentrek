@@ -55,6 +55,8 @@ fun SentrekMap(
                     isQuickZoomGesturesEnabled = true
                     isCompassEnabled = true
                     isLogoEnabled = false
+                    // The credit is drawn by the screens (MapCredit), without the "i" button.
+                    isAttributionEnabled = false
                 }
                 map.setStyle(Style.Builder().fromUri(style.uri)) { loaded ->
                     if (night) NightStyle.apply(loaded)

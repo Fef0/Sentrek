@@ -108,7 +108,7 @@ class TrackingService : Service() {
             else -> getString(R.string.follow_notification_title, f?.name.orEmpty())
         }
         val text = listOfNotNull(
-            r?.let { getString(R.string.record_notification_text, Format.distance(it.distance), Format.meters(it.ascent)) },
+            r?.let { getString(R.string.record_notification_text, Format.distance(it.distance), Format.elevation(it.ascent)) },
             f?.let { getString(R.string.follow_notification_left, Format.distance(it.remaining.distance), Format.duration(it.remaining.millis)) },
         ).joinToString(" · ")
         val showChronometer = r != null && !r.isPaused

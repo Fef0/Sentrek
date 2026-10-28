@@ -53,7 +53,7 @@ fun RecordingStats(recording: Recording, modifier: Modifier = Modifier) {
                 Stat(stringResource(R.string.record_time), Format.duration(recording.activeMillis(now)), Modifier.weight(1f))
             }
             Stat(stringResource(R.string.record_distance), Format.distance(recording.distance), Modifier.weight(1f))
-            Stat(stringResource(R.string.record_ascent), "↑ " + Format.meters(recording.ascent), Modifier.weight(1f))
+            Stat(stringResource(R.string.record_ascent), "↑ " + Format.elevation(recording.ascent), Modifier.weight(1f))
         }
     }
 }

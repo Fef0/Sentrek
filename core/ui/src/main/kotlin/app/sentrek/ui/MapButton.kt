@@ -1,18 +1,24 @@
 package app.sentrek.ui
 
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -35,7 +41,10 @@ val TouchTarget: Dp
     @Composable @ReadOnlyComposable
     get() = LocalTouch.current.target
 
-/** Large square button floating over the map. */
+/**
+ * Large square button floating over the map. [onLongClick] (described by [longClickLabel])
+ * adds a second action; [interactionSource] tells when the finger is still on the button.
+ */
 @Composable
 fun MapButton(
     icon: ImageVector,
@@ -43,12 +52,26 @@ fun MapButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     active: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
+    longClickLabel: String? = null,
+    interactionSource: MutableInteractionSource? = null,
 ) {
     val colors = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(16.dp)
+    val interactions = interactionSource ?: remember { MutableInteractionSource() }
     Surface(
-        onClick = onClick,
-        modifier = modifier.size(TouchTarget),
-        shape = RoundedCornerShape(16.dp),
+        modifier = modifier
+            .size(TouchTarget)
+            .clip(shape)
+            .combinedClickable(
+                interactionSource = interactions,
+                indication = ripple(),
+                role = Role.Button,
+                onLongClickLabel = longClickLabel,
+                onLongClick = onLongClick,
+                onClick = onClick,
+            ),
+        shape = shape,
         color = if (active) colors.primary else colors.surface,
         contentColor = if (active) colors.onPrimary else colors.onSurface,
         shadowElevation = 4.dp,

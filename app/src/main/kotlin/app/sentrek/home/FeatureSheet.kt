@@ -27,6 +27,7 @@ import app.sentrek.R
 import app.sentrek.geo.overlay.SacScale
 import app.sentrek.geo.overlay.TrailVisibility
 import app.sentrek.map.MapFeatureInfo
+import app.sentrek.ui.Format
 import app.sentrek.ui.TouchTarget
 import java.util.Locale
 
@@ -59,7 +60,10 @@ fun FeatureSheet(info: MapFeatureInfo, onSaveAsPlace: () -> Unit, onDismiss: () 
 
             SelectionContainer {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    info.tags["ele"]?.let { Fact(stringResource(R.string.feature_elevation), "$it m") }
+                    info.tags["ele"]?.let { ele ->
+                        // OSM heights are in metres; anything unusual is shown as written.
+                        Fact(stringResource(R.string.feature_elevation), ele.toDoubleOrNull()?.let(Format::elevation) ?: "$ele m")
+                    }
                     info.sacGrade?.let { grade ->
                         val name = SacScale.entries.firstOrNull { it.grade == grade }?.osm?.let(::humanize)
                         Fact(stringResource(R.string.feature_difficulty), listOfNotNull("T$grade", name).joinToString(" · "))
@@ -71,7 +75,7 @@ fun FeatureSheet(info: MapFeatureInfo, onSaveAsPlace: () -> Unit, onDismiss: () 
                     }
                     Fact(
                         stringResource(R.string.feature_coordinates),
-                        String.format(Locale.ROOT, "%.5f, %.5f", info.position.latitude, info.position.longitude),
+                        Format.coordinates(info.position.latitude, info.position.longitude),
                     )
                 }
             }

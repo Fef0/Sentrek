@@ -90,7 +90,7 @@ fun FollowPanel(
             Row(Modifier.padding(bottom = 8.dp)) {
                 FollowStat(stringResource(R.string.follow_distance_left), Format.distance(left.distance), Modifier.weight(1f))
                 if (following.hasElevation) {
-                    FollowStat(stringResource(R.string.follow_ascent_left), "↑ " + Format.meters(left.ascent), Modifier.weight(1f))
+                    FollowStat(stringResource(R.string.follow_ascent_left), "↑ " + Format.elevation(left.ascent), Modifier.weight(1f))
                 }
                 FollowStat(stringResource(R.string.follow_time_left), Format.duration(left.millis), Modifier.weight(1f))
             }

@@ -84,6 +84,16 @@ class HomeViewModel @Inject constructor(
     val autoHideControls: StateFlow<Boolean> =
         settings.autoHideControls.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    val showScaleBar: StateFlow<Boolean> =
+        settings.showScaleBar.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    val rotationLocked: StateFlow<Boolean> =
+        settings.rotationLocked.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setRotationLocked(locked: Boolean) {
+        viewModelScope.launch { settings.setRotationLocked(locked) }
+    }
+
     fun setFollowProfile(show: Boolean) {
         viewModelScope.launch { settings.setFollowProfile(show) }
     }

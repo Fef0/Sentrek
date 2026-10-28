@@ -19,6 +19,7 @@ android {
 }
 
 dependencies {
+    api(project(":core:geo"))
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.hilt.android)

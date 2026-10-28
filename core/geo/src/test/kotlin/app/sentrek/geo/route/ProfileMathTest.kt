@@ -25,11 +25,4 @@ class ProfileMathTest {
         assertEquals(0.0, ProfileMath.slopeDegrees(profile, 0.0), 1e-9)
         assertEquals(0.0, ProfileMath.slopeDegrees(listOf(0.0 to 10.0, 0.5 to 20.0), 0.2), 1e-9)
     }
-
-    @Test
-    fun `labels`() {
-        assertEquals("↗ 45°", ProfileMath.slopeLabel(45.0))
-        assertEquals("↘ 6°", ProfileMath.slopeLabel(-5.7))
-        assertEquals("→ 0°", ProfileMath.slopeLabel(0.3))
-    }
 }

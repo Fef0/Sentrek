@@ -9,6 +9,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.draw.alpha
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.AnimatedVisibility
+import android.graphics.PointF
 import android.view.MotionEvent
 import android.Manifest
 import android.os.Build
@@ -22,7 +23,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
@@ -36,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,6 +71,8 @@ import app.sentrek.geo.Geo
 import app.sentrek.geo.LatLon
 import app.sentrek.geo.place.Place
 import app.sentrek.geo.place.PlaceKind
+import app.sentrek.map.LocalNightMap
+import app.sentrek.map.FollowMode
 import app.sentrek.map.MapFeatureInfo
 import app.sentrek.map.MapFeatures
 import app.sentrek.map.MapLocation
@@ -94,6 +104,10 @@ import app.sentrek.ui.BottomBar
 import app.sentrek.ui.LocalTouch
 import app.sentrek.ui.TouchTarget
 import app.sentrek.ui.MapButton
+import app.sentrek.ui.MapCompass
+import app.sentrek.ui.MapCredit
+import app.sentrek.ui.ScaleBar
+import app.sentrek.ui.safeTopPadding
 import app.sentrek.ui.SentrekIcons
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -110,8 +124,22 @@ val DefaultCamera: CameraPosition = CameraPosition.Builder()
     .zoom(11.0)
     .build()
 
-/** Space between the bottom bar and the map's attribution button, in pixels. */
-private const val ATTRIBUTION_GAP_PX = 16
+/** Turned less than this from north, the map snaps back to north when it stops. */
+private const val SNAP_NORTH_DEGREES = 5.0
+
+private const val NORTH_ANIMATION_MS = 300
+
+/** Ground distance across one screen pixel at the centre of the map. */
+private fun metersPerPixel(map: MapLibreMap): Double {
+    val x = map.width / 2
+    val y = map.height / 2
+    if (x <= 0f || y <= 0f) return 0.0
+    val a = map.projection.fromScreenLocation(PointF(x - SCALE_PROBE_PX / 2, y))
+    val b = map.projection.fromScreenLocation(PointF(x + SCALE_PROBE_PX / 2, y))
+    return a.distanceTo(b) / SCALE_PROBE_PX
+}
+
+private const val SCALE_PROBE_PX = 100f
 
 /** How long without touches before buttons and bar fade out. */
 private const val HIDE_CONTROLS_MS = 8_000L
@@ -162,20 +190,31 @@ fun MapScreen(
     // Restarted once permission comes: the satellite count needs it.
     val gps by remember(hasLocation) { viewModel.gps() }.collectAsStateWithLifecycle(initialValue = null)
     val gpsTiming = rememberGpsLabelTiming(gps.takeIf { hasLocation })
-    // Counts taps on the location button with a fix; each shows the coordinates for a while.
-    var coordinatesTaps by remember { mutableIntStateOf(0) }
-    LaunchedEffect(coordinatesTaps) {
-        if (coordinatesTaps == 0) return@LaunchedEffect
-        delay(COORDINATES_MS)
-        coordinatesTaps = 0
+    // A long press on the location button shows the position: while the finger stays on it,
+    // and a few seconds after (time to tap it and copy the coordinates).
+    val locationPress = remember { MutableInteractionSource() }
+    val locationHeld by locationPress.collectIsPressedAsState()
+    var showPosition by remember { mutableStateOf(false) }
+    LaunchedEffect(showPosition, locationHeld) {
+        if (!showPosition || locationHeld) return@LaunchedEffect
+        delay(POSITION_LINGER_MS)
+        showPosition = false
     }
-    var following by remember { mutableStateOf(false) }
+    // How the camera follows the user, as MapLibre reports it. Taps on the location button go
+    // through Off -> North up -> heading up -> Off, as in Trekarta; panning pauses following,
+    // and the next tap resumes the mode it had ([resumeMode]).
+    var followMode by remember { mutableStateOf(FollowMode.Off) }
+    var resumeMode by remember { mutableStateOf(FollowMode.North) }
+    // A mode to apply once the position marker exists (right after a permission grant it doesn't yet).
+    var followRequest by remember { mutableStateOf<FollowMode?>(null) }
+    val rotationLocked by viewModel.rotationLocked.collectAsStateWithLifecycle()
     // Buttons and bar fade out after a while without touches: more map, and nothing static to
     // burn into OLED screens. A touch brings them back. Not while planning: that needs them.
     var touches by remember { mutableIntStateOf(0) }
     var controlsHidden by remember { mutableStateOf(false) }
     val controlsAlpha by animateFloatAsState(if (controlsHidden) 0f else 1f, label = "controls")
     val autoHideSetting by viewModel.autoHideControls.collectAsStateWithLifecycle()
+    val showScaleBar by viewModel.showScaleBar.collectAsStateWithLifecycle()
     val autoHide = autoHideSetting && !plan.active
     LaunchedEffect(autoHide, touches) {
         controlsHidden = false
@@ -248,8 +287,7 @@ fun MapScreen(
     // The user may grant or revoke location in system settings while we're in the background.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { hasLocation = viewModel.hasLocationPermission() }
 
-    // Applied by an effect below, once the position marker exists (right after a permission grant it doesn't yet).
-    val follow = { following = true }
+    val follow = { if (followMode == FollowMode.Off) followRequest = resumeMode }
     val startRecording = {
         viewModel.startRecording()
         follow()
@@ -287,9 +325,33 @@ fun MapScreen(
     // Its last height keeps the buttons above it either way.
     var barHeightPx by remember { mutableIntStateOf(0) }
     val barHeight = with(LocalDensity.current) { barHeightPx.toDp() }
-    LaunchedEffect(map, barHeightPx) {
-        val ui = map?.uiSettings ?: return@LaunchedEffect
-        ui.setAttributionMargins(ui.attributionMarginLeft, ui.attributionMarginTop, ui.attributionMarginRight, barHeightPx + ATTRIBUTION_GAP_PX)
+
+    // For the scale bar and the compass, kept up to date while the map moves.
+    var metersPerPx by remember { mutableDoubleStateOf(0.0) }
+    var bearing by remember { mutableDoubleStateOf(0.0) }
+    DisposableEffect(map) {
+        val m = map ?: return@DisposableEffect onDispose {}
+        val onMove = MapLibreMap.OnCameraMoveListener {
+            metersPerPx = metersPerPixel(m)
+            bearing = m.cameraPosition.bearing
+        }
+        val onIdle = MapLibreMap.OnCameraIdleListener {
+            metersPerPx = metersPerPixel(m)
+            bearing = m.cameraPosition.bearing
+            // Left a few degrees off north: almost certainly meant to be north.
+            val off = minOf(bearing, 360 - bearing)
+            if (followMode != FollowMode.Heading && off > 0.0 && off < SNAP_NORTH_DEGREES) {
+                m.animateCamera(CameraUpdateFactory.bearingTo(0.0), NORTH_ANIMATION_MS)
+            }
+        }
+        metersPerPx = metersPerPixel(m)
+        bearing = m.cameraPosition.bearing
+        m.addOnCameraMoveListener(onMove)
+        m.addOnCameraIdleListener(onIdle)
+        onDispose {
+            m.removeOnCameraMoveListener(onMove)
+            m.removeOnCameraIdleListener(onIdle)
+        }
     }
 
     // Every touch on the screen (map or buttons) restarts the hide timer; nothing is consumed.
@@ -311,6 +373,8 @@ fun MapScreen(
                 modifier = Modifier.fillMaxSize(),
                 onMapReady = { m, s ->
                     m.cameraPosition = camera
+                    // Our own compass (MapCompass) instead, with Trekarta's tap and long press.
+                    m.uiSettings.isCompassEnabled = false
                     map = m
                     style = s
                 },
@@ -320,7 +384,8 @@ fun MapScreen(
             Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .statusBarsPadding()
+                    .fillMaxWidth()
+                    .safeTopPadding()
                     .padding(horizontal = 12.dp, vertical = 8.dp)
                     .padding(end = TouchTarget), // Keep clear of the compass.
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -339,7 +404,34 @@ fun MapScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
+                // Top left, under any panel. It stays when the other controls fade out.
+                if (showScaleBar) ScaleBar(metersPerPx, night = LocalNightMap.current)
             }
+
+            MapCompass(
+                bearing = bearing,
+                locked = rotationLocked,
+                onClick = {
+                    // Out of heading up too: the map would turn away again at the next fix.
+                    if (followMode != FollowMode.Off) {
+                        followRequest = FollowMode.North
+                    } else {
+                        map?.animateCamera(CameraUpdateFactory.bearingTo(0.0), NORTH_ANIMATION_MS)
+                    }
+                },
+                onLongClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    val locked = !rotationLocked
+                    viewModel.setRotationLocked(locked)
+                    Toast.makeText(context, if (locked) R.string.rotation_locked else R.string.rotation_unlocked, Toast.LENGTH_SHORT).show()
+                },
+                contentDescription = stringResource(R.string.compass_north),
+                longClickLabel = stringResource(if (rotationLocked) R.string.compass_unlock else R.string.compass_lock),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .safeTopPadding()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            )
 
             // With the controls hidden, GPS trouble must still show.
             if (controlsHidden) {
@@ -378,9 +470,10 @@ fun MapScreen(
                         onClick = planner::start,
                     )
                 }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (coordinatesTaps > 0 && gps is GpsStatus.Fix) {
-                        CoordinatesLabel(viewModel.lastFix, Modifier.widthIn(max = 260.dp))
+                // Bottom-aligned: a taller label grows upwards and the button stays under the finger.
+                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (showPosition && gps is GpsStatus.Fix) {
+                        CoordinatesLabel(viewModel.lastFix, Modifier.widthIn(max = 300.dp))
                     } else {
                         GpsIndicator(
                             status = gps.takeIf { hasLocation },
@@ -390,18 +483,39 @@ fun MapScreen(
                         )
                     }
                     MapButton(
-                        icon = SentrekIcons.MyLocation,
-                        contentDescription = stringResource(R.string.my_location),
+                        icon = if (followMode == FollowMode.Heading) SentrekIcons.Heading else SentrekIcons.MyLocation,
+                        contentDescription = stringResource(
+                            when (followMode) {
+                                FollowMode.Off -> R.string.my_location
+                                FollowMode.North -> R.string.my_location_heading
+                                FollowMode.Heading -> R.string.my_location_stop
+                            },
+                        ),
                         onClick = {
-                            // Following a position that can't come is pointless: help switch the GPS on.
-                            if (hasLocation && gps == GpsStatus.Off) {
-                                openLocationSettings(context)
-                            } else {
-                                if (gps is GpsStatus.Fix) coordinatesTaps++
-                                withLocation(AfterPermission.Follow) { follow() }
+                            showPosition = false
+                            when {
+                                // Following a position that can't come is pointless: help switch the GPS on.
+                                hasLocation && gps == GpsStatus.Off -> openLocationSettings(context)
+                                followMode == FollowMode.Off -> withLocation(AfterPermission.Follow) { follow() }
+                                // With rotation locked there is no heading up: straight to off.
+                                followMode == FollowMode.North && !rotationLocked -> followRequest = FollowMode.Heading
+                                else -> {
+                                    resumeMode = FollowMode.North
+                                    followRequest = FollowMode.Off
+                                    map?.animateCamera(CameraUpdateFactory.bearingTo(0.0), NORTH_ANIMATION_MS)
+                                }
                             }
                         },
-                        active = following,
+                        onLongClick = {
+                            // Without a fix the GPS label already says why there is no position.
+                            if (gps is GpsStatus.Fix) {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                showPosition = true
+                            }
+                        },
+                        longClickLabel = stringResource(R.string.my_location_details),
+                        interactionSource = locationPress,
+                        active = followMode != FollowMode.Off,
                     )
                 }
                 MapButton(
@@ -416,6 +530,15 @@ fun MapScreen(
                 )
             }
         }
+
+        // Bottom left, above the bar, for the first seconds. Clear of the buttons on the right:
+        // the credit wraps instead.
+        MapCredit(
+            Modifier
+                .align(Alignment.BottomStart)
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start))
+                .padding(start = 12.dp, end = TouchTarget + 24.dp, bottom = barHeight + 12.dp),
+        )
 
         Box(
             Modifier
@@ -504,12 +627,37 @@ fun MapScreen(
         }
     }
 
-    LaunchedEffect(map, style, hasLocation, following) {
+    LaunchedEffect(map, style, hasLocation, followRequest) {
         val m = map ?: return@LaunchedEffect
         val s = style ?: return@LaunchedEffect
-        if (!hasLocation || !following) return@LaunchedEffect
+        val mode = followRequest ?: return@LaunchedEffect
+        if (!hasLocation) return@LaunchedEffect
         MapLocation.activate(context, m, s)
-        MapLocation.follow(m) { following = false }
+        MapLocation.follow(m, mode)
+        followRequest = null
+    }
+
+    DisposableEffect(map, style, hasLocation) {
+        val m = map
+        if (m == null || style == null || !hasLocation) return@DisposableEffect onDispose {}
+        val stop = MapLocation.observeFollow(m) { mode ->
+            // Stopped by a gesture, not by the button: the next tap picks up where it was.
+            if (mode == FollowMode.Off && followMode != FollowMode.Off && followRequest != FollowMode.Off) {
+                resumeMode = followMode
+            }
+            followMode = mode
+        }
+        onDispose { stop() }
+    }
+
+    // Locked: north up, no turning with two fingers, and no heading-up mode. Heading up turns
+    // the map itself, so two fingers can't turn it there either.
+    LaunchedEffect(map, rotationLocked, followMode) {
+        val m = map ?: return@LaunchedEffect
+        m.uiSettings.isRotateGesturesEnabled = !rotationLocked && followMode != FollowMode.Heading
+        if (!rotationLocked) return@LaunchedEffect
+        if (followMode == FollowMode.Heading) followRequest = FollowMode.North
+        if (m.cameraPosition.bearing != 0.0) m.animateCamera(CameraUpdateFactory.bearingTo(0.0), NORTH_ANIMATION_MS)
     }
 
     LaunchedEffect(map, zoomKeys) {

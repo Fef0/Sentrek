@@ -70,7 +70,7 @@ fun TrackSheet(
                 Format.estimate(HikingTime.millis(track.distance, track.ascent, track.descent))
             }
             Text(
-                "${Format.distance(track.distance)} · $time · ↑ ${Format.meters(track.ascent)} ↓ ${Format.meters(track.descent)}",
+                "${Format.distance(track.distance)} · $time · ↑ ${Format.elevation(track.ascent)} ↓ ${Format.elevation(track.descent)}",
                 style = MaterialTheme.typography.bodyLarge,
             )
             ElevationProfile(profile, Modifier.fillMaxWidth().height(72.dp))

@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -59,6 +58,8 @@ import app.sentrek.ui.Confirmation
 import app.sentrek.ui.ConfirmDialog
 import app.sentrek.ui.TouchTarget
 import app.sentrek.ui.MapButton
+import app.sentrek.ui.MapCredit
+import app.sentrek.ui.safeTopPadding
 import app.sentrek.ui.SentrekIcons
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.maps.MapLibreMap
@@ -149,8 +150,9 @@ fun RegionsScreen(
             icon = SentrekIcons.Back,
             contentDescription = stringResource(R.string.regions_back),
             onClick = onBack,
-            modifier = Modifier.statusBarsPadding().padding(12.dp),
+            modifier = Modifier.safeTopPadding().padding(12.dp),
         )
+        MapCredit(Modifier.align(Alignment.TopEnd).safeTopPadding().padding(12.dp))
 
         RegionsPanel(
             regions = regions,

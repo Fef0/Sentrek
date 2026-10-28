@@ -1,17 +1,35 @@
 package app.sentrek.ui
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import app.sentrek.geo.units.UnitFormat
+import app.sentrek.geo.units.Units
 import java.util.Locale
-import kotlin.math.roundToInt
 
-/** Glanceable numbers: few digits, units always shown. Metric only for now. */
+/** Glanceable numbers: few digits, units always shown, in the units chosen in Settings. */
 object Format {
-    fun distance(meters: Double): String = when {
-        meters < 1_000 -> "${meters.roundToInt()} m"
-        meters < 10_000 -> String.format(Locale.getDefault(), "%.2f km", meters / 1_000)
-        else -> String.format(Locale.getDefault(), "%.1f km", meters / 1_000)
-    }
+    /**
+     * Set at startup and whenever the setting changes (SentrekApp). Compose state, so anything
+     * drawn with these functions redraws in the new units.
+     */
+    var units by mutableStateOf(Units.forCountry(Locale.getDefault().country))
 
-    fun meters(meters: Double): String = "${meters.roundToInt()} m"
+    fun distance(meters: Double): String = UnitFormat.distance(meters, units.distance)
+
+    /** GPS accuracy and the like: metres, or feet with miles. */
+    fun shortDistance(meters: Double): String = UnitFormat.shortDistance(meters, units.distance)
+
+    /** Height, climb or descent. */
+    fun elevation(meters: Double): String = UnitFormat.elevation(meters, units.elevation)
+
+    fun speed(metersPerSecond: Double): String = UnitFormat.speed(metersPerSecond, units.speed)
+
+    fun slope(degrees: Double): String = UnitFormat.slope(degrees, units.slope)
+
+    fun bearing(degrees: Double): String = UnitFormat.bearing(degrees, units.bearing)
+
+    fun coordinates(lat: Double, lon: Double): String = UnitFormat.coordinates(lat, lon, units.coordinates)
 
     /** 1:05:09, or 5:09 under an hour. */
     fun duration(millis: Long): String {

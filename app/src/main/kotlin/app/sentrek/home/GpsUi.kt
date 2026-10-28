@@ -44,7 +44,6 @@ import app.sentrek.ui.Format
 import app.sentrek.ui.TouchTarget
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
-import kotlin.math.roundToInt
 
 /** Amber: a warning that isn't an error. Dark text reads on it in both themes. */
 private val Amber = Color(0xFFFFB300)
@@ -122,11 +121,11 @@ fun GpsIndicator(
             spinner = !longSearch,
         )
         status is GpsStatus.Fix && status.weak -> Pill(
-            status.accuracy?.let { stringResource(R.string.gps_weak, it.roundToInt()) } ?: stringResource(R.string.gps_weak_unknown),
+            status.accuracy?.let { stringResource(R.string.gps_weak, Format.shortDistance(it.toDouble())) } ?: stringResource(R.string.gps_weak_unknown),
             Amber, Color.Black, modifier,
         )
         status is GpsStatus.Fix && announceGood -> Pill(
-            stringResource(R.string.gps_ready, status.accuracy?.roundToInt() ?: 0), colors.surface, colors.onSurface, modifier,
+            stringResource(R.string.gps_ready, Format.shortDistance(status.accuracy?.toDouble() ?: 0.0)), colors.surface, colors.onSurface, modifier,
         )
     }
 }
@@ -164,8 +163,8 @@ private fun Pill(
 }
 
 /**
- * Where the user is: coordinates, height and accuracy, following [fix] live. A tap copies the
- * coordinates, e.g. to pass them on to rescuers.
+ * Where the user is: coordinates, height and accuracy, plus speed and heading while moving,
+ * following [fix] live. A tap copies the coordinates, e.g. to pass them on to rescuers.
  */
 @Composable
 fun CoordinatesLabel(fix: StateFlow<Location?>, modifier: Modifier = Modifier) {
@@ -173,10 +172,14 @@ fun CoordinatesLabel(fix: StateFlow<Location?>, modifier: Modifier = Modifier) {
     val here = location ?: return
     val context = LocalContext.current
     val coordinates = formatCoordinates(LatLon(here.latitude, here.longitude))
+    val moving = here.hasSpeed() && here.speed >= MOVING_MPS
     val details = listOfNotNull(
-        LocationRepository.altitude(here)?.let(Format::meters),
-        here.accuracy.takeIf { here.hasAccuracy() }?.let { "±${it.roundToInt()} m" },
-        stringResource(R.string.gps_copy_hint),
+        LocationRepository.altitude(here)?.let(Format::elevation),
+        here.accuracy.takeIf { here.hasAccuracy() }?.let { "±" + Format.shortDistance(it.toDouble()) },
+    ).joinToString(" · ")
+    val motion = listOfNotNull(
+        Format.speed(here.speed.toDouble()).takeIf { moving },
+        here.bearing.takeIf { moving && here.hasBearing() }?.let { Format.bearing(it.toDouble()) },
     ).joinToString(" · ")
     Surface(
         onClick = {
@@ -195,7 +198,9 @@ fun CoordinatesLabel(fix: StateFlow<Location?>, modifier: Modifier = Modifier) {
     ) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
             Text(coordinates, style = MaterialTheme.typography.titleMedium)
-            Text(details, style = MaterialTheme.typography.labelMedium)
+            if (details.isNotEmpty()) Text(details, style = MaterialTheme.typography.labelLarge)
+            if (motion.isNotEmpty()) Text(motion, style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.gps_copy_hint), style = MaterialTheme.typography.labelSmall)
         }
     }
 }
@@ -211,5 +216,8 @@ private const val SEARCH_GRACE_MS = 3_000L
 private const val SPIN_MS = 30_000L
 private const val READY_MS = 3_000L
 
-/** How long the coordinates stay after a tap on the location button. */
-const val COORDINATES_MS = 15_000L
+/** How long the position stays after the finger leaves the location button. */
+const val POSITION_LINGER_MS = 5_000L
+
+/** Slower than this is standing still (GPS noise): no speed or heading. */
+private const val MOVING_MPS = 0.5f

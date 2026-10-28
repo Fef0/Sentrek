@@ -88,7 +88,8 @@ fun PlaceIcon(kind: PlaceKind, color: Int, size: Dp, modifier: Modifier = Modifi
     }
 }
 
-fun formatCoordinates(p: LatLon): String = String.format(Locale.ROOT, "%.5f, %.5f", p.lat, p.lon)
+/** In the format chosen in Settings. */
+fun formatCoordinates(p: LatLon): String = Format.coordinates(p.lat, p.lon)
 
 /**
  * New or edited place: name, category, note and colour. [initial] carries the position (and
@@ -218,7 +219,7 @@ fun PlaceSheet(
             SelectionContainer {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Fact(stringResource(R.string.places_coordinates), formatCoordinates(place.position))
-                    place.position.ele?.let { Fact(stringResource(R.string.places_elevation), Format.meters(it)) }
+                    place.position.ele?.let { Fact(stringResource(R.string.places_elevation), Format.elevation(it)) }
                     distance?.let { Fact(stringResource(R.string.places_distance), Format.distance(it)) }
                 }
             }

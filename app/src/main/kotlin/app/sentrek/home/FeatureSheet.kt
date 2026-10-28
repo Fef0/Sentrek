@@ -1,11 +1,13 @@
 package app.sentrek.home
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -18,7 +20,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -27,6 +33,8 @@ import app.sentrek.R
 import app.sentrek.geo.overlay.SacScale
 import app.sentrek.geo.overlay.TrailVisibility
 import app.sentrek.map.MapFeatureInfo
+import app.sentrek.map.MapRoute
+import app.sentrek.map.RouteMarks
 import app.sentrek.ui.Format
 import app.sentrek.ui.TouchTarget
 import java.util.Locale
@@ -49,8 +57,10 @@ fun FeatureSheet(info: MapFeatureInfo, onSaveAsPlace: () -> Unit, onGoTo: () -> 
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             val kind = info.kind?.let(::humanize)
+            // A route pressed off any path (on a road, say) is named after the route.
+            val routeName = info.routes.firstOrNull()?.name?.takeIf { info.kind == "route" }
             Text(
-                text = info.name ?: kind ?: stringResource(R.string.feature_unnamed),
+                text = info.name ?: routeName ?: kind ?: stringResource(R.string.feature_unnamed),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
             )
@@ -78,6 +88,12 @@ fun FeatureSheet(info: MapFeatureInfo, onSaveAsPlace: () -> Unit, onGoTo: () -> 
                         Format.coordinates(info.position.latitude, info.position.longitude),
                     )
                 }
+            }
+
+            if (info.routes.isNotEmpty()) {
+                HorizontalDivider()
+                Text(stringResource(R.string.feature_routes), style = MaterialTheme.typography.titleSmall)
+                for (route in info.routes) RouteFacts(route) { uriHandler.openUri(it) }
             }
 
             val tags = info.tags - "ele"
@@ -109,6 +125,60 @@ fun FeatureSheet(info: MapFeatureInfo, onSaveAsPlace: () -> Unit, onGoTo: () -> 
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget),
             ) { Text(stringResource(R.string.feature_close)) }
+        }
+    }
+}
+
+/** A route running here: its waymark and name, what it's part of, and what OSM says about it. */
+@Composable
+private fun RouteFacts(route: MapRoute, onOpen: (String) -> Unit) {
+    val density = LocalDensity.current.density
+    val mark = remember(route.mark, density) {
+        route.mark?.let { RouteMarks.image(RouteMarks.PREFIX + it, density)?.asImageBitmap() }
+    }
+    val facts = route.facts
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            mark?.let { Image(it, contentDescription = null, modifier = Modifier.size(32.dp)) }
+            Column {
+                Text(
+                    route.name ?: facts["ref"] ?: stringResource(R.string.feature_route),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                for (whole in route.partOf) {
+                    Text(stringResource(R.string.feature_part_of, whole), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+        SelectionContainer {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOfNotNull(facts["from"], facts["to"]).takeIf { it.isNotEmpty() }?.let {
+                    Fact(stringResource(R.string.feature_route_from_to), it.joinToString(" → "))
+                }
+                facts["distance"]?.let { d ->
+                    // OSM route distances are in kilometres.
+                    Fact(stringResource(R.string.feature_route_distance), d.toDoubleOrNull()?.let { Format.distance(it * 1000) } ?: d)
+                }
+                listOfNotNull(
+                    facts["ascent"]?.let { "↑ " + (it.toDoubleOrNull()?.let(Format::elevation) ?: it) },
+                    facts["descent"]?.let { "↓ " + (it.toDoubleOrNull()?.let(Format::elevation) ?: it) },
+                ).takeIf { it.isNotEmpty() }?.let { Fact(stringResource(R.string.feature_route_climb), it.joinToString("  ")) }
+                facts["duration:forward"]?.let { Fact(stringResource(R.string.feature_route_time), it.removePrefix("0") + " h") }
+                facts["cai_scale"]?.let { Fact(stringResource(R.string.feature_route_cai), it) }
+                facts["operator"]?.let { Fact(stringResource(R.string.feature_route_operator), it) }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            facts["website"]?.takeIf { it.startsWith("http") }?.let { site ->
+                OutlinedButton(onClick = { onOpen(site) }, modifier = Modifier.weight(1f).heightIn(min = TouchTarget)) {
+                    Text(stringResource(R.string.feature_route_website))
+                }
+            }
+            OutlinedButton(
+                onClick = { onOpen("https://www.openstreetmap.org/${route.osmId}") },
+                modifier = Modifier.weight(1f).heightIn(min = TouchTarget),
+            ) { Text(stringResource(R.string.feature_route_osm)) }
         }
     }
 }

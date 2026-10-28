@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.text.format.Formatter
+import java.text.DateFormat
+import java.util.Date
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
@@ -178,6 +180,8 @@ fun RegionsScreen(
                 )
             },
             onClear = viewModel::clearSelection,
+            onUpdate = viewModel::updateSelected,
+            onUpdateOld = viewModel::updateOld,
             onRetryTrails = viewModel::retryTrails,
             onImport = { pickFile.launch(arrayOf("*/*")) },
             onShowImported = { showImported = true },
@@ -250,6 +254,8 @@ private fun RegionsPanel(
     onDownload: () -> Unit,
     onDelete: () -> Unit,
     onClear: () -> Unit,
+    onUpdate: () -> Unit,
+    onUpdateOld: () -> Unit,
     onRetryTrails: () -> Unit,
     onImport: () -> Unit,
     onShowImported: () -> Unit,
@@ -261,6 +267,9 @@ private fun RegionsPanel(
     val pending = regions.values.count { it.map !is MapDownload.Ready }
     val trailsFailed = regions.values.count { it.trails == TrailsDownload.Failed }
     val storedBytes = regions.values.sumOf { (it.map as? MapDownload.Ready)?.bytes ?: 0L }
+    val now = System.currentTimeMillis()
+    val old = regions.values.count { it.isOld(now) }
+    val selectedDate = selection.mapNotNull { regions[it]?.updatedAt }.minOrNull()
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -290,9 +299,16 @@ private fun RegionsPanel(
             }
 
             if (selection.isNotEmpty()) {
+                selectedDate?.let { date ->
+                    val day = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(date))
+                    Text(stringResource(R.string.regions_downloaded_on, day), style = MaterialTheme.typography.bodyLarge)
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Three buttons at most, wide enough for gloves: new areas first.
                     if (toDownload > 0) {
                         PanelButton(stringResource(R.string.regions_download, toDownload), onDownload, Modifier.weight(1f))
+                    } else if (toDelete > 0) {
+                        PanelButton(stringResource(R.string.regions_update, toDelete), onUpdate, Modifier.weight(1f))
                     }
                     if (toDelete > 0) {
                         PanelButton(
@@ -304,6 +320,19 @@ private fun RegionsPanel(
                     }
                 }
                 return@Column
+            }
+
+            if (old > 0 && pending == 0) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        pluralStringResource(R.plurals.regions_old, old, old),
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    OutlinedButton(onClick = onUpdateOld, modifier = Modifier.heightIn(min = TouchTarget)) {
+                        Text(stringResource(R.string.regions_update_old))
+                    }
+                }
             }
 
             if (trailsFailed > 0) {

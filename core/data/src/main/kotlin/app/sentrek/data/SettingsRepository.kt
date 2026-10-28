@@ -311,6 +311,30 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[SHOW_CONTOURS] = show }
     }
 
+    /** Downloaded areas updated by themselves at startup, on Wi-Fi only. */
+    val autoUpdateMaps: Flow<Boolean> =
+        context.settings.data.map { it[AUTO_UPDATE_MAPS] ?: false }
+
+    suspend fun setAutoUpdateMaps(on: Boolean) {
+        context.settings.edit { it[AUTO_UPDATE_MAPS] = on }
+    }
+
+    /** A reminder at startup when downloaded maps are a few months old. */
+    val mapUpdateReminders: Flow<Boolean> =
+        context.settings.data.map { it[MAP_REMINDERS] ?: true }
+
+    suspend fun setMapUpdateReminders(on: Boolean) {
+        context.settings.edit { it[MAP_REMINDERS] = on }
+    }
+
+    /** When the user last put the reminder off (epoch ms); 0 if never. */
+    val mapReminderSnoozedAt: Flow<Long> =
+        context.settings.data.map { it[MAP_REMINDER_SNOOZED] ?: 0L }
+
+    suspend fun snoozeMapReminder(now: Long) {
+        context.settings.edit { it[MAP_REMINDER_SNOOZED] = now }
+    }
+
     /** Back on the map asks for a second press before leaving the app. */
     val confirmExit: Flow<Boolean> =
         context.settings.data.map { it[CONFIRM_EXIT] ?: true }
@@ -398,6 +422,9 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val SHOW_SCALE_BAR = booleanPreferencesKey("show_scale_bar")
         val SHOW_LOCK_BUTTON = booleanPreferencesKey("show_lock_button")
         val SHOW_CONTOURS = booleanPreferencesKey("show_contours")
+        val MAP_REMINDERS = booleanPreferencesKey("map_reminders")
+        val AUTO_UPDATE_MAPS = booleanPreferencesKey("auto_update_maps")
+        val MAP_REMINDER_SNOOZED = longPreferencesKey("map_reminder_snoozed")
         val ROTATION_LOCKED = booleanPreferencesKey("rotation_locked")
         val DISTANCE_UNIT = stringPreferencesKey("distance_unit")
         val ELEVATION_UNIT = stringPreferencesKey("elevation_unit")
@@ -413,7 +440,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         /** State kept in the same store that [resetAll] leaves alone. */
         private val NOT_SETTINGS = setOf(
             CAMERA_LAT, CAMERA_LON, CAMERA_ZOOM, CAMERA_BEARING,
-            AUTO_SAVER_ARMED, AUTO_STAMINA_ARMED, PHONE_SAVER_SEEN, SAVER_BY_PHONE,
+            AUTO_SAVER_ARMED, AUTO_STAMINA_ARMED, PHONE_SAVER_SEEN, SAVER_BY_PHONE, MAP_REMINDER_SNOOZED,
         )
     }
 }

@@ -2,6 +2,7 @@ package app.sentrek.map
 
 import android.graphics.PointF
 import android.graphics.RectF
+import app.sentrek.geo.overlay.OverpassOverlay
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.geojson.Feature
@@ -25,6 +26,19 @@ data class MapFeatureInfo(
     val trackId: String? = null,
     /** One of the user's saved places. */
     val placeId: String? = null,
+    /** Waymarked routes running here (hiking overlay only), most important first. */
+    val routes: List<MapRoute> = emptyList(),
+)
+
+/** A waymarked route under a long press; [facts] are its OSM tags (from, to, distance…). */
+data class MapRoute(
+    val name: String?,
+    /** The waymark as an osmc:symbol, to draw with [RouteMarks]. */
+    val mark: String?,
+    /** The routes it belongs to, nearest first: "Regione Sicilia V00", "Sentiero Italia". */
+    val partOf: List<String>,
+    val osmId: String,
+    val facts: Map<String, String>,
 )
 
 /** Finds the map feature under a long press. */
@@ -53,19 +67,43 @@ object MapFeatures {
         nearestPoint(map, near, screen, pointLayers)?.let { return it }
         if (hasTracks) track(map, near, at)?.let { return it }
 
+        // A trail, with the routes on it; or a route on its own (on a road, say).
+        val routes = routes(map, near, layerIds.filter(MapOverlays::isRouteLayer))
         val trailLayers = layerIds.filter(MapOverlays::isTrailLayer)
-        if (trailLayers.isEmpty()) return null
-        val trail = map.queryRenderedFeatures(near, *trailLayers.toTypedArray()).firstOrNull() ?: return null
-        val props = properties(trail)
+        val trail = trailLayers.takeIf { it.isNotEmpty() }
+            ?.let { map.queryRenderedFeatures(near, *it.toTypedArray()).firstOrNull() }
+        if (trail == null && routes.isEmpty()) return null
+        val props = trail?.let(::properties).orEmpty()
         return MapFeatureInfo(
             name = null,
-            kind = "path",
+            kind = if (trail != null) "path" else "route",
             position = at,
             osmId = props["id"],
             sacGrade = props["s"]?.toIntOrNull(),
             visibility = props["v"]?.toIntOrNull(),
+            routes = routes,
         )
     }
+
+    private fun routes(map: MapLibreMap, box: RectF, layers: List<String>): List<MapRoute> {
+        if (layers.isEmpty()) return emptyList()
+        return map.queryRenderedFeatures(box, *layers.toTypedArray())
+            .map(::properties)
+            .filter { "rid" in it }
+            .distinctBy { it["rid"] }
+            .sortedByDescending { it["w"]?.toDoubleOrNull() ?: 0.0 }
+            .map { p ->
+                MapRoute(
+                    name = p["n"],
+                    mark = p["m"],
+                    partOf = p["p"]?.split('\n').orEmpty(),
+                    osmId = "relation/${p["rid"]?.toDoubleOrNull()?.toLong() ?: p["rid"]}",
+                    facts = p.filterKeys { it in ROUTE_FACTS },
+                )
+            }
+    }
+
+    private val ROUTE_FACTS = OverpassOverlay.ROUTE_FACTS.toSet()
 
     private fun box(center: PointF, radius: Float) =
         RectF(center.x - radius, center.y - radius, center.x + radius, center.y + radius)

@@ -114,6 +114,9 @@ object MapOverlays {
     private const val TRACK_BROWN = "#8b5a2b"
     private val baseFilters = WeakHashMap<Style, MutableMap<String, Expression>>()
 
+    /** When each overlay source's file was written, as loaded: a newer file is loaded again. */
+    private val loadedAt = WeakHashMap<Style, MutableMap<String, Long>>()
+
     /** First label layer of the hiking style. */
     private const val BELOW_LAYER = "water-name"
 
@@ -124,6 +127,8 @@ object MapOverlays {
 
     internal fun isTrailLayer(id: String) =
         id.startsWith(TRAILS) && listOf(CLEAR, FAINT, OVERVIEW, PLAIN_PATH, PLAIN_TRACK).any(id::endsWith)
+
+    internal fun isRouteLayer(id: String) = id.startsWith(TRAILS) && id.endsWith(ROUTES)
 
     /** [overlays]: cell id → overlay file. [showDifficulty] hides only the trail colours, not the points. */
     fun sync(style: Style, rasters: List<RasterOverlay>, overlays: Map<String, File>, showDifficulty: Boolean) {
@@ -142,10 +147,16 @@ object MapOverlays {
         }
         for ((id, file) in overlays) {
             val sourceId = TRAILS + id
-            if (style.getSource(sourceId) == null) {
-                // MapLibre needs "file://" + absolute path; File.toURI() yields "file:/…", which it rejects.
-                style.addSource(GeoJsonSource(sourceId, URI("file://${file.absolutePath}")))
+            // MapLibre needs "file://" + absolute path; File.toURI() yields "file:/…", which it rejects.
+            val uri = URI("file://${file.absolutePath}")
+            val loaded = loadedAt.getOrPut(style) { HashMap() }
+            val source = style.getSourceAs<GeoJsonSource>(sourceId)
+            if (source == null) {
+                style.addSource(GeoJsonSource(sourceId, uri))
+            } else if (loaded[sourceId] != file.lastModified()) {
+                source.setUri(uri) // An updated area: the new file replaced the old one.
             }
+            loaded[sourceId] = file.lastModified()
             // The base tiles carry paths only from zoom 12; the overlay has every path, so in
             // downloaded areas trails show from further out.
             style.addLayerBelow(routeLayer(style, sourceId, sourceId + ROUTES), BELOW_LAYER)

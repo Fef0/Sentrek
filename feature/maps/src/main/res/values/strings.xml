@@ -14,6 +14,14 @@
     <string name="regions_download">Download (%d)</string>
     <string name="regions_delete">Delete (%d)</string>
     <string name="regions_clear">Clear</string>
+    <string name="regions_update">Update (%d)</string>
+    <!-- The oldest download date among the selected areas. -->
+    <string name="regions_downloaded_on">Downloaded on %1$s</string>
+    <plurals name="regions_old">
+        <item quantity="one">%d area is over 6 months old</item>
+        <item quantity="other">%d areas are over 6 months old</item>
+    </plurals>
+    <string name="regions_update_old">Update</string>
     <!-- On a grid cell whose map is ready but whose hiking details are still downloading. -->
     <string name="regions_cell_trails">Trails…</string>
     <plurals name="regions_downloading">

@@ -12,6 +12,7 @@ import org.maplibre.android.style.expressions.Expression.eq
 import org.maplibre.android.style.expressions.Expression.geometryType
 import org.maplibre.android.style.expressions.Expression.get
 import org.maplibre.android.style.expressions.Expression.gte
+import org.maplibre.android.style.expressions.Expression.has
 import org.maplibre.android.style.expressions.Expression.interpolate
 import org.maplibre.android.style.expressions.Expression.linear
 import org.maplibre.android.style.expressions.Expression.literal
@@ -20,6 +21,8 @@ import org.maplibre.android.style.expressions.Expression.match
 import org.maplibre.android.style.expressions.Expression.not
 import org.maplibre.android.style.expressions.Expression.rgb
 import org.maplibre.android.style.expressions.Expression.step
+import org.maplibre.android.style.expressions.Expression.switchCase
+import org.maplibre.android.style.expressions.Expression.toColor
 import org.maplibre.android.style.expressions.Expression.within
 import org.maplibre.android.style.expressions.Expression.stop
 import org.maplibre.android.style.expressions.Expression.zoom
@@ -59,8 +62,12 @@ data class RasterOverlay(val id: String, val url: String)
  * and all below the base labels so names stay readable:
  * 1. imported raster maps,
  * 2. the hiking overlay, one GeoJSON file per downloaded cell (see OverpassOverlay):
+ *    - every footpath and track, from zoom 10 (the base tiles only have them from 12).
+ *      Inside downloaded areas the base tiles' own paths and tracks are hidden, so the
+ *      overlay draws them all, at every zoom;
  *    - trail difficulty, coloured like Swiss waymarking: T1 yellow, T2–T3 red-white-red,
- *      T4–T6 blue-white-blue; faint trails get sparser dashes;
+ *      T4–T6 blue-white-blue; faint trails get sparser dashes. Ungraded paths and tracks
+ *      look like the base style's own;
  *    - hiking points (huts, water, caves, guideposts, crosses…) as icons, from lower zooms
  *      than the base tiles allow. Inside downloaded areas the base tiles' own copies of these
  *      points are hidden, so nothing is drawn twice.
@@ -71,15 +78,21 @@ object MapOverlays {
     private const val CLEAR = "-clear"
     private const val FAINT = "-faint"
     private const val OVERVIEW = "-overview"
+    private const val PLAIN_PATH = "-path"
+    private const val PLAIN_TRACK = "-track"
 
-    /** Where the base tiles' own paths begin, and the overlay's detailed trails with them. */
+    /** Thin solid lines below this, dashed ones (like the base style's) from here. */
     private const val DETAIL_ZOOM = 12f
-    private const val OVERVIEW_ZOOM = 9f
+    private const val OVERVIEW_ZOOM = 10f
     private const val POINTS = "-points-z"
 
-    /** Base style layer with the hiking points the overlay also carries (hiking.json). */
+    /** Base style layers the overlay replaces inside downloaded areas (hiking.json). */
     private const val BASE_HIKING_POIS = "poi-hiking"
-    private val baseFilters = WeakHashMap<Style, Expression>()
+    private const val BASE_PATH = "path"
+    private const val BASE_TRACK = "track"
+    private const val PATH_RED = "#c0262d"
+    private const val TRACK_BROWN = "#8b5a2b"
+    private val baseFilters = WeakHashMap<Style, MutableMap<String, Expression>>()
 
     /** First label layer of the hiking style. */
     private const val BELOW_LAYER = "water-name"
@@ -90,7 +103,7 @@ object MapOverlays {
     internal fun isOverlaySource(id: String) = id.startsWith(TRAILS)
 
     internal fun isTrailLayer(id: String) =
-        id.startsWith(TRAILS) && (id.endsWith(CLEAR) || id.endsWith(FAINT) || id.endsWith(OVERVIEW))
+        id.startsWith(TRAILS) && listOf(CLEAR, FAINT, OVERVIEW, PLAIN_PATH, PLAIN_TRACK).any(id::endsWith)
 
     /** [overlays]: cell id → overlay file. [showDifficulty] hides only the trail colours, not the points. */
     fun sync(style: Style, rasters: List<RasterOverlay>, overlays: Map<String, File>, showDifficulty: Boolean) {
@@ -113,9 +126,11 @@ object MapOverlays {
                 // MapLibre needs "file://" + absolute path; File.toURI() yields "file:/…", which it rejects.
                 style.addSource(GeoJsonSource(sourceId, URI("file://${file.absolutePath}")))
             }
-            // The base tiles carry paths only from zoom 12; the overlay has no such limit, so in
-            // downloaded areas trails show from much further out.
-            style.addLayerBelow(overviewLayer(sourceId, sourceId + OVERVIEW, showDifficulty), BELOW_LAYER)
+            // The base tiles carry paths only from zoom 12; the overlay has every path, so in
+            // downloaded areas trails show from further out.
+            style.addLayerBelow(overviewLayer(style, sourceId, sourceId + OVERVIEW, showDifficulty), BELOW_LAYER)
+            style.addLayerBelow(plainLayer(style, sourceId, sourceId + PLAIN_TRACK, track = true, showDifficulty), BELOW_LAYER)
+            style.addLayerBelow(plainLayer(style, sourceId, sourceId + PLAIN_PATH, track = false, showDifficulty), BELOW_LAYER)
             if (showDifficulty) {
                 // Visibility 0 (unknown) to 3 (intermediate) is a trail you can follow.
                 style.addLayerBelow(trailLayer(sourceId, sourceId + CLEAR, faint = false), BELOW_LAYER)
@@ -127,7 +142,7 @@ object MapOverlays {
                 PlaceLayers.addBelow(style, pointLayer(sourceId, sourceId + POINTS + minZoom, minZoom, kinds))
             }
         }
-        hideBaseHikingPois(style, overlays.keys)
+        for (layer in listOf(BASE_HIKING_POIS, BASE_PATH, BASE_TRACK)) hideInDownloaded(style, layer, overlays.keys)
     }
 
     private fun pointLayer(sourceId: String, layerId: String, minZoom: Int, kinds: List<PoiKind>) =
@@ -153,15 +168,20 @@ object MapOverlays {
         }
 
     /**
-     * Hides the base tiles' hiking points inside cells whose overlay is loaded: the overlay
-     * draws them already, from lower zooms. Outside downloaded areas nothing changes.
+     * Hides a base layer's features inside cells whose overlay is loaded: the overlay draws
+     * them already, from lower zooms. Outside downloaded areas nothing changes.
      */
-    private fun hideBaseHikingPois(style: Style, cellIds: Collection<String>) {
-        val layer = style.getLayer(BASE_HIKING_POIS) as? SymbolLayer ?: return
-        val original = baseFilters.getOrPut(style) { layer.filter ?: literal(true) }
+    private fun hideInDownloaded(style: Style, layerId: String, cellIds: Collection<String>) {
+        val layer = style.getLayer(layerId)
+        val (filter, setFilter) = when (layer) {
+            is SymbolLayer -> layer.filter to layer::setFilter
+            is LineLayer -> layer.filter to layer::setFilter
+            else -> return
+        }
+        val original = baseFilters.getOrPut(style) { HashMap() }.getOrPut(layerId) { filter ?: literal(true) }
         val cells = cellIds.mapNotNull(RegionCell::parse)
         if (cells.isEmpty()) {
-            layer.setFilter(original)
+            setFilter(original)
             return
         }
         // One "within" per cell: the Android expression API only accepts a single Polygon
@@ -177,8 +197,18 @@ object MapOverlays {
                 within(Polygon.fromLngLats(listOf(ring)))
             }.toTypedArray(),
         )
-        layer.setFilter(all(original, not(inDownloaded)))
+        setFilter(all(original, not(inDownloaded)))
     }
+
+    /** The base style's colour for [layerId], as currently set (the night map changes it). */
+    private fun baseColor(style: Style, layerId: String, fallback: String) =
+        (style.getLayer(layerId) as? LineLayer)?.lineColor?.value as? String ?: fallback
+
+    /** Ungraded lines: tracks (`t`) brown, paths red, like the base style's own. */
+    private fun plainColor(style: Style) = switchCase(
+        has("t"), toColor(literal(baseColor(style, BASE_TRACK, TRACK_BROWN))),
+        toColor(literal(baseColor(style, BASE_PATH, PATH_RED))),
+    )
 
     private fun difficultyColor() = step(
         get("s"), rgb(230, 175, 0),
@@ -187,16 +217,29 @@ object MapOverlays {
     )
 
     /** Thin solid lines for zoomed-out views, where dashes would just be noise. */
-    private fun overviewLayer(sourceId: String, layerId: String, showDifficulty: Boolean) =
+    private fun overviewLayer(style: Style, sourceId: String, layerId: String, showDifficulty: Boolean) =
         LineLayer(layerId, sourceId).apply {
             minZoom = OVERVIEW_ZOOM
             maxZoom = DETAIL_ZOOM
             setFilter(eq(geometryType(), literal("LineString")))
             setProperties(
-                // Without difficulty colours: the red of the style's own paths (hiking.json).
-                lineColor(if (showDifficulty) difficultyColor() else rgb(192, 38, 45)),
-                lineWidth(interpolate(linear(), zoom(), stop(OVERVIEW_ZOOM, 0.7f), stop(DETAIL_ZOOM, 1.6f))),
+                lineColor(if (showDifficulty) switchCase(has("s"), difficultyColor(), plainColor(style)) else plainColor(style)),
+                lineWidth(interpolate(linear(), zoom(), stop(OVERVIEW_ZOOM, 0.6f), stop(DETAIL_ZOOM, 1.6f))),
                 lineOpacity(interpolate(linear(), zoom(), stop(OVERVIEW_ZOOM, 0.7f), stop(DETAIL_ZOOM, 0.9f))),
+            )
+        }
+
+    /** Paths or tracks without a grade (all of them without difficulty colours), dashed like the base style's. */
+    private fun plainLayer(style: Style, sourceId: String, layerId: String, track: Boolean, showDifficulty: Boolean) =
+        LineLayer(layerId, sourceId).apply {
+            minZoom = DETAIL_ZOOM
+            val kind = if (track) has("t") else not(has("t"))
+            val lines = all(eq(geometryType(), literal("LineString")), kind)
+            setFilter(if (showDifficulty) all(lines, not(has("s"))) else lines)
+            setProperties(
+                lineColor(plainColor(style)),
+                lineWidth(interpolate(linear(), zoom(), stop(DETAIL_ZOOM, 1.5f), stop(14, 2.5f), stop(17, 4f))),
+                lineDasharray(if (track) arrayOf(4f, 2f) else arrayOf(3f, 1.5f)),
             )
         }
 
@@ -204,7 +247,7 @@ object MapOverlays {
         LineLayer(layerId, sourceId).apply {
             minZoom = DETAIL_ZOOM
             val visibility = if (faint) gte(get("v"), literal(4)) else lt(get("v"), literal(4))
-            setFilter(all(eq(geometryType(), literal("LineString")), visibility))
+            setFilter(all(eq(geometryType(), literal("LineString")), has("s"), visibility))
             setProperties(
                 lineColor(difficultyColor()),
                 lineWidth(interpolate(linear(), zoom(), stop(DETAIL_ZOOM, 1.8f), stop(14, 3f), stop(17, 5f))),

@@ -34,11 +34,15 @@ class OverpassOverlayTest {
             {"type":"trail","id":1,"geometry":{"type":"LineString","coordinates":[[7.0,46.0],[7.1,46.1]]},"tags":{"sac":"bogus","vis":""}},
             {"type":"trail","id":2,"geometry":{"type":"Point","coordinates":[7.0,46.0]},"tags":{"sac":"hiking","vis":""}},
             {"type":"poi","id":3,"geometry":{"type":"Point","coordinates":[7.0,46.0]},"tags":{"natural":"tree","name":""}},
-            {"type":"trail","id":4,"geometry":{"type":"LineString","coordinates":[[7.0,46.0],[7.1,46.1]]},"tags":{"sac":"alpine_hiking","vis":""}}
+            {"type":"trail","id":4,"geometry":{"type":"LineString","coordinates":[[7.0,46.0],[7.1,46.1]]},"tags":{"sac":"alpine_hiking","vis":""}},
+            {"type":"trail","id":5,"geometry":{"type":"LineString","coordinates":[[7.0,46.0],[7.1,46.1]]},"tags":{"hw":"track","sac":"","vis":""}}
         ]}"""
         val out = StringWriter()
-        assertEquals(1, OverpassOverlay.convert(input.reader(), out))
+        assertEquals(3, OverpassOverlay.convert(input.reader(), out))
+        // An unknown grade is still a path, drawn ungraded.
+        assertTrue(out.toString().contains(""""properties":{"v":0,"id":"way/1"}"""))
         assertTrue(out.toString().contains(""""s":4,"v":0"""))
+        assertTrue(out.toString().contains(""""properties":{"v":0,"t":1,"id":"way/5"}"""))
     }
 
     @Test
@@ -46,6 +50,7 @@ class OverpassOverlayTest {
         val q = OverpassOverlay.query(BoundingBox(45.5, 7.5, 46.0, 8.0))
         assertTrue(q.contains("[bbox:45.5,7.5,46.0,8.0]"))
         assertTrue(q.contains("cave_entrance"))
+        assertTrue(q.contains("way[\"highway\"~\"^(path|bridleway|track)$\"];"))
         assertTrue(q.contains("::=::,::id=id(),osm_type=type(),::geom=center(geom())"))
     }
 

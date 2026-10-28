@@ -13,7 +13,8 @@ import kotlin.math.roundToLong
 /**
  * The per-cell hiking overlay: details the OpenMapTiles base tiles leave out. One Overpass
  * request returns both, converted into one compact GeoJSON file:
- * - trail lines: `s` = SAC grade 1–6, `v` = visibility 1–6 (0 when unknown), `id` = "way/…";
+ * - trail lines (every footpath and track): `s` = SAC grade 1–6 (absent when ungraded),
+ *   `v` = visibility 1–6 (0 when unknown), `t` = 1 on tracks, `id` = "way/…";
  * - hiking points (huts, water, caves, guideposts, crosses…): `k` = [PoiKind.icon], `n` = name,
  *   `id` = "node/…" (or way/relation), plus every other OSM tag of the point except mapper
  *   bookkeeping ([isBookkeeping]), shown when the user long-presses it.
@@ -24,8 +25,11 @@ object OverpassOverlay {
 
     fun query(box: BoundingBox): String =
         "[out:json][timeout:180][bbox:${box.south},${box.west},${box.north},${box.east}];" +
-            "way[\"highway\"~\"^(path|footway|track|steps|bridleway)$\"][\"sac_scale\"];" +
-            "convert trail ::id=id(),sac=t[\"sac_scale\"],vis=t[\"trail_visibility\"],::geom=geom();" +
+            // Every path and track, graded or not, so they show when zoomed out; footways and
+            // steps only when graded, which leaves out pavements.
+            "(way[\"highway\"~\"^(path|bridleway|track)$\"];" +
+            "way[\"highway\"~\"^(footway|steps)$\"][\"sac_scale\"];);" +
+            "convert trail ::id=id(),hw=t[\"highway\"],sac=t[\"sac_scale\"],vis=t[\"trail_visibility\"],::geom=geom();" +
             "out geom;" +
             "(" +
             "nwr[\"natural\"~\"^(cave_entrance|spring)$\"];" +
@@ -141,13 +145,15 @@ object OverpassOverlay {
     }
 
     private fun trailFeature(e: Element, toleranceM: Double): String? {
-        val sac = SacScale.fromOsm(e.tags["sac"]) ?: return null
+        val sac = SacScale.fromOsm(e.tags["sac"])
         if (e.geometryType != "LineString" || e.lons.size < 2) return null
         val vis = TrailVisibility.fromOsm(e.tags["vis"])?.level ?: 0
         val coords = Simplify.douglasPeucker(e.lons, e.lats, toleranceM)
             .joinToString(",") { i -> "[${round5(e.lons[i])},${round5(e.lats[i])}]" }
         val id = e.id?.let { ""","id":"way/$it"""" }.orEmpty()
-        return """{"type":"Feature","properties":{"s":${sac.grade},"v":$vis$id},""" +
+        val grade = sac?.let { """"s":${it.grade},""" }.orEmpty()
+        val track = if (e.tags["hw"] == "track") ""","t":1""" else ""
+        return """{"type":"Feature","properties":{$grade"v":$vis$track$id},""" +
             """"geometry":{"type":"LineString","coordinates":[$coords]}}"""
     }
 

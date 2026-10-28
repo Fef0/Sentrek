@@ -772,6 +772,7 @@
      0,
      1.1
     ],
+    "icon-allow-overlap": ["step", ["zoom"], false, 13, true],
     "text-optional": true
    },
    "paint": {
@@ -832,6 +833,7 @@
      0,
      1.1
     ],
+    "icon-allow-overlap": ["step", ["zoom"], false, 13, true],
     "text-optional": true
    },
    "paint": {
@@ -916,6 +918,7 @@
      0,
      1.1
     ],
+    "icon-allow-overlap": ["step", ["zoom"], false, 13, true],
     "text-optional": true
    },
    "paint": {
@@ -995,6 +998,7 @@
      0,
      1.0
     ],
+    "icon-allow-overlap": ["step", ["zoom"], false, 13, true],
     "text-optional": true
    },
    "paint": {

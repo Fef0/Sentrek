@@ -92,6 +92,17 @@ class PlaceRepository @Inject constructor(
     fun savedBetween(start: Long, end: Long): List<Place> =
         _places.value.filter { it.time in start..end }.sortedBy { it.time }
 
+    /** Places from a Sentrek file that aren't here yet (by id); those added. */
+    suspend fun restore(text: String): List<Place> {
+        loaded.await()
+        val known = _places.value.map { it.id }.toSet()
+        val added = runCatching { parse(text) }.getOrDefault(emptyList()).filter { it.id !in known }
+        if (added.isEmpty()) return emptyList()
+        _places.update { all -> (all + added).sortedByDescending { it.time } }
+        save()
+        return added
+    }
+
     /** Waypoints from an imported file; [fallbackName] for those without a name. */
     fun addAll(waypoints: List<GpxWaypoint>, fallbackName: String): List<Place> {
         val now = System.currentTimeMillis()
@@ -136,23 +147,6 @@ class PlaceRepository @Inject constructor(
 
     private fun newId() = UUID.randomUUID().toString()
 
-    private fun json(places: List<Place>): String = JSONArray().apply {
-        for (p in places) {
-            put(
-                JSONObject()
-                    .put("id", p.id)
-                    .put("name", p.name)
-                    .put("kind", p.kind.id)
-                    .put("lat", p.position.lat)
-                    .put("lon", p.position.lon)
-                    .apply { p.position.ele?.let { put("ele", it) } }
-                    .put("note", p.note)
-                    .apply { p.color?.let { put("color", it) } }
-                    .put("time", p.time)
-                    .apply { if (p.photos.isNotEmpty()) put("photos", JSONArray(p.photos)) },
-            )
-        }
-    }.toString()
 
     private fun parse(text: String): List<Place> {
         val array = JSONArray(text)
@@ -178,6 +172,25 @@ class PlaceRepository @Inject constructor(
         private const val CREATOR = "Sentrek"
         private const val EXPORT_NAME = "Sentrek places"
         const val EXPORT_FILE_NAME = "Sentrek places.gpx"
+
+        /** The list as stored: in places.json and in Sentrek files. */
+        fun json(places: List<Place>): String = JSONArray().apply {
+            for (p in places) {
+                put(
+                    JSONObject()
+                        .put("id", p.id)
+                        .put("name", p.name)
+                        .put("kind", p.kind.id)
+                        .put("lat", p.position.lat)
+                        .put("lon", p.position.lon)
+                        .apply { p.position.ele?.let { put("ele", it) } }
+                        .put("note", p.note)
+                        .apply { p.color?.let { put("color", it) } }
+                        .put("time", p.time)
+                        .apply { if (p.photos.isNotEmpty()) put("photos", JSONArray(p.photos)) },
+                )
+            }
+        }.toString()
 
         fun waypoint(p: Place) = GpxWaypoint(p.name, p.position, p.note, p.kind.id, p.time)
     }

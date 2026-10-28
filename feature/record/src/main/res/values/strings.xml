@@ -78,6 +78,7 @@ Long-press the map to add one.</string>
     <string name="places_unnamed">Place</string>
     <string name="places_new">New place</string>
     <string name="places_edit">Edit place</string>
+    <string name="places_go_to">Take me there</string>
     <string name="places_name">Name</string>
     <string name="places_note">Note</string>
     <string name="places_category">Category</string>
@@ -100,6 +101,15 @@ Long-press the map to add one.</string>
     <string name="places_distance">Distance</string>
     <string name="places_close">Close</string>
     <string name="places_photos">Photos</string>
+    <string name="share_title">Share %s</string>
+    <string name="share_message">Message</string>
+    <string name="share_message_hint">Text, a map link and the photos</string>
+    <string name="share_gpx">Map file (GPX)</string>
+    <string name="share_gpx_hint">Opens in any map app</string>
+    <string name="share_sentrek">Sentrek file</string>
+    <string name="share_sentrek_place_hint">With photos and notes, for Sentrek on another phone</string>
+    <string name="share_sentrek_track_hint">With the places saved on the way, their photos and notes</string>
+    <string name="share_failed">Couldn’t prepare the file</string>
     <string name="places_camera">Camera</string>
     <string name="places_gallery">Gallery</string>
     <string name="places_photo_remove">Remove photo</string>

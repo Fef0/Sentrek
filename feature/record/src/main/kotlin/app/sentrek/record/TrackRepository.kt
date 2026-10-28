@@ -99,6 +99,8 @@ class TrackRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val places: PlaceRepository,
     private val elevation: ElevationRepository,
+    // Lazy: Sentrek files hold tracks, and this opens them on import.
+    private val backups: dagger.Lazy<BackupRepository>,
 ) {
     private val dir = File(context.filesDir, "tracks").apply { mkdirs() }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -120,15 +122,23 @@ class TrackRepository @Inject constructor(
 
     init {
         scope.launch {
-            _tracks.value = withContext(Dispatchers.IO) {
-                dir.listFiles { f -> f.name.endsWith(SUMMARY) }.orEmpty()
-                    .mapNotNull { runCatching { readSummary(it) }.getOrNull() }
-                    .sortedByDescending { it.startTime }
-            }
+            reload()
             val ids = withContext(Dispatchers.IO) { runCatching { shownFile.readLines() }.getOrDefault(emptyList()) }
             ids.mapNotNull(::find).forEach { show(it) }
         }
     }
+
+    /** Reads the list again from the files, e.g. after a backup put some back. */
+    suspend fun reload() {
+        _tracks.value = withContext(Dispatchers.IO) {
+            dir.listFiles { f -> f.name.endsWith(SUMMARY) }.orEmpty()
+                .mapNotNull { runCatching { readSummary(it) }.getOrNull() }
+                .sortedByDescending { it.startTime }
+        }
+    }
+
+    /** Where the tracks' files are, for backups. */
+    val directory: File get() = dir
 
     fun gpxFile(track: SavedTrack) = File(dir, track.id + GPX)
 
@@ -168,12 +178,16 @@ class TrackRepository @Inject constructor(
         val results = uris.map { import(it) }
         val imported = results.filterIsInstance<ImportResult.Imported>()
         val placeFiles = results.filterIsInstance<ImportResult.ImportedPlaces>()
-        val succeeded = imported.size + placeFiles.size
+        val sentrekFiles = results.filterIsInstance<ImportResult.ImportedMany>()
+        val succeeded = imported.size + placeFiles.size + sentrekFiles.size
         if (succeeded == 0) return results.firstOrNull() ?: ImportResult.Failed
-        val corners = (imported + placeFiles).mapNotNull { it.bounds }
+        val corners = (imported + placeFiles + sentrekFiles).mapNotNull { it.bounds }
             .flatMap { listOf(LatLon(it.south, it.west), LatLon(it.north, it.east)) }
         return ImportResult.ImportedMany(
-            imported.map { it.track }, placeFiles.sumOf { it.count }, results.size - succeeded, bounds(corners),
+            imported.map { it.track } + sentrekFiles.flatMap { it.tracks },
+            placeFiles.sumOf { it.count } + sentrekFiles.sumOf { it.places },
+            results.size - succeeded,
+            bounds(corners),
         )
     }
 
@@ -182,6 +196,7 @@ class TrackRepository @Inject constructor(
      * A file with waypoints only (a list of places) adds them to the saved places.
      */
     suspend fun import(uri: Uri): ImportResult {
+        if (backups.get().isSentrekFile(uri)) return importSentrekFile(uri)
         val result = withContext(Dispatchers.IO) {
             runCatching {
                 val file = context.contentResolver.openInputStream(uri)?.use { TrackFiles.read(it.buffered()) }
@@ -207,6 +222,15 @@ class TrackRepository @Inject constructor(
         }
         if (result is ImportResult.Imported) show(result.track)
         return result
+    }
+
+    /** A place or track shared from Sentrek (or a backup): what it adds, shown on the map. */
+    private suspend fun importSentrekFile(uri: Uri): ImportResult {
+        val restored = backups.get().restore(uri) ?: return ImportResult.Failed
+        if (restored.tracks.isEmpty() && restored.places.isEmpty()) return ImportResult.Empty
+        val corners = restored.tracks.mapNotNull { show(it) }
+            .flatMap { listOf(LatLon(it.south, it.west), LatLon(it.north, it.east)) } + restored.places.map { it.position }
+        return ImportResult.ImportedMany(restored.tracks, restored.places.size, 0, bounds(corners))
     }
 
     /** Renames the track, in the list and inside its GPX file. */
@@ -499,9 +523,21 @@ class TrackRepository @Inject constructor(
             return List(PROFILE_POINTS) { all[(it * step).toInt()] } + all.last()
         }
 
+        /** At least about 1 km across: a single place would otherwise zoom the map to its limit. */
         fun bounds(points: List<LatLon>): BoundingBox? {
             if (points.isEmpty()) return null
-            return BoundingBox(points.minOf { it.lat }, points.minOf { it.lon }, points.maxOf { it.lat }, points.maxOf { it.lon })
+            val south = points.minOf { it.lat }
+            val north = points.maxOf { it.lat }
+            val west = points.minOf { it.lon }
+            val east = points.maxOf { it.lon }
+            val padLat = ((MIN_SPAN_DEG - (north - south)) / 2).coerceAtLeast(0.0)
+            val padLon = ((MIN_SPAN_DEG - (east - west)) / 2).coerceAtLeast(0.0)
+            return BoundingBox(
+                (south - padLat).coerceAtLeast(-90.0), (west - padLon).coerceAtLeast(-180.0),
+                (north + padLat).coerceAtMost(90.0), (east + padLon).coerceAtMost(180.0),
+            )
         }
+
+        private const val MIN_SPAN_DEG = 0.008
     }
 }

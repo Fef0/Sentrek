@@ -221,6 +221,8 @@ fun PlaceSheet(
     onShare: () -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
+    /** Null where there is no map to point the way on. */
+    onGoTo: (() -> Unit)? = null,
 ) {
     val wide = Modifier.fillMaxWidth().heightIn(min = TouchTarget)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
@@ -244,7 +246,12 @@ fun PlaceSheet(
                     distance?.let { Fact(stringResource(R.string.places_distance), Format.distance(it)) }
                 }
             }
-            Button(onClick = onEdit, modifier = wide) { Text(stringResource(R.string.places_edit)) }
+            if (onGoTo != null) Button(onClick = onGoTo, modifier = wide) { Text(stringResource(R.string.places_go_to)) }
+            if (onGoTo != null) {
+                OutlinedButton(onClick = onEdit, modifier = wide) { Text(stringResource(R.string.places_edit)) }
+            } else {
+                Button(onClick = onEdit, modifier = wide) { Text(stringResource(R.string.places_edit)) }
+            }
             OutlinedButton(onClick = onShare, modifier = wide) { Text(stringResource(R.string.places_share)) }
             OutlinedButton(onClick = onDelete, modifier = wide) {
                 Text(stringResource(R.string.places_delete), color = MaterialTheme.colorScheme.error)

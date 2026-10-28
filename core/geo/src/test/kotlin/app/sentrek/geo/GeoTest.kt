@@ -21,6 +21,16 @@ class GeoTest {
     }
 
     @Test
+    fun `bearing points the four ways and Rome to Milan north-west`() {
+        val o = LatLon(0.0, 0.0)
+        assertEquals(0.0, Geo.bearing(o, LatLon(1.0, 0.0)), 1e-9)
+        assertEquals(90.0, Geo.bearing(o, LatLon(0.0, 1.0)), 1e-9)
+        assertEquals(180.0, Geo.bearing(o, LatLon(-1.0, 0.0)), 1e-9)
+        assertEquals(270.0, Geo.bearing(o, LatLon(0.0, -1.0)), 1e-9)
+        assertEquals(327.0, Geo.bearing(LatLon(41.9028, 12.4964), LatLon(45.4642, 9.1900)), 1.0)
+    }
+
+    @Test
     fun `tile coordinates match known values`() {
         // Zoom 10 tile containing the Matterhorn.
         assertEquals(533, TileMath.tileX(7.6586, 10))

@@ -34,7 +34,7 @@ import java.util.Locale
 /** Everything we know about a long-pressed map feature. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FeatureSheet(info: MapFeatureInfo, onSaveAsPlace: () -> Unit, onDismiss: () -> Unit) {
+fun FeatureSheet(info: MapFeatureInfo, onSaveAsPlace: () -> Unit, onGoTo: () -> Unit, onDismiss: () -> Unit) {
     val uriHandler = LocalUriHandler.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -91,6 +91,10 @@ fun FeatureSheet(info: MapFeatureInfo, onSaveAsPlace: () -> Unit, onDismiss: () 
                 }
             }
 
+            OutlinedButton(
+                onClick = onGoTo,
+                modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget),
+            ) { Text(stringResource(R.string.feature_go_to)) }
             OutlinedButton(
                 onClick = onSaveAsPlace,
                 modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget),

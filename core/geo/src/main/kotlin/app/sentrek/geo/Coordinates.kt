@@ -1,6 +1,7 @@
 package app.sentrek.geo
 
 import kotlin.math.asin
+import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -38,6 +39,16 @@ object Geo {
         val h = sin(dLat / 2).let { it * it } +
             cos(Math.toRadians(a.lat)) * cos(Math.toRadians(b.lat)) * sin(dLon / 2).let { it * it }
         return 2 * EARTH_RADIUS_M * asin(sqrt(h.coerceAtMost(1.0)))
+    }
+
+    /** Initial compass direction from [a] to [b], degrees clockwise from north (0–360). */
+    fun bearing(a: LatLon, b: LatLon): Double {
+        val phi1 = Math.toRadians(a.lat)
+        val phi2 = Math.toRadians(b.lat)
+        val dLon = Math.toRadians(b.lon - a.lon)
+        val y = sin(dLon) * cos(phi2)
+        val x = cos(phi1) * sin(phi2) - sin(phi1) * cos(phi2) * cos(dLon)
+        return (Math.toDegrees(atan2(y, x)) + 360) % 360
     }
 
     /** Total length of a polyline in metres. */

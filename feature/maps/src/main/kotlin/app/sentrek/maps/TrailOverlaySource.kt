@@ -4,6 +4,7 @@ import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.overlay.OverlayPoiSource
 import app.sentrek.geo.overlay.OverpassOverlay
 import app.sentrek.map.MapEngine
+import app.sentrek.map.Server
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -65,16 +66,13 @@ class OverpassTrailSource @Inject constructor() : TrailOverlaySource {
     }
 
     private companion object {
-        val ENDPOINTS = listOf(
-            // FOSSGIS main instance: answers a cell in under a minute, or fails fast (502) when busy.
-            "https://overpass-api.de/api/interpreter",
-            // VK Maps: "no request limits, free to use in any project". Often answers 504 under
-            // load, but fails fast, so it's tried before the one that can hang.
-            "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-            // "No rate limit; notify us before large-scale use" (support@private.coffee). It can
-            // hold a request for minutes without answering, so it's only a fallback.
-            "https://overpass.private.coffee/api/interpreter",
-        )
+        // FOSSGIS main instance: answers a cell in under a minute, or fails fast (502) when busy.
+        // VK Maps: "no request limits, free to use in any project". Often answers 504 under
+        // load, but fails fast, so it's tried before the one that can hang.
+        // private.coffee: "No rate limit; notify us before large-scale use". It can hold a
+        // request for minutes without answering, so it's only a fallback.
+        // A server of the user's own takes the place of all three (see ServerRoutes).
+        val ENDPOINTS = Server.Trails.defaults
         const val ROUNDS = 3
         const val BACKOFF_MS = 30_000L
     }

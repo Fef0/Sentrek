@@ -1,5 +1,22 @@
 package app.sentrek.settings
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
+import app.sentrek.map.Server
+import androidx.compose.ui.platform.LocalContext
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
+import android.widget.Toast
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -48,9 +65,11 @@ import androidx.lifecycle.viewModelScope
 import app.sentrek.BuildConfig
 import app.sentrek.R
 import app.sentrek.data.AppTheme
+import app.sentrek.record.BackupRepository
 import app.sentrek.data.ButtonSize
 import app.sentrek.data.TextSize
 import app.sentrek.data.MapTheme
+import app.sentrek.data.DEFAULT_EMERGENCY_NUMBER
 import app.sentrek.data.SettingsRepository
 import app.sentrek.geo.units.BearingUnit
 import app.sentrek.geo.units.CoordinateFormat
@@ -78,7 +97,18 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class SettingsViewModel @Inject constructor(private val settings: SettingsRepository) : ViewModel() {
+class SettingsViewModel @Inject constructor(
+    private val settings: SettingsRepository,
+    private val backups: BackupRepository,
+) : ViewModel() {
+    fun backUp(target: Uri, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch { onDone(backups.backUp(target)) }
+    }
+
+    fun restore(source: Uri, onDone: (BackupRepository.Restored?) -> Unit) {
+        viewModelScope.launch { onDone(backups.restore(source)) }
+    }
+
     val showTrailDifficulty: StateFlow<Boolean> =
         settings.showTrailDifficulty.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
@@ -90,6 +120,41 @@ class SettingsViewModel @Inject constructor(private val settings: SettingsReposi
 
     val gloveMode: StateFlow<Boolean> =
         settings.gloveMode.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    val sosEnabled: StateFlow<Boolean> =
+        settings.sosEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setSosEnabled(on: Boolean) {
+        viewModelScope.launch { settings.setSosEnabled(on) }
+    }
+
+    val emergencyNumber: StateFlow<String> =
+        settings.emergencyNumber.stateIn(viewModelScope, SharingStarted.Eagerly, DEFAULT_EMERGENCY_NUMBER)
+
+    fun setEmergencyNumber(number: String) {
+        viewModelScope.launch { settings.setEmergencyNumber(number) }
+    }
+
+    val emergencySmsTo: StateFlow<String> =
+        settings.emergencySmsTo.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
+    fun setEmergencySmsTo(number: String) {
+        viewModelScope.launch { settings.setEmergencySmsTo(number) }
+    }
+
+    val servers: StateFlow<Map<String, String>> =
+        settings.servers.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    fun setServer(server: Server, address: String) {
+        viewModelScope.launch { settings.setServer(server.name, address) }
+    }
+
+    val emergencySms: StateFlow<Boolean> =
+        settings.emergencySms.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setEmergencySms(on: Boolean) {
+        viewModelScope.launch { settings.setEmergencySms(on) }
+    }
 
     val volumeKeysZoom: StateFlow<Boolean> =
         settings.volumeKeysZoom.stateIn(viewModelScope, SharingStarted.Eagerly, false)
@@ -241,6 +306,11 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
     if (advanced) {
         BackHandler { advanced = false }
         return AdvancedSettings(viewModel, onBack = { advanced = false })
+    }
+    var emergencyPage by rememberSaveable { mutableStateOf(false) }
+    if (emergencyPage) {
+        BackHandler { emergencyPage = false }
+        return EmergencySettings(viewModel, onBack = { emergencyPage = false })
     }
     val showTrailDifficulty by viewModel.showTrailDifficulty.collectAsStateWithLifecycle()
     val textSize by viewModel.textSize.collectAsStateWithLifecycle()
@@ -477,12 +547,49 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                     )
             }
 
+            SectionTitle(stringResource(R.string.settings_emergency))
+            NavRow(
+                title = stringResource(R.string.settings_emergency_page),
+                hint = stringResource(R.string.settings_emergency_page_hint),
+                onClick = { emergencyPage = true },
+            )
+
             SectionTitle(stringResource(R.string.settings_advanced_section))
             NavRow(
                 title = stringResource(R.string.settings_advanced),
                 hint = stringResource(R.string.settings_advanced_hint),
                 onClick = { advanced = true },
             )
+
+            SectionTitle(stringResource(R.string.settings_data))
+            val context = LocalContext.current
+            val saveTo = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+                if (uri != null) {
+                    viewModel.backUp(uri) { ok ->
+                        Toast.makeText(context, if (ok) R.string.settings_backup_done else R.string.settings_backup_failed, Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            val openFrom = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                if (uri != null) {
+                    viewModel.restore(uri) { restored ->
+                        val text = restored?.let { context.getString(R.string.settings_restore_done, it.tracks.size, it.places.size) }
+                            ?: context.getString(R.string.settings_restore_failed)
+                        Toast.makeText(context, text, Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            Text(stringResource(R.string.settings_data_hint), style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = { saveTo.launch(BackupRepository.fileName()) },
+                    modifier = Modifier.weight(1f).heightIn(min = TouchTarget),
+                ) { FitText(stringResource(R.string.settings_backup)) }
+                OutlinedButton(
+                    onClick = { openFrom.launch(arrayOf("application/zip", "application/octet-stream")) },
+                    modifier = Modifier.weight(1f).heightIn(min = TouchTarget),
+                ) { FitText(stringResource(R.string.settings_restore)) }
+            }
 
             SectionTitle(stringResource(R.string.settings_about))
             Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodyLarge)
@@ -535,6 +642,61 @@ private fun ToggleRow(
 }
 
 /** Map frame rate and GPS timing: rarely changed, so on a page of their own. */
+@Composable
+private fun EmergencySettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
+    val emergencySms by viewModel.emergencySms.collectAsStateWithLifecycle()
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(
+            modifier = Modifier
+                .safeDrawingPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                MapButton(SentrekIcons.Back, stringResource(R.string.settings_back), onBack, Modifier.padding(vertical = 12.dp))
+                Text(stringResource(R.string.settings_emergency_page), style = MaterialTheme.typography.headlineMedium)
+            }
+            val emergencyNumber by viewModel.emergencyNumber.collectAsStateWithLifecycle()
+            val emergencySmsTo by viewModel.emergencySmsTo.collectAsStateWithLifecycle()
+            val sos by viewModel.sosEnabled.collectAsStateWithLifecycle()
+            ToggleRow(
+                icon = SentrekIcons.Emergency,
+                title = stringResource(R.string.settings_sos),
+                hint = stringResource(R.string.settings_sos_hint),
+                checked = sos,
+                onChange = viewModel::setSosEnabled,
+            )
+            // Off: the rest of the section waits, greyed out, until it's on again.
+            TextSettingRow(
+                enabled = sos,
+                title = stringResource(R.string.settings_emergency_number),
+                value = emergencyNumber,
+                hint = stringResource(R.string.settings_emergency_number_hint),
+                phone = true,
+                onChange = viewModel::setEmergencyNumber,
+            )
+            ToggleRow(
+                enabled = sos,
+                title = stringResource(R.string.settings_emergency_sms),
+                hint = stringResource(R.string.settings_emergency_sms_hint),
+                checked = emergencySms,
+                onChange = viewModel::setEmergencySms,
+            )
+            TextSettingRow(
+                enabled = sos && emergencySms,
+                title = stringResource(R.string.settings_emergency_sms_to),
+                value = emergencySmsTo.ifEmpty { stringResource(R.string.settings_emergency_sms_to_none) },
+                editValue = emergencySmsTo,
+                hint = stringResource(R.string.settings_emergency_sms_to_hint),
+                phone = true,
+                onChange = viewModel::setEmergencySmsTo,
+            )
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
 @Composable
 private fun AdvancedSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val fps by viewModel.mapMaxFps.collectAsStateWithLifecycle()
@@ -638,6 +800,22 @@ private fun AdvancedSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
                 modifier = Modifier.padding(vertical = 6.dp),
             )
 
+            SectionTitle(stringResource(R.string.settings_servers))
+            Text(stringResource(R.string.settings_servers_hint), style = MaterialTheme.typography.bodyMedium)
+            val servers by viewModel.servers.collectAsStateWithLifecycle()
+            for (server in Server.entries) {
+                val custom = servers[server.name]
+                TextSettingRow(
+                    title = stringResource(serverTitle(server)),
+                    value = custom ?: stringResource(R.string.settings_server_default, server.defaults.first().removePrefix("https://").substringBefore('/')),
+                    editValue = custom.orEmpty(),
+                    hint = stringResource(serverHint(server)),
+                    placeholder = server.defaults.first(),
+                    validate = Server::isValid,
+                    onChange = { viewModel.setServer(server, it) },
+                )
+            }
+
             // Here, a page away from the main settings: out of reach of a stray tap.
             var askReset by remember { mutableStateOf(false) }
             OutlinedButton(
@@ -664,6 +842,93 @@ private fun seconds(ms: Long): String = "${ms / 1_000} s"
 
 /** Material's look for disabled content. */
 private const val DISABLED_ALPHA = 0.38f
+
+private fun serverTitle(server: Server) = when (server) {
+    Server.Tiles -> R.string.settings_server_tiles
+    Server.Terrain -> R.string.settings_server_terrain
+    Server.Trails -> R.string.settings_server_trails
+}
+
+private fun serverHint(server: Server) = when (server) {
+    Server.Tiles -> R.string.settings_server_tiles_hint
+    Server.Terrain -> R.string.settings_server_terrain_hint
+    Server.Trails -> R.string.settings_server_trails_hint
+}
+
+/**
+ * A value typed in (a phone number, an address): shown in the row, edited in a dialog.
+ * An empty value goes back to the default. [validate]: what may be saved.
+ */
+@Composable
+private fun TextSettingRow(
+    title: String,
+    value: String,
+    onChange: (String) -> Unit,
+    hint: String? = null,
+    editValue: String = value,
+    placeholder: String? = null,
+    phone: Boolean = false,
+    enabled: Boolean = true,
+    validate: (String) -> Boolean = { true },
+) {
+    var editing by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = TouchTarget)
+            .clickable(enabled = enabled, role = Role.Button) { editing = true }
+            .padding(vertical = 6.dp)
+            .alpha(if (enabled) 1f else DISABLED_ALPHA),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(value, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
+            if (hint != null) Text(hint, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+    if (editing) {
+        // All selected: typing replaces the old value, no fiddling with the cursor.
+        var field by remember { mutableStateOf(TextFieldValue(editValue, TextRange(0, editValue.length))) }
+        val text = field.text
+        val valid = text.isBlank() || validate(text.trim())
+        AlertDialog(
+            onDismissRequest = { editing = false },
+            title = { Text(title) },
+            text = {
+                val focus = remember { FocusRequester() }
+                LaunchedEffect(Unit) { focus.requestFocus() }
+                OutlinedTextField(
+                    value = field,
+                    onValueChange = { field = it },
+                    singleLine = true,
+                    isError = !valid,
+                    placeholder = placeholder?.let { { Text(it) } },
+                    supportingText = if (!valid) ({ Text(stringResource(R.string.settings_invalid)) }) else null,
+                    keyboardOptions = KeyboardOptions(keyboardType = if (phone) KeyboardType.Phone else KeyboardType.Uri),
+                    modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { onChange(text.trim()); editing = false },
+                    enabled = valid,
+                    modifier = Modifier.heightIn(min = TouchTarget),
+                ) { Text(stringResource(R.string.settings_save)) }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { onChange(""); editing = false }, modifier = Modifier.heightIn(min = TouchTarget)) {
+                        Text(stringResource(R.string.settings_default))
+                    }
+                    TextButton(onClick = { editing = false }, modifier = Modifier.heightIn(min = TouchTarget)) {
+                        Text(stringResource(R.string.settings_cancel))
+                    }
+                }
+            },
+        )
+    }
+}
 
 /** A row that opens a page of its own. */
 @Composable

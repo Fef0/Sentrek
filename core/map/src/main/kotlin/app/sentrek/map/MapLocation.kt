@@ -3,6 +3,7 @@ package app.sentrek.map
 import android.annotation.SuppressLint
 import android.content.Context
 import android.location.Location
+import org.maplibre.android.location.CompassListener
 import org.maplibre.android.location.LocationComponentActivationOptions
 import org.maplibre.android.location.OnCameraTrackingChangedListener
 import org.maplibre.android.location.modes.CameraMode
@@ -106,6 +107,20 @@ object MapLocation {
         }
         component.addOnCameraTrackingChangedListener(listener)
         return { component.removeOnCameraTrackingChangedListener(listener) }
+    }
+
+    /**
+     * The phone's compass heading (degrees from north) as it changes, while the position is
+     * shown; nothing without a compass. Returns the way to stop listening.
+     */
+    fun observeHeading(map: MapLibreMap, onHeading: (Float) -> Unit): () -> Unit {
+        val compass = map.locationComponent.takeIf { it.isLocationComponentActivated }?.compassEngine ?: return {}
+        val listener = object : CompassListener {
+            override fun onCompassChanged(userHeading: Float) = onHeading(userHeading)
+            override fun onCompassAccuracyChange(compassStatus: Int) = Unit
+        }
+        compass.addCompassListener(listener)
+        return { compass.removeCompassListener(listener) }
     }
 
     fun lastLocation(map: MapLibreMap): Location? =

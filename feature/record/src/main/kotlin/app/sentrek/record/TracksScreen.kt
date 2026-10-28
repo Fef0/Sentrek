@@ -2,7 +2,6 @@ package app.sentrek.record
 
 import android.Manifest
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -47,7 +46,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sentrek.feature.record.R
@@ -79,6 +77,7 @@ fun TracksScreen(
     var choosingFormat by remember { mutableStateOf<SavedTrack?>(null) }
     var confirm by remember { mutableStateOf<Confirmation?>(null) }
     var deleting by remember { mutableStateOf<SavedTrack?>(null) }
+    val sharing = rememberSharing()
     var renaming by remember { mutableStateOf<SavedTrack?>(null) }
     var toFollow by remember { mutableStateOf<SavedTrack?>(null) }
     var importing by remember { mutableStateOf(false) }
@@ -181,17 +180,7 @@ fun TracksScreen(
                                 else -> viewModel.hide(track)
                             }
                         },
-                        onShare = {
-                            viewModel.shareCopy(track) { file ->
-                                val uri = FileProvider.getUriForFile(context, "${context.packageName}.tracks", file)
-                                val send = Intent(Intent.ACTION_SEND)
-                                    .setType(GPX_MIME)
-                                    .putExtra(Intent.EXTRA_STREAM, uri)
-                                    .putExtra(Intent.EXTRA_SUBJECT, track.name)
-                                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                context.startActivity(Intent.createChooser(send, track.name))
-                            }
-                        },
+                        onShare = { sharing.share(track) },
                         onSave = { choosingFormat = track },
                         onEdit = if (track.imported) ({ onEditRoute(track) }) else null,
                         onDelete = { deleting = track },
@@ -258,6 +247,7 @@ fun TracksScreen(
         )
     }
 
+    ShareDialog(sharing)
     deleting?.let { track ->
         AlertDialog(
             onDismissRequest = { deleting = null },

@@ -23,6 +23,8 @@ object Format {
     /** Height, climb or descent. */
     fun elevation(meters: Double): String = UnitFormat.elevation(meters, units.elevation)
 
+    fun pressure(hPa: Double): String = UnitFormat.pressure(hPa, units.elevation)
+
     fun speed(metersPerSecond: Double): String = UnitFormat.speed(metersPerSecond, units.speed)
 
     fun slope(degrees: Double): String = UnitFormat.slope(degrees, units.slope)

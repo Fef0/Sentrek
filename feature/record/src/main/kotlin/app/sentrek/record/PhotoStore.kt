@@ -32,6 +32,9 @@ class PhotoStore @Inject constructor(@ApplicationContext private val context: Co
 
     fun file(name: String) = File(dir, name)
 
+    /** Where the photos are, for backups. */
+    val directory: File get() = dir
+
     /** For other apps: the camera writing a new photo, or the share sheet reading one. */
     fun uri(name: String): Uri = FileProvider.getUriForFile(context, context.packageName + ".tracks", file(name))
 

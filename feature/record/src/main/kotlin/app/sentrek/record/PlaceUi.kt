@@ -1,5 +1,6 @@
 package app.sentrek.record
 
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.border
@@ -92,8 +93,8 @@ fun PlaceIcon(kind: PlaceKind, color: Int, size: Dp, modifier: Modifier = Modifi
 fun formatCoordinates(p: LatLon): String = Format.coordinates(p.lat, p.lon)
 
 /**
- * New or edited place: name, category, note and colour. [initial] carries the position (and
- * for a new place a suggested name and kind); [onSave] gets the edited copy.
+ * New or edited place: name, category, note, photos and colour. [initial] carries the position
+ * (and for a new place a suggested name and kind); [onSave] gets the edited copy.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -104,11 +105,19 @@ fun PlaceDialog(title: String, initial: Place, onSave: (Place) -> Unit, onDismis
     var note by rememberSaveable { mutableStateOf(initial.note) }
     var kind by rememberSaveable { mutableStateOf(initial.kind) }
     var color by rememberSaveable { mutableStateOf(initial.color) }
+    var photos by rememberSaveable { mutableStateOf(initial.photos) }
+    // Taken in this dialog: deleted again if it's dropped, or if removed before saving.
+    var added by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var choosingColor by remember { mutableStateOf(false) }
-    val edited = initial.copy(name = name.text.trim().ifEmpty { initial.name }, kind = kind, note = note, color = color)
+    val store = rememberPhotoStore()
+    val edited = initial.copy(name = name.text.trim().ifEmpty { initial.name }, kind = kind, note = note, color = color, photos = photos)
+    val dismiss = {
+        store.delete(added)
+        onDismiss()
+    }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = dismiss,
         title = { Text(title) },
         text = {
             Column(
@@ -147,15 +156,26 @@ fun PlaceDialog(title: String, initial: Place, onSave: (Place) -> Unit, onDismis
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     modifier = Modifier.fillMaxWidth(),
                 )
+                PhotoEditor(
+                    photos = photos,
+                    onAdd = { photos = photos + it; added = added + it },
+                    onRemove = { photos = photos - it },
+                )
             }
         },
         confirmButton = {
-            Button(onClick = { onSave(edited) }, modifier = Modifier.heightIn(min = TouchTarget)) {
+            Button(
+                onClick = {
+                    store.delete(added - photos.toSet())
+                    onSave(edited)
+                },
+                modifier = Modifier.heightIn(min = TouchTarget),
+            ) {
                 Text(stringResource(R.string.places_save))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = TouchTarget)) {
+            TextButton(onClick = dismiss, modifier = Modifier.heightIn(min = TouchTarget)) {
                 Text(stringResource(R.string.tracks_cancel))
             }
         },
@@ -216,6 +236,7 @@ fun PlaceSheet(
                 }
             }
             if (place.note.isNotEmpty()) Text(place.note, style = MaterialTheme.typography.bodyLarge)
+            if (place.photos.isNotEmpty()) PhotoStrip(place.photos, size = TouchTarget * 1.6f)
             SelectionContainer {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Fact(stringResource(R.string.places_coordinates), formatCoordinates(place.position))
@@ -261,7 +282,7 @@ fun DeletePlaceDialog(place: Place, onDelete: () -> Unit, onDismiss: () -> Unit)
     )
 }
 
-/** Sends the place as text: name, note, coordinates and a map link anyone can open. */
+/** Sends the place as text (name, note, coordinates and a map link anyone can open), with its photos. */
 fun sharePlace(context: Context, place: Place) {
     val lat = String.format(Locale.ROOT, "%.5f", place.position.lat)
     val lon = String.format(Locale.ROOT, "%.5f", place.position.lon)
@@ -271,9 +292,19 @@ fun sharePlace(context: Context, place: Place) {
         "$lat, $lon",
         "https://www.openstreetmap.org/?mlat=$lat&mlon=$lon#map=16/$lat/$lon",
     ).filter { it.isNotEmpty() }.joinToString("\n")
-    val send = Intent(Intent.ACTION_SEND)
-        .setType("text/plain")
+    val store = photoStore(context)
+    val photos = place.photos.filter { store.file(it).exists() }.map(store::uri)
+    val send = when {
+        photos.isEmpty() -> Intent(Intent.ACTION_SEND).setType("text/plain")
+        photos.size == 1 -> Intent(Intent.ACTION_SEND).setType("image/jpeg").putExtra(Intent.EXTRA_STREAM, photos[0])
+        else -> Intent(Intent.ACTION_SEND_MULTIPLE).setType("image/jpeg").putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(photos))
+    }
         .putExtra(Intent.EXTRA_SUBJECT, place.name)
         .putExtra(Intent.EXTRA_TEXT, text)
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    // The chooser passes the grant on only when the photos are also its clip data.
+    if (photos.isNotEmpty()) {
+        send.clipData = ClipData.newRawUri(null, photos[0]).apply { photos.drop(1).forEach { addItem(ClipData.Item(it)) } }
+    }
     context.startActivity(Intent.createChooser(send, place.name))
 }

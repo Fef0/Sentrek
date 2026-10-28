@@ -202,6 +202,7 @@ private fun PlaceCard(
                 }
             }
             if (place.note.isNotEmpty()) Text(place.note, style = MaterialTheme.typography.bodyLarge)
+            if (place.photos.isNotEmpty()) PhotoStrip(place.photos, size = TouchTarget * 1.2f)
             val buttonModifier = Modifier.weight(1f).heightIn(min = TouchTarget)
             val padding = PaddingValues(horizontal = 4.dp)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

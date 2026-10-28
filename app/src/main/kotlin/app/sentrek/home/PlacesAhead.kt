@@ -116,7 +116,7 @@ private fun AheadRow(ahead: UpcomingPlace, showClimb: Boolean, modifier: Modifie
 
 /** As on the map: the symbol in its colour on a white disc. */
 @Composable
-private fun PlaceBadge(kind: RoutePlace.Kind, size: Dp) {
+internal fun PlaceBadge(kind: RoutePlace.Kind, size: Dp) {
     when (kind) {
         is RoutePlace.Kind.Saved -> PlaceIcon(kind.kind, kind.color, size)
         RoutePlace.Kind.Waypoint -> PlaceIcon(PlaceKind.Star, WAYPOINT_COLOR, size)
@@ -137,7 +137,7 @@ private fun PlaceBadge(kind: RoutePlace.Kind, size: Dp) {
 }
 
 @Composable
-private fun kindLabel(kind: RoutePlace.Kind): String = when (kind) {
+internal fun kindLabel(kind: RoutePlace.Kind): String = when (kind) {
     is RoutePlace.Kind.Saved -> placeKindLabel(kind.kind)
     RoutePlace.Kind.Waypoint -> stringResource(R.string.ahead_waypoint)
     is RoutePlace.Kind.Osm -> stringResource(
@@ -154,8 +154,15 @@ private fun kindLabel(kind: RoutePlace.Kind): String = when (kind) {
             PoiKind.EmergencyPhone -> R.string.ahead_emergency_phone
             PoiKind.Peak -> R.string.ahead_peak
             PoiKind.Pass -> R.string.ahead_pass
-            // Not listed as places ahead (see PoiKind.landmark); a readable name all the same.
-            else -> R.string.ahead_waypoint
+            // Not listed as places ahead (see PoiKind.landmark), but found by search.
+            PoiKind.Castle -> R.string.ahead_castle
+            PoiKind.Guidepost -> R.string.ahead_guidepost
+            PoiKind.Cross -> R.string.ahead_cross
+            PoiKind.Shrine -> R.string.ahead_shrine
+            PoiKind.Ruins -> R.string.ahead_ruins
+            PoiKind.Monument -> R.string.ahead_monument
+            PoiKind.Memorial -> R.string.ahead_memorial
+            PoiKind.Board -> R.string.ahead_board
         },
     )
 }

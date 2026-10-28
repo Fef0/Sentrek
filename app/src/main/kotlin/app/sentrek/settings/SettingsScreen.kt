@@ -122,6 +122,13 @@ class SettingsViewModel @Inject constructor(private val settings: SettingsReposi
         viewModelScope.launch { settings.setFullScreen(on) }
     }
 
+    val showLockButton: StateFlow<Boolean> =
+        settings.showLockButton.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setShowLockButton(show: Boolean) {
+        viewModelScope.launch { settings.setShowLockButton(show) }
+    }
+
     val showScaleBar: StateFlow<Boolean> =
         settings.showScaleBar.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
@@ -217,6 +224,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
     val autoHideControls by viewModel.autoHideControls.collectAsStateWithLifecycle()
     val confirmExit by viewModel.confirmExit.collectAsStateWithLifecycle()
     val showScaleBar by viewModel.showScaleBar.collectAsStateWithLifecycle()
+    val showLockButton by viewModel.showLockButton.collectAsStateWithLifecycle()
     val showContours by viewModel.showContours.collectAsStateWithLifecycle()
     val batterySaver by viewModel.batterySaver.collectAsStateWithLifecycle()
     val staminaMode by viewModel.staminaMode.collectAsStateWithLifecycle()
@@ -247,6 +255,63 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 onChange = viewModel::setBatterySaver,
                 // Stamina mode replaces it: off there.
                 enabled = !staminaMode,
+            )
+
+            // By how often they're changed: the map and the controls first, units are set once.
+            SectionTitle(stringResource(R.string.settings_map))
+            ToggleRow(
+                enabled = !saving,
+                title = stringResource(R.string.settings_contours),
+                checked = showContours,
+                onChange = viewModel::setShowContours,
+            )
+            ToggleRow(
+                title = stringResource(R.string.settings_trail_difficulty),
+                hint = stringResource(R.string.settings_trail_difficulty_hint),
+                checked = showTrailDifficulty,
+                onChange = viewModel::setShowTrailDifficulty,
+            )
+            ToggleRow(
+                title = stringResource(R.string.settings_scale_bar),
+                checked = showScaleBar,
+                onChange = viewModel::setShowScaleBar,
+            )
+            ToggleRow(
+                title = stringResource(R.string.settings_lock_north),
+                hint = stringResource(R.string.settings_lock_north_hint),
+                checked = rotationLocked,
+                onChange = viewModel::setRotationLocked,
+            )
+
+            SectionTitle(stringResource(R.string.settings_controls))
+            ToggleRow(
+                title = stringResource(R.string.settings_glove_mode),
+                hint = stringResource(R.string.settings_glove_mode_hint),
+                checked = gloveMode,
+                onChange = viewModel::setGloveMode,
+            )
+            ToggleRow(
+                title = stringResource(R.string.settings_lock_button),
+                hint = stringResource(R.string.settings_lock_button_hint),
+                checked = showLockButton,
+                onChange = viewModel::setShowLockButton,
+            )
+            ToggleRow(
+                title = stringResource(R.string.settings_auto_hide),
+                hint = stringResource(R.string.settings_auto_hide_hint),
+                checked = autoHideControls,
+                onChange = viewModel::setAutoHideControls,
+            )
+            ToggleRow(
+                title = stringResource(R.string.settings_off_route_vibration),
+                hint = stringResource(R.string.settings_off_route_vibration_hint),
+                checked = offRouteVibration,
+                onChange = viewModel::setOffRouteVibration,
+            )
+            ToggleRow(
+                title = stringResource(R.string.settings_confirm_exit),
+                checked = confirmExit,
+                onChange = viewModel::setConfirmExit,
             )
 
             SectionTitle(stringResource(R.string.settings_appearance))
@@ -280,12 +345,6 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 checked = fullScreen,
                 onChange = viewModel::setFullScreen,
             )
-            ToggleRow(
-                title = stringResource(R.string.settings_auto_hide),
-                hint = stringResource(R.string.settings_auto_hide_hint),
-                checked = autoHideControls,
-                onChange = viewModel::setAutoHideControls,
-            )
 
             SectionTitle(stringResource(R.string.settings_units))
             // Metric or imperial sets distance, height and speed; the rest stays as chosen.
@@ -302,7 +361,6 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 onChange = { preset ->
                     viewModel.setUnits { it.copy(distance = preset.distance, elevation = preset.elevation, speed = preset.speed) }
                 },
-                inline = true,
             )
             ChoiceRow(
                 title = stringResource(R.string.settings_units_coordinates),
@@ -330,83 +388,34 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                     options = listOf(DistanceUnit.Kilometers to "km", DistanceUnit.Miles to "mi", DistanceUnit.NauticalMiles to "nmi"),
                     selected = units.distance,
                     onChange = { unit -> viewModel.setUnits { it.copy(distance = unit) } },
-                    inline = true,
-                )
+                    )
                 ChoiceRow(
                     title = stringResource(R.string.settings_units_elevation),
                     options = listOf(ElevationUnit.Meters to "m", ElevationUnit.Feet to "ft"),
                     selected = units.elevation,
                     onChange = { unit -> viewModel.setUnits { it.copy(elevation = unit) } },
-                    inline = true,
-                )
+                    )
                 ChoiceRow(
                     title = stringResource(R.string.settings_units_speed),
                     options = listOf(SpeedUnit.KilometersPerHour to "km/h", SpeedUnit.MilesPerHour to "mph", SpeedUnit.Knots to "kn"),
                     selected = units.speed,
                     onChange = { unit -> viewModel.setUnits { it.copy(speed = unit) } },
-                    inline = true,
-                )
+                    )
                 ChoiceRow(
                     title = stringResource(R.string.settings_units_slope),
                     options = listOf(SlopeUnit.Degrees to "12°", SlopeUnit.Percent to "21%"),
                     selected = units.slope,
                     onChange = { unit -> viewModel.setUnits { it.copy(slope = unit) } },
-                    inline = true,
-                )
+                    )
                 ChoiceRow(
                     title = stringResource(R.string.settings_units_bearing),
                     options = listOf(BearingUnit.Degrees to "245°", BearingUnit.Mils to "4356 mil"),
                     selected = units.bearing,
                     onChange = { unit -> viewModel.setUnits { it.copy(bearing = unit) } },
-                    inline = true,
-                )
+                    )
             }
 
-            SectionTitle(stringResource(R.string.settings_map))
-            ToggleRow(
-                title = stringResource(R.string.settings_scale_bar),
-                checked = showScaleBar,
-                onChange = viewModel::setShowScaleBar,
-            )
-            ToggleRow(
-                enabled = !saving,
-                title = stringResource(R.string.settings_contours),
-                checked = showContours,
-                onChange = viewModel::setShowContours,
-            )
-            ToggleRow(
-                title = stringResource(R.string.settings_lock_north),
-                hint = stringResource(R.string.settings_lock_north_hint),
-                checked = rotationLocked,
-                onChange = viewModel::setRotationLocked,
-            )
-            ToggleRow(
-                title = stringResource(R.string.settings_trail_difficulty),
-                hint = stringResource(R.string.settings_trail_difficulty_hint),
-                checked = showTrailDifficulty,
-                onChange = viewModel::setShowTrailDifficulty,
-            )
-
-            SectionTitle(stringResource(R.string.settings_controls))
-            ToggleRow(
-                title = stringResource(R.string.settings_glove_mode),
-                hint = stringResource(R.string.settings_glove_mode_hint),
-                checked = gloveMode,
-                onChange = viewModel::setGloveMode,
-            )
-            ToggleRow(
-                title = stringResource(R.string.settings_off_route_vibration),
-                hint = stringResource(R.string.settings_off_route_vibration_hint),
-                checked = offRouteVibration,
-                onChange = viewModel::setOffRouteVibration,
-            )
-            ToggleRow(
-                title = stringResource(R.string.settings_confirm_exit),
-                hint = stringResource(R.string.settings_confirm_exit_hint),
-                checked = confirmExit,
-                onChange = viewModel::setConfirmExit,
-            )
-
+            SectionTitle(stringResource(R.string.settings_advanced_section))
             NavRow(
                 title = stringResource(R.string.settings_advanced),
                 hint = stringResource(R.string.settings_advanced_hint),
@@ -621,8 +630,7 @@ private fun ExpandRow(title: String, hint: String?, expanded: Boolean, onToggle:
 }
 
 /**
- * Large segments, one per option: under the [title], or beside it when [inline] (for a few
- * short options). [selected] may match none of them.
+ * Large segments, one per option, under the [title]. [selected] may match none of them.
  */
 @Composable
 private fun <T> ChoiceRow(
@@ -631,7 +639,6 @@ private fun <T> ChoiceRow(
     selected: T?,
     onChange: (T) -> Unit,
     hint: String? = null,
-    inline: Boolean = false,
     enabled: Boolean = true,
 ) {
     val segments = @Composable { modifier: Modifier ->
@@ -652,15 +659,8 @@ private fun <T> ChoiceRow(
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier.padding(vertical = 6.dp).alpha(if (enabled) 1f else DISABLED_ALPHA),
     ) {
-        if (inline) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                segments(Modifier.weight(1.6f))
-            }
-        } else {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            segments(Modifier.fillMaxWidth())
-        }
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        segments(Modifier.fillMaxWidth())
         if (hint != null) Text(hint, style = MaterialTheme.typography.bodyMedium)
     }
 }

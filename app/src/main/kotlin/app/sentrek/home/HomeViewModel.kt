@@ -129,6 +129,9 @@ class HomeViewModel @Inject constructor(
     val autoHideControls: StateFlow<Boolean> =
         settings.autoHideControls.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    val showLockButton: StateFlow<Boolean> =
+        settings.showLockButton.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
     val showScaleBar: StateFlow<Boolean> =
         settings.showScaleBar.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
@@ -148,7 +151,7 @@ class HomeViewModel @Inject constructor(
     fun place(id: String): Place? = placeRepository.find(id)
 
     fun addPlace(place: Place) {
-        placeRepository.add(place.name, place.kind, place.position, place.note, place.color)
+        placeRepository.add(place.name, place.kind, place.position, place.note, place.color, place.photos)
     }
 
     fun updatePlace(place: Place) = placeRepository.update(place)

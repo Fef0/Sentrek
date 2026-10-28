@@ -34,14 +34,15 @@ data class BarItem(
  * is a full-height, equal-width target with icon and label; taller in glove mode.
  */
 @Composable
-fun BottomBar(items: List<BarItem>, modifier: Modifier = Modifier) {
+fun BottomBar(items: List<BarItem>, modifier: Modifier = Modifier, edgeToEdge: Boolean = true) {
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = 8.dp,
     ) {
         Row(
-            modifier = Modifier.navigationBarsPadding().padding(horizontal = 8.dp, vertical = 4.dp),
+            // [edgeToEdge] false: a row stacked above the bar, clear of the system navigation.
+            modifier = (if (edgeToEdge) Modifier.navigationBarsPadding() else Modifier).padding(horizontal = 8.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             for (item in items) {

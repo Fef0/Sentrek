@@ -5,7 +5,8 @@ import java.util.Locale
 
 /**
  * A point the user saved: a camp spot, a spring, a parking… [color] is ARGB, null for the
- * kind's own colour. [time] is when it was saved (ms), 0 if unknown.
+ * kind's own colour. [time] is when it was saved (ms), 0 if unknown. [photos] are file names
+ * in the app's photo folder, in the order taken.
  */
 data class Place(
     val id: String,
@@ -15,6 +16,7 @@ data class Place(
     val note: String = "",
     val color: Int? = null,
     val time: Long = 0,
+    val photos: List<String> = emptyList(),
 ) {
     val displayColor: Int get() = color ?: kind.color
 }

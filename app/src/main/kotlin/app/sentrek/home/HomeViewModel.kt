@@ -12,6 +12,8 @@ import app.sentrek.maps.RegionRepository
 import app.sentrek.maps.TrailsDownload
 import app.sentrek.geo.place.Place
 import app.sentrek.record.FollowRepository
+import app.sentrek.record.GpsStatus
+import app.sentrek.record.Satellites
 import app.sentrek.record.PlaceRepository
 import app.sentrek.record.Following
 import app.sentrek.record.LocationRepository
@@ -20,7 +22,14 @@ import app.sentrek.record.RecordingRepository
 import app.sentrek.record.SavedTrack
 import app.sentrek.record.TrackRepository
 import app.sentrek.map.MapTrack
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -72,6 +81,9 @@ class HomeViewModel @Inject constructor(
     val followProfile: StateFlow<Boolean> =
         settings.followProfile.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
+    val autoHideControls: StateFlow<Boolean> =
+        settings.autoHideControls.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
     fun setFollowProfile(show: Boolean) {
         viewModelScope.launch { settings.setFollowProfile(show) }
     }
@@ -116,7 +128,23 @@ class HomeViewModel @Inject constructor(
 
     fun hasLocationPermission() = location.hasPermission()
 
-    fun locations(): Flow<Location> = location.locations()
+    // The latest fix the map received, for the GPS status and the coordinates label.
+    private val _lastFix = MutableStateFlow<Location?>(null)
+    val lastFix: StateFlow<Location?> = _lastFix.asStateFlow()
+
+    fun locations(): Flow<Location> = location.locations().onEach { _lastFix.value = it }
+
+    /**
+     * The GPS status while collected (the map on screen). Re-checked every couple of seconds,
+     * since a fix going stale or location being switched off sends no event of its own.
+     * Call again once permission is granted: without it there are no satellites to count.
+     */
+    fun gps(): Flow<GpsStatus> = combine(
+        _lastFix,
+        location.satellites().onStart { emit(Satellites(0, 0)) },
+        flow { while (true) { emit(Unit); delay(GPS_CHECK_MS) } },
+    ) { fix, satellites, _ -> GpsStatus.of(location.isGpsOn(), fix, satellites) }
+        .distinctUntilChanged()
 
     fun startRecording() = recorder.start()
 
@@ -131,4 +159,8 @@ class HomeViewModel @Inject constructor(
     fun discardRecording() = recorder.discard()
 
     fun defaultTrackName(recording: Recording) = tracks.defaultName(recording.startTime)
+
+    private companion object {
+        const val GPS_CHECK_MS = 2_000L
+    }
 }

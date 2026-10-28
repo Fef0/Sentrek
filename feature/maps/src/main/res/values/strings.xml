@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="regions_back">Back to map</string>
-    <string name="regions_zoom_in">Zoom in to choose areas to download</string>
-    <string name="regions_hint">Tap squares to select areas</string>
+    <string name="regions_zoom_in">Zoom in to select areas</string>
+    <string name="regions_hint">Tap squares to select</string>
     <plurals name="regions_stored">
         <item quantity="one">%1$d area · %2$s on device</item>
         <item quantity="other">%1$d areas · %2$s on device</item>
@@ -37,18 +37,18 @@
         <item quantity="one">Delete %d downloaded area?</item>
         <item quantity="other">Delete %d downloaded areas?</item>
     </plurals>
-    <string name="confirm_delete_regions_text">Their map and trail details are removed from the phone. Downloading them again needs a connection.</string>
+    <string name="confirm_delete_regions_text">Map and trail data will be removed from this device.</string>
     <string name="confirm_delete_imported_title">Delete this map file?</string>
-    <string name="confirm_delete_imported_text">%s is removed from the phone. To use it again, import the file again.</string>
+    <string name="confirm_delete_imported_text">%s will be removed from this device.</string>
     <string name="confirm_delete">Delete</string>
     <string name="imported_close">Close</string>
     <string name="imported_zooms">Zoom %1$d–%2$d · %3$s</string>
     <string name="import_running">Importing…</string>
-    <string name="import_vector">Vector map files aren\'t supported yet. Import a raster (image) map in MBTiles or PMTiles format.</string>
-    <string name="import_unknown">Choose an .mbtiles or .pmtiles file.</string>
-    <string name="import_failed">Couldn\'t import this file.</string>
+    <string name="import_vector">Vector map files are not supported yet. Use a raster MBTiles or PMTiles file.</string>
+    <string name="import_unknown">Unsupported file. Use .mbtiles or .pmtiles.</string>
+    <string name="import_failed">Import failed</string>
     <string name="download_channel">Map downloads</string>
     <string name="download_notification_title">Downloading maps</string>
-    <string name="download_notification_area">Areas left: %1$d · current %2$d%%</string>
-    <string name="download_notification_trails">Fetching trail details…</string>
+    <string name="download_notification_area">%1$d left, current %2$d%%</string>
+    <string name="download_notification_trails">Downloading trail data…</string>
 </resources>

@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <files-path name="tracks" path="tracks/" />
+    <!-- Place photos: written by the camera app, sent with a shared place. -->
+    <files-path name="photos" path="photos/" />
     <!-- Copies named after the track, for the share sheet. -->
     <cache-path name="share" path="share/" />
 </paths>

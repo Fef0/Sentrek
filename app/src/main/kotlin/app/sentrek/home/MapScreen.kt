@@ -1,5 +1,6 @@
 package app.sentrek.home
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.fadeIn
@@ -45,6 +46,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -152,6 +154,9 @@ private const val SCALE_PROBE_PX = 100f
 /** How long without touches before buttons and bar fade out. */
 private const val HIDE_CONTROLS_MS = 8_000L
 
+/** How long "hold the lock to unlock" stays after a touch on a locked screen. */
+private const val LOCK_HINT_MS = 2_500L
+
 /** What a location permission request was for, to carry on once granted. */
 private enum class AfterPermission { Follow, Record, FollowRoute }
 
@@ -162,6 +167,7 @@ fun MapScreen(
     onOpenMaps: () -> Unit,
     onOpenTracks: () -> Unit,
     onOpenPlaces: () -> Unit,
+    onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
     focus: BoundingBox?,
     onFocusDone: () -> Unit,
@@ -231,9 +237,25 @@ fun MapScreen(
     val downloadedCells by viewModel.downloadedCells.collectAsStateWithLifecycle()
     val lastFixForSun by viewModel.lastFix.collectAsStateWithLifecycle()
     val autoHide = autoHideSetting && !plan.active
-    LaunchedEffect(autoHide, touches) {
-        controlsHidden = false
-        if (!autoHide) return@LaunchedEffect
+    // Touch lock: everything but the lock button ignores touches; the controls step aside.
+    var locked by rememberSaveable { mutableStateOf(false) }
+    val showLockButton by viewModel.showLockButton.collectAsStateWithLifecycle()
+    var libraryOpen by rememberSaveable { mutableStateOf(false) }
+    // Bumped by a touch while locked: shows how to unlock for a moment.
+    var lockHint by remember { mutableIntStateOf(0) }
+    var showLockHint by remember { mutableStateOf(false) }
+    LaunchedEffect(lockHint) {
+        if (lockHint == 0) return@LaunchedEffect
+        showLockHint = true
+        delay(LOCK_HINT_MS)
+        showLockHint = false
+    }
+    LaunchedEffect(locked) { if (!locked) showLockHint = false }
+    // Back would leave the map (or the app) under a wet thumb just the same.
+    BackHandler(enabled = locked) { lockHint++ }
+    LaunchedEffect(autoHide, touches, locked) {
+        controlsHidden = locked
+        if (locked || !autoHide) return@LaunchedEffect
         delay(HIDE_CONTROLS_MS)
         controlsHidden = true
     }
@@ -289,6 +311,8 @@ fun MapScreen(
     var swallowing by remember { mutableStateOf(false) }
     val onMapTouch: (MotionEvent) -> Boolean = { event ->
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            // A touch on the map closes the library row, as it would a menu.
+            libraryOpen = false
             swallowing = controlsHidden
         }
         val swallow = swallowing
@@ -506,12 +530,6 @@ fun MapScreen(
                         onClick = planner::toggleTrails,
                         active = plan.followTrails,
                     )
-                } else {
-                    MapButton(
-                        icon = SentrekIcons.Plan,
-                        contentDescription = stringResource(PlannerR.string.plan_start),
-                        onClick = planner::start,
-                    )
                 }
                 // Bottom-aligned: a taller label grows upwards and the button stays under the finger.
                 Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -581,7 +599,7 @@ fun MapScreen(
             Modifier
                 .align(Alignment.BottomStart)
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start))
-                .padding(start = 12.dp, end = TouchTarget + 24.dp, bottom = barHeight + 12.dp),
+                .padding(start = TouchTarget + 24.dp, end = TouchTarget + 24.dp, bottom = barHeight + 12.dp),
         )
 
         Box(
@@ -603,10 +621,22 @@ fun MapScreen(
                         }),
                     ),
                 )
-            } else AnimatedVisibility(visible = !controlsHidden, enter = fadeIn(), exit = fadeOut()) { BottomBar(
+            } else AnimatedVisibility(visible = !controlsHidden, enter = fadeIn(), exit = fadeOut()) { Column {
+                // Library: what's kept on the phone, opened less often than the rest of the bar.
+                if (libraryOpen) {
+                    BottomBar(
+                        items = listOf(
+                            BarItem(SentrekIcons.Tracks, stringResource(R.string.bar_tracks), { libraryOpen = false; onOpenTracks() }),
+                            BarItem(SentrekIcons.Place, stringResource(R.string.bar_places), { libraryOpen = false; onOpenPlaces() }),
+                            BarItem(SentrekIcons.Layers, stringResource(R.string.bar_maps), { libraryOpen = false; onOpenMaps() }),
+                        ),
+                        edgeToEdge = false,
+                    )
+                }
+                BottomBar(
                 items = listOf(
-                    BarItem(SentrekIcons.Layers, stringResource(R.string.bar_maps), onOpenMaps),
-                    BarItem(SentrekIcons.Tracks, stringResource(R.string.bar_tracks), onOpenTracks),
+                    BarItem(SentrekIcons.Library, stringResource(R.string.bar_library), { libraryOpen = !libraryOpen }, highlighted = libraryOpen),
+                    BarItem(SentrekIcons.Plan, stringResource(R.string.bar_plan), { libraryOpen = false; planner.start() }),
                     if (recording?.isPaused == true) {
                         BarItem(SentrekIcons.Pause, stringResource(R.string.bar_paused), { askStop = true }, highlighted = true)
                     } else if (recording != null) {
@@ -616,10 +646,31 @@ fun MapScreen(
                             withLocation(AfterPermission.Record) { startRecording() }
                         })
                     },
-                    BarItem(SentrekIcons.Place, stringResource(R.string.bar_places), onOpenPlaces),
-                    BarItem(Icons.Filled.Settings, stringResource(R.string.bar_settings), onOpenSettings),
+                    BarItem(SentrekIcons.Search, stringResource(R.string.search_open), { libraryOpen = false; onOpenSearch() }),
+                    BarItem(Icons.Filled.Settings, stringResource(R.string.bar_settings), { libraryOpen = false; onOpenSettings() }),
                 ),
-            ) }
+            ) } }
+        }
+
+        if (locked) TouchShield(onTouch = { lockHint++ })
+        // Bottom left, where the thumb rests, opposite the map buttons. Shown while locked
+        // whatever the setting says: there must always be a way out.
+        if (!plan.active && (locked || (showLockButton && controlsAlpha > 0f))) Row(
+            Modifier
+                .align(Alignment.BottomStart)
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start))
+                .padding(start = 12.dp, end = TouchTarget + 24.dp, bottom = barHeight + 24.dp)
+                .alpha(if (locked) 1f else controlsAlpha),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            LockButton(
+                locked = locked,
+                onLock = { locked = true },
+                onUnlock = { locked = false },
+                onShortPress = { lockHint++ },
+            )
+            if (showLockHint) MapNote(stringResource(R.string.lock_hint), SentrekIcons.Lock)
         }
     }
 

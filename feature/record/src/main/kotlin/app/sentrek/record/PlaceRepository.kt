@@ -29,7 +29,10 @@ import javax.inject.Singleton
 
 /** The user's saved places, newest first, kept in one small `places.json`. */
 @Singleton
-class PlaceRepository @Inject constructor(@ApplicationContext private val context: Context) {
+class PlaceRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val photos: PhotoStore,
+) {
     private val file = File(context.filesDir, "places.json")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -58,14 +61,22 @@ class PlaceRepository @Inject constructor(@ApplicationContext private val contex
 
     fun find(id: String): Place? = _places.value.firstOrNull { it.id == id }
 
-    fun add(name: String, kind: PlaceKind, position: LatLon, note: String = "", color: Int? = null): Place {
-        val place = Place(newId(), name.trim(), kind, position, note.trim(), color, System.currentTimeMillis())
+    fun add(
+        name: String,
+        kind: PlaceKind,
+        position: LatLon,
+        note: String = "",
+        color: Int? = null,
+        photos: List<String> = emptyList(),
+    ): Place {
+        val place = Place(newId(), name.trim(), kind, position, note.trim(), color, System.currentTimeMillis(), photos)
         _places.update { listOf(place) + it }
         save()
         return place
     }
 
     fun update(place: Place) {
+        find(place.id)?.let { old -> photos.delete(old.photos - place.photos.toSet()) }
         val cleaned = place.copy(name = place.name.trim(), note = place.note.trim())
         _places.update { all -> all.map { if (it.id == place.id) cleaned else it } }
         save()
@@ -74,7 +85,12 @@ class PlaceRepository @Inject constructor(@ApplicationContext private val contex
     fun delete(place: Place) {
         _places.update { all -> all.filterNot { it.id == place.id } }
         save()
+        photos.delete(place.photos)
     }
+
+    /** Places saved between [start] and [end] (ms), oldest first: those of a recording. */
+    fun savedBetween(start: Long, end: Long): List<Place> =
+        _places.value.filter { it.time in start..end }.sortedBy { it.time }
 
     /** Waypoints from an imported file; [fallbackName] for those without a name. */
     fun addAll(waypoints: List<GpxWaypoint>, fallbackName: String): List<Place> {
@@ -132,7 +148,8 @@ class PlaceRepository @Inject constructor(@ApplicationContext private val contex
                     .apply { p.position.ele?.let { put("ele", it) } }
                     .put("note", p.note)
                     .apply { p.color?.let { put("color", it) } }
-                    .put("time", p.time),
+                    .put("time", p.time)
+                    .apply { if (p.photos.isNotEmpty()) put("photos", JSONArray(p.photos)) },
             )
         }
     }.toString()
@@ -150,6 +167,7 @@ class PlaceRepository @Inject constructor(@ApplicationContext private val contex
                     note = o.optString("note"),
                     color = if (o.has("color")) o.getInt("color") else null,
                     time = o.optLong("time"),
+                    photos = o.optJSONArray("photos")?.let { a -> (0 until a.length()).map(a::getString) }.orEmpty(),
                 )
             }.getOrNull()
         }

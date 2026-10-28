@@ -99,6 +99,12 @@ Long-press the map to add one.</string>
     <string name="places_elevation">Elevation</string>
     <string name="places_distance">Distance</string>
     <string name="places_close">Close</string>
+    <string name="places_photos">Photos</string>
+    <string name="places_camera">Camera</string>
+    <string name="places_gallery">Gallery</string>
+    <string name="places_photo_remove">Remove photo</string>
+    <string name="places_photo_failed">Couldn’t add the photo</string>
+    <string name="places_no_camera">No camera app found</string>
     <string name="place_kind_star">Other</string>
     <string name="place_kind_camp">Camp spot</string>
     <string name="place_kind_water">Water</string>

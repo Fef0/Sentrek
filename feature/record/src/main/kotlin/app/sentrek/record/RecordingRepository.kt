@@ -46,6 +46,7 @@ data class Recording(
 class RecordingRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val tracks: TrackRepository,
+    private val places: PlaceRepository,
 ) {
     private val journal = File(File(context.filesDir, "recording").apply { mkdirs() }, "current.txt")
 
@@ -125,7 +126,7 @@ class RecordingRepository @Inject constructor(
     suspend fun save(name: String?): SavedTrack? {
         if (_state.value == null) return null
         val kept = segments.map { it.toList() }.filter { it.isNotEmpty() }
-        val saved = if (kept.isNotEmpty()) tracks.save(kept, name) else null
+        val saved = if (kept.isNotEmpty()) tracks.save(kept, name, waypointsSoFar()) else null
         end()
         return saved
     }
@@ -134,8 +135,12 @@ class RecordingRepository @Inject constructor(
     suspend fun saveSoFar(name: String): SavedTrack? {
         if (_state.value == null) return null
         val kept = segments.map { it.toList() }.filter { it.isNotEmpty() }
-        return if (kept.isNotEmpty()) tracks.save(kept, name) else null
+        return if (kept.isNotEmpty()) tracks.save(kept, name, waypointsSoFar()) else null
     }
+
+    /** Places saved during the recording go into its GPX, so they travel with the track. */
+    private fun waypointsSoFar() =
+        places.savedBetween(startTime, System.currentTimeMillis()).map(PlaceRepository::waypoint)
 
     fun discard() {
         if (_state.value != null) end()

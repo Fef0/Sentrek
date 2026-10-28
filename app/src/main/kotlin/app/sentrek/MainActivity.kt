@@ -44,12 +44,14 @@ import app.sentrek.map.LocalNightMap
 import app.sentrek.data.SavedCamera
 import app.sentrek.data.SettingsRepository
 import app.sentrek.geo.BoundingBox
+import app.sentrek.geo.LatLon
 import app.sentrek.home.DefaultCamera
 import app.sentrek.home.MapScreen
 import app.sentrek.planner.PlannerViewModel
 import app.sentrek.feature.planner.R as PlannerR
 import app.sentrek.maps.RegionsScreen
 import app.sentrek.record.PlacesScreen
+import app.sentrek.search.SearchScreen
 import app.sentrek.record.TrackRepository
 import app.sentrek.record.TracksScreen
 import app.sentrek.record.showImportResult
@@ -66,7 +68,7 @@ import org.maplibre.android.geometry.LatLng
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-private enum class Screen { Map, Maps, Tracks, Places, Settings }
+private enum class Screen { Map, Maps, Tracks, Places, Search, Settings }
 
 private const val CAMERA_SAVE_MS = 5_000L
 
@@ -190,6 +192,7 @@ class MainActivity : ComponentActivity() {
                                     onOpenMaps = { screen = Screen.Maps },
                                     onOpenTracks = { screen = Screen.Tracks },
                                     onOpenPlaces = { screen = Screen.Places },
+                                    onOpenSearch = { screen = Screen.Search },
                                     onOpenSettings = { screen = Screen.Settings },
                                     focus = focus,
                                     onFocusDone = { focus = null },
@@ -220,6 +223,11 @@ class MainActivity : ComponentActivity() {
                                     },
                                 )
                                 Screen.Places -> PlacesScreen(
+                                    onBack = toMap,
+                                    onShowOnMap = { box -> focus = box; screen = Screen.Map },
+                                )
+                                Screen.Search -> SearchScreen(
+                                    near = shownCamera.target?.let { LatLon(it.latitude, it.longitude) },
                                     onBack = toMap,
                                     onShowOnMap = { box -> focus = box; screen = Screen.Map },
                                 )

@@ -216,6 +216,14 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     }
 
     /** Scale bar at the top left of the map. */
+    /** The touch lock button on the map, against rain drops and pocket touches. */
+    val showLockButton: Flow<Boolean> =
+        context.settings.data.map { it[SHOW_LOCK_BUTTON] ?: true }
+
+    suspend fun setShowLockButton(show: Boolean) {
+        context.settings.edit { it[SHOW_LOCK_BUTTON] = show }
+    }
+
     val showScaleBar: Flow<Boolean> =
         context.settings.data.map { it[SHOW_SCALE_BAR] ?: true }
 
@@ -308,6 +316,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val AUTO_HIDE_CONTROLS = booleanPreferencesKey("auto_hide_controls")
         val CONFIRM_EXIT = booleanPreferencesKey("confirm_exit")
         val SHOW_SCALE_BAR = booleanPreferencesKey("show_scale_bar")
+        val SHOW_LOCK_BUTTON = booleanPreferencesKey("show_lock_button")
         val SHOW_CONTOURS = booleanPreferencesKey("show_contours")
         val ROTATION_LOCKED = booleanPreferencesKey("rotation_locked")
         val DISTANCE_UNIT = stringPreferencesKey("distance_unit")

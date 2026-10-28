@@ -62,7 +62,7 @@ class PlacesViewModel @Inject constructor(
     }
 
     fun add(place: Place) {
-        repository.add(place.name, place.kind, place.position, place.note, place.color)
+        repository.add(place.name, place.kind, place.position, place.note, place.color, place.photos)
     }
 
     fun update(place: Place) = repository.update(place)

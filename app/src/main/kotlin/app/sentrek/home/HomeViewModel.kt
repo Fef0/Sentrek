@@ -4,6 +4,8 @@ import android.content.Context
 import android.location.Location
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.sentrek.data.GpsTiming
+import app.sentrek.data.PowerMode
 import app.sentrek.data.SettingsRepository
 import app.sentrek.geo.LatLon
 import app.sentrek.geo.RegionCell
@@ -62,9 +64,18 @@ class HomeViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
     elevation: ElevationRepository,
 ) : ViewModel() {
-    /** Terrain for the contour lines, or null with them switched off. */
-    val contourTerrain: StateFlow<TerrainTiles?> = settings.showContours
-        .map { show -> elevation.takeIf { show } }
+    val powerMode: StateFlow<PowerMode> =
+        settings.powerMode.stateIn(viewModelScope, SharingStarted.Eagerly, PowerMode.Normal)
+
+    /** How often the map asks for a fix while on screen, power mode included. */
+    val screenGpsMs: StateFlow<Long> = combine(settings.gpsTiming, settings.powerMode) { timing, mode ->
+        timing.forMode(mode).screenMs
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, GpsTiming.Default.screenMs)
+
+    /** Terrain for the contour lines, or null with them switched off (or saving power). */
+    val contourTerrain: StateFlow<TerrainTiles?> = combine(settings.showContours, settings.powerMode) { show, mode ->
+        elevation.takeIf { show && mode == PowerMode.Normal }
+    }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     val units: StateFlow<Units> = settings.units
@@ -176,7 +187,7 @@ class HomeViewModel @Inject constructor(
     private val _lastFix = MutableStateFlow<Location?>(null)
     val lastFix: StateFlow<Location?> = _lastFix.asStateFlow()
 
-    fun locations(): Flow<Location> = location.locations().onEach { _lastFix.value = it }
+    fun locations(intervalMs: Long): Flow<Location> = location.locations(intervalMs).onEach { _lastFix.value = it }
 
     /**
      * The GPS status while collected (the map on screen). Re-checked every couple of seconds,

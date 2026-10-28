@@ -37,6 +37,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import android.widget.Toast
 import app.sentrek.data.AppTheme
 import app.sentrek.data.MapTheme
+import app.sentrek.data.PowerMode
+import org.maplibre.android.MapLibre
+import app.sentrek.map.LocalMapMaxFps
 import app.sentrek.map.LocalNightMap
 import app.sentrek.data.SavedCamera
 import app.sentrek.data.SettingsRepository
@@ -113,11 +116,19 @@ class MainActivity : ComponentActivity() {
             val fullScreen by settings.fullScreen.collectAsStateWithLifecycle(initialValue = false)
             val mapTheme by settings.mapTheme.collectAsStateWithLifecycle(initialValue = MapTheme.Day)
             val confirmExit by settings.confirmExit.collectAsStateWithLifecycle(initialValue = true)
+            val power by settings.powerMode.collectAsStateWithLifecycle(initialValue = PowerMode.Normal)
+            val chosenFps by settings.mapMaxFps.collectAsStateWithLifecycle(initialValue = 0)
+            val mapFps = power.mapFps(chosenFps)
+            // Stamina mode: downloaded maps only, so the radio isn't woken for tiles.
+            LaunchedEffect(power) {
+                MapLibre.setConnected(if (power == PowerMode.Stamina) false else null)
+            }
             LaunchedEffect(fullScreen) {
                 hideSystemBars = fullScreen
                 applySystemBars()
             }
-            val dark = when (theme) {
+            // Saving power: black screens, whatever the theme (black OLED pixels use no power).
+            val dark = power.blackScreens || when (theme) {
                 AppTheme.System -> isSystemInDarkTheme()
                 AppTheme.Light -> false
                 AppTheme.Dark, AppTheme.Black -> true
@@ -130,13 +141,13 @@ class MainActivity : ComponentActivity() {
                 applySystemBars()
                 onDispose {}
             }
-            val nightMap = when (mapTheme) {
+            val nightMap = power.blackScreens || when (mapTheme) {
                 MapTheme.Auto -> dark
                 MapTheme.Day -> false
                 MapTheme.Night -> true
             }
-            CompositionLocalProvider(LocalNightMap provides nightMap) {
-                SentrekTheme(darkTheme = dark, black = theme == AppTheme.Black, gloves = gloves) {
+            CompositionLocalProvider(LocalNightMap provides nightMap, LocalMapMaxFps provides mapFps) {
+                SentrekTheme(darkTheme = dark, black = power.blackScreens || theme == AppTheme.Black, gloves = gloves) {
                     var screen by rememberSaveable { mutableStateOf(Screen.Map) }
                     // Null until the last saved view is read: the map opens where it was left, not at a default first.
                     var camera by rememberSaveable { mutableStateOf<CameraPosition?>(null) }
@@ -162,9 +173,10 @@ class MainActivity : ComponentActivity() {
                     val shownCamera = camera ?: return@SentrekTheme
                     ExitConfirmation(enabled = confirmExit && screen == Screen.Map)
                     if (screen != Screen.Map) BackHandler(onBack = toMap)
-                    // A theme change rebuilds the screens, and with them the map in the right colours.
-                    key(dark, nightMap) {
-                        Box(Modifier.fillMaxSize()) {
+                    Box(Modifier.fillMaxSize()) {
+                        // A theme or power mode change rebuilds the map in the right colours and
+                        // frame rate. Only the map: a screen open on top (Settings) stays where it was.
+                        key(dark, nightMap, power, mapFps) {
                             // The map stays loaded under the other screens: building it again
                             // (style, icons, overlays, tiles) made every return to it slow.
                             // Hidden, it draws nothing new unless followed GPS moves it.
@@ -182,35 +194,36 @@ class MainActivity : ComponentActivity() {
                                     focus = focus,
                                     onFocusDone = { focus = null },
                                     zoomKeys = zoomKeys,
+                                    visible = screen == Screen.Map,
                                 )
                             }
-                            // Opaque and touch-tight: nothing reaches the map below.
-                            if (screen != Screen.Map) Surface(Modifier.fillMaxSize()) {
-                                when (screen) {
-                                    Screen.Map -> Unit
-                                    Screen.Maps -> RegionsScreen(initialCamera = shownCamera, onBack = toMap)
-                                    Screen.Tracks -> TracksScreen(
-                                        onBack = toMap,
-                                        onShowOnMap = { box -> focus = box; screen = Screen.Map },
-                                        onEditRoute = { track ->
-                                            planner.editRoute(track) { opened ->
-                                                if (opened) {
-                                                    scope.launch {
-                                                        focus = tracks.show(track)
-                                                        screen = Screen.Map
-                                                    }
-                                                } else {
-                                                    Toast.makeText(this@MainActivity, PlannerR.string.plan_busy, Toast.LENGTH_LONG).show()
+                        }
+                        // Opaque and touch-tight: nothing reaches the map below.
+                        if (screen != Screen.Map) Surface(Modifier.fillMaxSize()) {
+                            when (screen) {
+                                Screen.Map -> Unit
+                                Screen.Maps -> RegionsScreen(initialCamera = shownCamera, onBack = toMap)
+                                Screen.Tracks -> TracksScreen(
+                                    onBack = toMap,
+                                    onShowOnMap = { box -> focus = box; screen = Screen.Map },
+                                    onEditRoute = { track ->
+                                        planner.editRoute(track) { opened ->
+                                            if (opened) {
+                                                scope.launch {
+                                                    focus = tracks.show(track)
+                                                    screen = Screen.Map
                                                 }
+                                            } else {
+                                                Toast.makeText(this@MainActivity, PlannerR.string.plan_busy, Toast.LENGTH_LONG).show()
                                             }
-                                        },
-                                    )
-                                    Screen.Places -> PlacesScreen(
-                                        onBack = toMap,
-                                        onShowOnMap = { box -> focus = box; screen = Screen.Map },
-                                    )
-                                    Screen.Settings -> SettingsScreen(onBack = toMap)
-                                }
+                                        }
+                                    },
+                                )
+                                Screen.Places -> PlacesScreen(
+                                    onBack = toMap,
+                                    onShowOnMap = { box -> focus = box; screen = Screen.Map },
+                                )
+                                Screen.Settings -> SettingsScreen(onBack = toMap)
                             }
                         }
                     }

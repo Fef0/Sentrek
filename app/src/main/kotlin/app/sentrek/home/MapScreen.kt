@@ -66,6 +66,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import app.sentrek.R
 import app.sentrek.feature.planner.R as PlannerR
 import app.sentrek.feature.record.R as RecordR
+import app.sentrek.data.PowerMode
 import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.Geo
 import app.sentrek.geo.LatLon
@@ -166,6 +167,8 @@ fun MapScreen(
     onFocusDone: () -> Unit,
     /** +1 / -1 zoom steps from the volume keys (glove mode). */
     zoomKeys: Flow<Int>,
+    /** False while another screen covers the map (it stays loaded underneath). */
+    visible: Boolean = true,
     viewModel: HomeViewModel = hiltViewModel(),
     planner: PlannerViewModel = hiltViewModel(),
 ) {
@@ -223,6 +226,7 @@ fun MapScreen(
     val controlsAlpha by animateFloatAsState(if (controlsHidden) 0f else 1f, label = "controls")
     val autoHideSetting by viewModel.autoHideControls.collectAsStateWithLifecycle()
     val showScaleBar by viewModel.showScaleBar.collectAsStateWithLifecycle()
+    val powerMode by viewModel.powerMode.collectAsStateWithLifecycle()
     val online by viewModel.online.collectAsStateWithLifecycle()
     val downloadedCells by viewModel.downloadedCells.collectAsStateWithLifecycle()
     val lastFixForSun by viewModel.lastFix.collectAsStateWithLifecycle()
@@ -436,7 +440,15 @@ fun MapScreen(
                 if (showScaleBar) ScaleBar(metersPerPx, night = LocalNightMap.current)
                 // A reminder, not a block: the map still moves and answers taps, it just has
                 // nothing to draw here until the area is downloaded or the network is back.
-                if (!online && centreCell?.let { it !in downloadedCells } == true) OfflineAreaNote()
+                if (!online && centreCell?.let { it !in downloadedCells } == true) {
+                    MapNote(stringResource(R.string.offline_area), SentrekIcons.CloudOff)
+                }
+                // Never forgotten: they change how the whole app behaves.
+                when (powerMode) {
+                    PowerMode.Stamina -> MapNote(stringResource(R.string.stamina_on_map), SentrekIcons.BatteryAlert)
+                    PowerMode.Saver -> MapNote(stringResource(R.string.saver_on_map), SentrekIcons.BatterySaver)
+                    PowerMode.Normal -> Unit
+                }
             }
 
             MapCompass(
@@ -648,14 +660,23 @@ fun MapScreen(
         }
     }
 
-    // Position on the map while the app is visible; the GPS is off otherwise (unless recording).
-    LaunchedEffect(map, style, hasLocation) {
+    // Position on the map while it's on screen; the GPS is off otherwise (unless recording or
+    // following, at the tracking service's slower rate). Covered by another screen, the arrow
+    // goes too, and with it the compass and the redraws.
+    val markerPower = when (powerMode) {
+        PowerMode.Normal -> MapLocation.Power.Normal
+        PowerMode.Saver -> MapLocation.Power.Saver
+        PowerMode.Stamina -> MapLocation.Power.Minimal
+    }
+    val gpsMs by viewModel.screenGpsMs.collectAsStateWithLifecycle()
+    LaunchedEffect(map, style, hasLocation, visible, markerPower, gpsMs) {
         val m = map ?: return@LaunchedEffect
         val s = style ?: return@LaunchedEffect
         if (!hasLocation) return@LaunchedEffect
-        MapLocation.activate(context, m, s)
+        if (!visible) return@LaunchedEffect MapLocation.hide(m)
+        MapLocation.activate(context, m, s, markerPower)
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            viewModel.locations().collect { MapLocation.update(m, it) }
+            viewModel.locations(gpsMs).collect { MapLocation.update(m, it) }
         }
     }
 
@@ -664,7 +685,7 @@ fun MapScreen(
         val s = style ?: return@LaunchedEffect
         val mode = followRequest ?: return@LaunchedEffect
         if (!hasLocation) return@LaunchedEffect
-        MapLocation.activate(context, m, s)
+        MapLocation.activate(context, m, s, markerPower)
         MapLocation.follow(m, mode)
         followRequest = null
     }
@@ -859,6 +880,9 @@ fun MapScreen(
     }
     LaunchedEffect(style, elevationUnit) {
         style?.let { MapHeights.apply(it, elevationUnit) }
+    }
+    LaunchedEffect(style, powerMode) {
+        style?.let { MapContours.showRelief(it, powerMode != PowerMode.Stamina) }
     }
 
     LaunchedEffect(style, plan, planLegs, planPreview) {

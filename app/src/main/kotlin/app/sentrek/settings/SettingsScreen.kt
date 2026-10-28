@@ -1,11 +1,14 @@
 package app.sentrek.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -13,9 +16,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -52,6 +59,9 @@ import app.sentrek.geo.units.UnitFormat
 import app.sentrek.geo.units.Units
 import app.sentrek.ui.Format
 import app.sentrek.ui.TouchTarget
+import app.sentrek.data.AutoPower
+import app.sentrek.data.GpsTiming
+import app.sentrek.data.PowerMode
 import app.sentrek.ui.MapButton
 import app.sentrek.ui.SentrekIcons
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -119,6 +129,49 @@ class SettingsViewModel @Inject constructor(private val settings: SettingsReposi
         viewModelScope.launch { settings.setShowScaleBar(show) }
     }
 
+    val batterySaver: StateFlow<Boolean> =
+        settings.batterySaver.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setBatterySaver(on: Boolean) {
+        viewModelScope.launch { settings.setBatterySaver(on) }
+    }
+
+    val staminaMode: StateFlow<Boolean> =
+        settings.staminaMode.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setStaminaMode(on: Boolean) {
+        viewModelScope.launch { settings.setStaminaMode(on) }
+    }
+
+    val autoPower: StateFlow<AutoPower> =
+        settings.autoPower.stateIn(viewModelScope, SharingStarted.Eagerly, AutoPower())
+
+    fun setAutoPower(on: Boolean) {
+        viewModelScope.launch { settings.setAutoPower(on) }
+    }
+
+    fun setAutoLevel(stamina: Boolean, percent: Int) {
+        viewModelScope.launch { settings.setAutoLevel(stamina, percent) }
+    }
+
+    val gpsTiming: StateFlow<GpsTiming> =
+        settings.gpsTiming.stateIn(viewModelScope, SharingStarted.Eagerly, GpsTiming.Default)
+
+    fun setGpsTiming(change: (GpsTiming) -> GpsTiming) {
+        viewModelScope.launch { settings.setGpsTiming(change(gpsTiming.value)) }
+    }
+
+    val mapMaxFps: StateFlow<Int> =
+        settings.mapMaxFps.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    fun setMapMaxFps(fps: Int) {
+        viewModelScope.launch { settings.setMapMaxFps(fps) }
+    }
+
+    fun resetAdvanced() {
+        viewModelScope.launch { settings.resetAdvanced() }
+    }
+
     val showContours: StateFlow<Boolean> =
         settings.showContours.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
@@ -150,6 +203,11 @@ class SettingsViewModel @Inject constructor(private val settings: SettingsReposi
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
+    var advanced by rememberSaveable { mutableStateOf(false) }
+    if (advanced) {
+        BackHandler { advanced = false }
+        return AdvancedSettings(viewModel, onBack = { advanced = false })
+    }
     val showTrailDifficulty by viewModel.showTrailDifficulty.collectAsStateWithLifecycle()
     val gloveMode by viewModel.gloveMode.collectAsStateWithLifecycle()
     val offRouteVibration by viewModel.offRouteVibration.collectAsStateWithLifecycle()
@@ -160,6 +218,8 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
     val confirmExit by viewModel.confirmExit.collectAsStateWithLifecycle()
     val showScaleBar by viewModel.showScaleBar.collectAsStateWithLifecycle()
     val showContours by viewModel.showContours.collectAsStateWithLifecycle()
+    val batterySaver by viewModel.batterySaver.collectAsStateWithLifecycle()
+    val staminaMode by viewModel.staminaMode.collectAsStateWithLifecycle()
     val rotationLocked by viewModel.rotationLocked.collectAsStateWithLifecycle()
     val units by viewModel.units.collectAsStateWithLifecycle()
 
@@ -176,8 +236,22 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 Text(stringResource(R.string.bar_settings), style = MaterialTheme.typography.headlineMedium)
             }
 
+            // First: on a long trip, the one switch that matters most.
+            // What the power modes override is greyed out: it waits until they're off.
+            val saving = batterySaver || staminaMode
+            ToggleRow(
+                icon = SentrekIcons.BatterySaver,
+                title = stringResource(R.string.settings_battery_saver),
+                hint = stringResource(if (staminaMode) R.string.settings_battery_saver_stamina else R.string.settings_battery_saver_hint),
+                checked = batterySaver && !staminaMode,
+                onChange = viewModel::setBatterySaver,
+                // Stamina mode replaces it: off there.
+                enabled = !staminaMode,
+            )
+
             SectionTitle(stringResource(R.string.settings_appearance))
             ChoiceRow(
+                enabled = !saving,
                 title = stringResource(R.string.settings_app_theme),
                 options = listOf(
                     AppTheme.System to stringResource(R.string.settings_theme_system),
@@ -189,6 +263,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 onChange = viewModel::setTheme,
             )
             ChoiceRow(
+                enabled = !saving,
                 title = stringResource(R.string.settings_map_theme),
                 hint = stringResource(R.string.settings_map_theme_hint),
                 options = listOf(
@@ -294,6 +369,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 onChange = viewModel::setShowScaleBar,
             )
             ToggleRow(
+                enabled = !saving,
                 title = stringResource(R.string.settings_contours),
                 checked = showContours,
                 onChange = viewModel::setShowContours,
@@ -331,6 +407,12 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 onChange = viewModel::setConfirmExit,
             )
 
+            NavRow(
+                title = stringResource(R.string.settings_advanced),
+                hint = stringResource(R.string.settings_advanced_hint),
+                onClick = { advanced = true },
+            )
+
             SectionTitle(stringResource(R.string.settings_about))
             Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodyLarge)
             Text(stringResource(R.string.settings_osm_credit), style = MaterialTheme.typography.bodyMedium)
@@ -353,12 +435,161 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
 }
 
 @Composable
-private fun ToggleRow(title: String, checked: Boolean, onChange: (Boolean) -> Unit, hint: String? = null) {
+private fun ToggleRow(
+    title: String,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+    hint: String? = null,
+    enabled: Boolean = true,
+    icon: ImageVector? = null,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = TouchTarget)
-            .toggleable(checked, role = Role.Switch, onValueChange = onChange)
+            .toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
+            .padding(vertical = 6.dp)
+            .alpha(if (enabled) 1f else DISABLED_ALPHA),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (icon != null) Icon(icon, contentDescription = null)
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            if (hint != null) Text(hint, style = MaterialTheme.typography.bodyMedium)
+        }
+        // The whole row toggles; the switch only shows the state.
+        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+    }
+}
+
+/** Map frame rate and GPS timing: rarely changed, so on a page of their own. */
+@Composable
+private fun AdvancedSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
+    val fps by viewModel.mapMaxFps.collectAsStateWithLifecycle()
+    val gps by viewModel.gpsTiming.collectAsStateWithLifecycle()
+    val stamina by viewModel.staminaMode.collectAsStateWithLifecycle()
+    val auto by viewModel.autoPower.collectAsStateWithLifecycle()
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(
+            modifier = Modifier
+                .safeDrawingPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                MapButton(SentrekIcons.Back, stringResource(R.string.settings_back), onBack, Modifier.padding(vertical = 12.dp))
+                Text(stringResource(R.string.settings_advanced), style = MaterialTheme.typography.headlineMedium)
+            }
+
+            SectionTitle(stringResource(R.string.settings_stamina_section))
+            ToggleRow(
+                icon = SentrekIcons.BatteryAlert,
+                title = stringResource(R.string.settings_stamina),
+                hint = stringResource(
+                    R.string.settings_stamina_hint,
+                    PowerMode.STAMINA_FPS,
+                    seconds(GpsTiming.Stamina.screenMs), seconds(GpsTiming.Stamina.followMs), seconds(GpsTiming.Stamina.recordMs),
+                ),
+                checked = stamina,
+                onChange = viewModel::setStaminaMode,
+            )
+            ToggleRow(
+                title = stringResource(R.string.settings_auto_power),
+                hint = stringResource(R.string.settings_auto_hint),
+                checked = auto.enabled,
+                onChange = viewModel::setAutoPower,
+            )
+            ChoiceRow(
+                enabled = auto.enabled,
+                title = stringResource(R.string.settings_auto_saver),
+                options = AutoPower.SAVER_CHOICES.map { it to "$it%" },
+                selected = auto.saverAt,
+                onChange = { viewModel.setAutoLevel(stamina = false, percent = it) },
+            )
+            ChoiceRow(
+                enabled = auto.enabled,
+                title = stringResource(R.string.settings_auto_stamina),
+                options = AutoPower.STAMINA_CHOICES.map { it to "$it%" },
+                selected = auto.staminaAt,
+                onChange = { viewModel.setAutoLevel(stamina = true, percent = it) },
+            )
+            if (stamina) {
+                Text(
+                    stringResource(R.string.settings_stamina_overrides),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+
+            SectionTitle(stringResource(R.string.settings_map))
+            ChoiceRow(
+                enabled = !stamina,
+                title = stringResource(R.string.settings_map_fps),
+                options = PowerMode.FPS_CHOICES.map { it to if (it == 0) stringResource(R.string.settings_map_fps_no_cap) else "$it" },
+                selected = fps,
+                onChange = viewModel::setMapMaxFps,
+                hint = stringResource(R.string.settings_map_fps_hint),
+            )
+
+            SectionTitle(stringResource(R.string.settings_gps))
+            Text(stringResource(R.string.settings_gps_hint), style = MaterialTheme.typography.bodyMedium)
+            ChoiceRow(
+                enabled = !stamina,
+                title = stringResource(R.string.settings_gps_screen),
+                options = GpsTiming.SCREEN_CHOICES.map { it to seconds(it) },
+                selected = gps.screenMs,
+                onChange = { ms -> viewModel.setGpsTiming { it.copy(screenMs = ms) } },
+            )
+            ChoiceRow(
+                enabled = !stamina,
+                title = stringResource(R.string.settings_gps_follow),
+                options = GpsTiming.FOLLOW_CHOICES.map { it to seconds(it) },
+                selected = gps.followMs,
+                onChange = { ms -> viewModel.setGpsTiming { it.copy(followMs = ms) } },
+                hint = stringResource(R.string.settings_gps_follow_hint),
+            )
+            ChoiceRow(
+                enabled = !stamina,
+                title = stringResource(R.string.settings_gps_record),
+                options = GpsTiming.RECORD_CHOICES.map { it to seconds(it) },
+                selected = gps.recordMs,
+                onChange = { ms -> viewModel.setGpsTiming { it.copy(recordMs = ms) } },
+                hint = stringResource(R.string.settings_gps_record_hint),
+            )
+            Text(
+                stringResource(
+                    R.string.settings_gps_saver,
+                    seconds(GpsTiming.Saver.screenMs), seconds(GpsTiming.Saver.followMs), seconds(GpsTiming.Saver.recordMs),
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(vertical = 6.dp),
+            )
+
+            OutlinedButton(
+                onClick = viewModel::resetAdvanced,
+                enabled = !stamina,
+                modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget).padding(vertical = 4.dp),
+            ) { Text(stringResource(R.string.settings_advanced_reset)) }
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+private fun seconds(ms: Long): String = "${ms / 1_000} s"
+
+/** Material's look for disabled content. */
+private const val DISABLED_ALPHA = 0.38f
+
+/** A row that opens a page of its own. */
+@Composable
+private fun NavRow(title: String, hint: String?, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = TouchTarget)
+            .clickable(role = Role.Button, onClick = onClick)
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -366,8 +597,7 @@ private fun ToggleRow(title: String, checked: Boolean, onChange: (Boolean) -> Un
             Text(title, style = MaterialTheme.typography.titleMedium)
             if (hint != null) Text(hint, style = MaterialTheme.typography.bodyMedium)
         }
-        // The whole row toggles; the switch only shows the state.
-        Switch(checked = checked, onCheckedChange = null)
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
     }
 }
 
@@ -402,6 +632,7 @@ private fun <T> ChoiceRow(
     onChange: (T) -> Unit,
     hint: String? = null,
     inline: Boolean = false,
+    enabled: Boolean = true,
 ) {
     val segments = @Composable { modifier: Modifier ->
         SingleChoiceSegmentedButtonRow(modifier) {
@@ -409,6 +640,7 @@ private fun <T> ChoiceRow(
                 SegmentedButton(
                     selected = option == selected,
                     onClick = { onChange(option) },
+                    enabled = enabled,
                     shape = SegmentedButtonDefaults.itemShape(i, options.size),
                     modifier = Modifier.heightIn(min = TouchTarget),
                     icon = {},
@@ -416,7 +648,10 @@ private fun <T> ChoiceRow(
             }
         }
     }
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 6.dp)) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.padding(vertical = 6.dp).alpha(if (enabled) 1f else DISABLED_ALPHA),
+    ) {
         if (inline) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))

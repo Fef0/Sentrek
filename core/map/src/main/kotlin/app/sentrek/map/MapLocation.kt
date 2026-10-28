@@ -20,9 +20,21 @@ object MapLocation {
     private const val FOLLOW_ZOOM = 15.0
     private const val TRANSITION_MS = 750L
     private const val MAX_ANIMATION_FPS = 20
+    private const val SAVER_ANIMATION_FPS = 10
 
+    /** The dot slides to each new fix in a couple of steps instead of gliding. */
+    private const val MINIMAL_ANIMATION_FPS = 2
+
+    /** How much the position marker may cost. */
+    enum class Power { Normal, Saver, Minimal }
+
+    /**
+     * Shows the position. [Power.Saver] turns the arrow less often; [Power.Minimal] drops the
+     * compass (a dot instead of an arrow, the sensor off). Call [hide] when the map is covered
+     * by another screen: the compass sensor and the redraws stop with it.
+     */
     @SuppressLint("MissingPermission") // No engine: MapLibre never touches the GPS itself.
-    fun activate(context: Context, map: MapLibreMap, style: Style) {
+    fun activate(context: Context, map: MapLibreMap, style: Style, power: Power = Power.Normal) {
         val component = map.locationComponent
         if (!component.isLocationComponentActivated) {
             component.activateLocationComponent(
@@ -31,11 +43,25 @@ object MapLocation {
                     .build(),
             )
         }
+        val compass = component.compassEngine as? SteadyCompass
+            ?: component.compassEngine?.let(::SteadyCompass)?.also { component.compassEngine = it }
+        compass?.minIntervalMs = if (power == Power.Normal) SteadyCompass.NORMAL_INTERVAL_MS else SteadyCompass.SAVER_INTERVAL_MS
         component.isLocationComponentEnabled = true
-        component.renderMode = RenderMode.COMPASS
-        // The compass turns the arrow on every sensor reading, which redraws the whole map:
-        // capped, a phone held still in the hand doesn't burn through the battery.
-        component.setMaxAnimationFps(MAX_ANIMATION_FPS)
+        component.renderMode = if (power == Power.Minimal) RenderMode.NORMAL else RenderMode.COMPASS
+        // Each turn of the arrow is animated, and each animation frame redraws the whole map.
+        component.setMaxAnimationFps(
+            when (power) {
+                Power.Normal -> MAX_ANIMATION_FPS
+                Power.Saver -> SAVER_ANIMATION_FPS
+                Power.Minimal -> MINIMAL_ANIMATION_FPS
+            },
+        )
+    }
+
+    /** Hidden under another screen: no arrow, so no compass and no redraws for it. */
+    fun hide(map: MapLibreMap) {
+        val component = map.locationComponent
+        if (component.isLocationComponentActivated) component.isLocationComponentEnabled = false
     }
 
     fun update(map: MapLibreMap, location: Location) {

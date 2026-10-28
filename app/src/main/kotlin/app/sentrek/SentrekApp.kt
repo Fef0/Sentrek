@@ -12,11 +12,13 @@ import javax.inject.Inject
 @HiltAndroidApp
 class SentrekApp : Application() {
     @Inject lateinit var settings: SettingsRepository
+    @Inject lateinit var powerAutoSwitch: PowerAutoSwitch
 
     override fun onCreate() {
         super.onCreate()
         MapEngine.init(this, BuildConfig.VERSION_NAME)
         // For the whole process: screens and the recording notification alike.
         MainScope().launch { settings.units.collect { Format.units = it } }
+        powerAutoSwitch.start(MainScope())
     }
 }

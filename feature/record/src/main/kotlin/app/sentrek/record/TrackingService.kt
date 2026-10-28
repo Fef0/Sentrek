@@ -23,6 +23,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import app.sentrek.data.SettingsRepository
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.sample
@@ -40,6 +42,7 @@ class TrackingService : Service() {
     @Inject lateinit var recording: RecordingRepository
     @Inject lateinit var following: FollowRepository
     @Inject lateinit var location: LocationRepository
+    @Inject lateinit var settings: SettingsRepository
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -59,10 +62,17 @@ class TrackingService : Service() {
             stopSelf()
             return
         }
+        // While the screen is on, the map asks for a fix every second and this gets those too;
+        // in the pocket, the slower rate here is all the GPS does.
+        val interval = combine(following.state, settings.gpsTiming, settings.powerMode) { f, timing, mode ->
+            timing.forMode(mode).let { if (f != null) it.followMs else it.recordMs }
+        }.distinctUntilChanged()
         scope.launch {
-            location.locations().collect {
-                recording.onLocation(it)
-                following.onLocation(it)
+            interval.collectLatest { ms ->
+                location.locations(ms).collect {
+                    recording.onLocation(it)
+                    following.onLocation(it)
+                }
             }
         }
         val both = combine(recording.state, following.state) { r, f -> r to f }

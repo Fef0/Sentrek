@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -32,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -255,18 +257,20 @@ const val POSITION_LINGER_MS = 5_000L
 private const val MOVING_MPS = 0.5f
 
 /**
- * Offline over an area that isn't downloaded: says why the map is empty there. Small and
+ * A quiet note on the map, e.g. offline over an area that isn't downloaded. Small and
  * see-through, and it takes no touches: the map underneath works as ever.
  */
 @Composable
-fun OfflineAreaNote(modifier: Modifier = Modifier) {
+fun MapNote(text: String, icon: ImageVector, modifier: Modifier = Modifier) {
     // A plain background, not a Surface: a Surface would swallow taps on the map under it.
-    Text(
-        stringResource(R.string.offline_area),
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurface,
+    Row(
         modifier = modifier
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), RoundedCornerShape(50))
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-    )
+            .padding(start = 10.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
+        Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+    }
 }

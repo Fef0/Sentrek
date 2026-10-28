@@ -85,6 +85,7 @@ import app.sentrek.map.MapContours
 import app.sentrek.map.MapHeights
 import app.sentrek.map.MapOverlays
 import app.sentrek.map.MapStyle
+import app.sentrek.map.GoToLayer
 import app.sentrek.map.PlaceLayers
 import app.sentrek.map.MapTrails
 import app.sentrek.map.PlanLayers
@@ -99,12 +100,14 @@ import app.sentrek.map.TrackLayers
 import app.sentrek.record.DeletePlaceDialog
 import app.sentrek.record.FollowConfirmations
 import app.sentrek.record.GpsStatus
+import app.sentrek.record.LocationRepository
 import app.sentrek.ui.Confirmation
 import app.sentrek.ui.ConfirmDialog
 import app.sentrek.record.PlaceDialog
 import app.sentrek.record.PlaceSheet
 import app.sentrek.record.SavedTrack
-import app.sentrek.record.sharePlace
+import app.sentrek.record.ShareDialog
+import app.sentrek.record.rememberSharing
 import app.sentrek.record.TrackNameDialog
 import app.sentrek.ui.BarItem
 import app.sentrek.ui.BottomBar
@@ -168,6 +171,7 @@ fun MapScreen(
     onOpenTracks: () -> Unit,
     onOpenPlaces: () -> Unit,
     onOpenSearch: () -> Unit,
+    onOpenEmergency: () -> Unit,
     onOpenSettings: () -> Unit,
     focus: BoundingBox?,
     onFocusDone: () -> Unit,
@@ -240,7 +244,12 @@ fun MapScreen(
     val autoHide = autoHideSetting && !plan.active
     // Touch lock: everything but the lock button ignores touches; the controls step aside.
     var locked by rememberSaveable { mutableStateOf(false) }
+    val sharing = rememberSharing()
+    val goTo by viewModel.goTo.collectAsStateWithLifecycle()
+    // The phone's compass while pointing the way: the arrow then points the real way.
+    var heading by remember { mutableStateOf<Float?>(null) }
     val showLockButton by viewModel.showLockButton.collectAsStateWithLifecycle()
+    val sosEnabled by viewModel.sosEnabled.collectAsStateWithLifecycle()
     var libraryOpen by rememberSaveable { mutableStateOf(false) }
     // Bumped by a touch while locked: shows how to unlock for a moment.
     var lockHint by remember { mutableIntStateOf(0) }
@@ -360,6 +369,11 @@ fun MapScreen(
             permissions.launch(asked.toTypedArray())
         }
     }
+    // Pointing the way needs the position, shown and followed (after the permission, if asked).
+    val startGoTo = { target: GoTo ->
+        viewModel.goTo(target)
+        withLocation(AfterPermission.Follow) { follow() }
+    }
 
     // The bottom bar is drawn over the map, so showing and hiding it never resizes the map.
     // Its last height keeps the buttons above it either way.
@@ -445,6 +459,16 @@ fun MapScreen(
                 recording?.let {
                     // While following, the route's panel says it, against the time left.
                     RecordingStats(recording = it, modifier = Modifier.fillMaxWidth(), position = sunPosition.takeIf { followedRoute == null })
+                }
+                goTo?.let { target ->
+                    GoToPanel(
+                        target = target,
+                        here = lastFixForSun?.let { LatLon(it.latitude, it.longitude, LocationRepository.altitude(it)) },
+                        heading = heading,
+                        mapBearing = bearing,
+                        onStop = { viewModel.goTo(null) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
                 followedRoute?.let {
                     FollowPanel(
@@ -535,7 +559,7 @@ fun MapScreen(
                 // Bottom-aligned: a taller label grows upwards and the button stays under the finger.
                 Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (showPosition && gps is GpsStatus.Fix) {
-                        CoordinatesLabel(viewModel.lastFix, Modifier.widthIn(max = 300.dp))
+                        CoordinatesLabel(viewModel.lastFix, remember { viewModel.barometer() }, Modifier.widthIn(max = 300.dp))
                     } else {
                         GpsIndicator(
                             status = gps.takeIf { hasLocation },
@@ -626,10 +650,12 @@ fun MapScreen(
                 // Library: what's kept on the phone, opened less often than the rest of the bar.
                 if (libraryOpen) {
                     BottomBar(
-                        items = listOf(
+                        items = listOfNotNull(
                             BarItem(SentrekIcons.Tracks, stringResource(R.string.bar_tracks), { libraryOpen = false; onOpenTracks() }),
                             BarItem(SentrekIcons.Place, stringResource(R.string.bar_places), { libraryOpen = false; onOpenPlaces() }),
                             BarItem(SentrekIcons.Layers, stringResource(R.string.bar_maps), { libraryOpen = false; onOpenMaps() }),
+                            BarItem(SentrekIcons.Emergency, stringResource(R.string.bar_emergency), { libraryOpen = false; onOpenEmergency() })
+                                .takeIf { sosEnabled },
                         ),
                         edgeToEdge = false,
                     )
@@ -798,9 +824,10 @@ fun MapScreen(
                 place = place,
                 distance = here?.let { Geo.distance(LatLon(it.latitude, it.longitude), place.position) },
                 onEdit = { pressed = null; placeDraft = place },
-                onShare = { sharePlace(context, place) },
+                onShare = { pressed = null; sharing.share(place) },
                 onDelete = { pressed = null; deletingPlace = place },
                 onDismiss = { pressed = null },
+                onGoTo = { pressed = null; startGoTo(GoTo(place.name, place.position)) },
             )
         } else if (track == null) {
             FeatureSheet(
@@ -814,6 +841,12 @@ fun MapScreen(
                         kind = PlaceKind.guess(info.kind),
                         position = LatLon(p.latitude, p.longitude, info.tags["ele"]?.toDoubleOrNull()),
                     )
+                },
+                onGoTo = {
+                    pressed = null
+                    val p = info.position
+                    val name = info.name ?: info.kind?.let(::humanize) ?: unnamedPlace
+                    startGoTo(GoTo(name, LatLon(p.latitude, p.longitude, info.tags["ele"]?.toDoubleOrNull())))
                 },
                 onDismiss = { pressed = null },
             )
@@ -996,12 +1029,27 @@ fun MapScreen(
         )
     }
     confirm?.let { ConfirmDialog(it) { confirm = null } }
+    ShareDialog(sharing)
 
     if (askPlanDiscard) {
         DiscardPlanDialog(
             onDiscard = { askPlanDiscard = false; planner.discard() },
             onDismiss = { askPlanDiscard = false },
         )
+    }
+
+    LaunchedEffect(style, goTo, lastFixForSun) {
+        val s = style ?: return@LaunchedEffect
+        GoToLayer.sync(s, lastFixForSun?.takeIf { goTo != null }?.let { LatLon(it.latitude, it.longitude) }, goTo?.position)
+    }
+    DisposableEffect(map, goTo != null, visible, hasLocation) {
+        val m = map
+        if (m == null || goTo == null || !visible) return@DisposableEffect onDispose { heading = null }
+        val stop = MapLocation.observeHeading(m) { heading = it }
+        onDispose {
+            stop()
+            heading = null
+        }
     }
 
     LaunchedEffect(style, places) {

@@ -18,6 +18,9 @@ import javax.inject.Singleton
 
 private val Context.settings by preferencesDataStore(name = "settings")
 
+/** Works across Europe and on most phones elsewhere, even without a SIM. */
+const val DEFAULT_EMERGENCY_NUMBER = "112"
+
 @Singleton
 class SettingsRepository @Inject constructor(@ApplicationContext private val context: Context) {
     val showTrailDifficulty: Flow<Boolean> =
@@ -41,6 +44,52 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     suspend fun setVolumeKeysZoom(on: Boolean) {
         context.settings.edit { it[VOLUME_KEYS_ZOOM] = on }
+    }
+
+    /** The SOS screen (Library > SOS) and everything on it. */
+    val sosEnabled: Flow<Boolean> =
+        context.settings.data.map { it[SOS_ENABLED] ?: true }
+
+    suspend fun setSosEnabled(on: Boolean) {
+        context.settings.edit { it[SOS_ENABLED] = on }
+    }
+
+    /** Called from the emergency screen: 112 by default; 911, a mountain rescue, a friend… */
+    val emergencyNumber: Flow<String> =
+        context.settings.data.map { it[EMERGENCY_NUMBER]?.takeIf(String::isNotBlank) ?: DEFAULT_EMERGENCY_NUMBER }
+
+    suspend fun setEmergencyNumber(number: String) {
+        context.settings.edit { if (number.isBlank()) it.remove(EMERGENCY_NUMBER) else it[EMERGENCY_NUMBER] = number.trim() }
+    }
+
+    /** Whom the emergency SMS goes to; empty: chosen each time. */
+    val emergencySmsTo: Flow<String> =
+        context.settings.data.map { it[EMERGENCY_SMS_TO].orEmpty() }
+
+    suspend fun setEmergencySmsTo(number: String) {
+        context.settings.edit { if (number.isBlank()) it.remove(EMERGENCY_SMS_TO) else it[EMERGENCY_SMS_TO] = number.trim() }
+    }
+
+    /** The user's own servers by name (see the map module's Server); missing: the default. */
+    val servers: Flow<Map<String, String>> =
+        context.settings.data.map { p ->
+            p.asMap().mapNotNull { (key, value) ->
+                key.name.removePrefix(SERVER_PREFIX).takeIf { key.name.startsWith(SERVER_PREFIX) }?.let { it to value as String }
+            }.toMap()
+        }.distinctUntilChanged()
+
+    /** Blank: back to the default. */
+    suspend fun setServer(name: String, address: String) {
+        val key = stringPreferencesKey(SERVER_PREFIX + name)
+        context.settings.edit { if (address.isBlank()) it.remove(key) else it[key] = address.trim() }
+    }
+
+    /** The SMS button on the emergency screen. */
+    val emergencySms: Flow<Boolean> =
+        context.settings.data.map { it[EMERGENCY_SMS] ?: true }
+
+    suspend fun setEmergencySms(on: Boolean) {
+        context.settings.edit { it[EMERGENCY_SMS] = on }
     }
 
     val textSize: Flow<TextSize> =
@@ -320,6 +369,11 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val TEXT_SIZE = stringPreferencesKey("text_size")
         val BUTTON_SIZE = stringPreferencesKey("button_size")
         val VOLUME_KEYS_ZOOM = booleanPreferencesKey("volume_keys_zoom")
+        val EMERGENCY_SMS = booleanPreferencesKey("emergency_sms")
+        val SOS_ENABLED = booleanPreferencesKey("sos_enabled")
+        val EMERGENCY_NUMBER = stringPreferencesKey("emergency_number")
+        val EMERGENCY_SMS_TO = stringPreferencesKey("emergency_sms_to")
+        private const val SERVER_PREFIX = "server_"
         val OFF_ROUTE_VIBRATION = booleanPreferencesKey("off_route_vibration")
         val FOLLOW_PROFILE = booleanPreferencesKey("follow_profile")
         val FOLLOW_PLACES = booleanPreferencesKey("follow_places")

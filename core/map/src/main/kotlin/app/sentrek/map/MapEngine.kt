@@ -28,12 +28,24 @@ object MapEngine {
         val userAgent = "Sentrek/$appVersion (Android)"
         httpClient = OkHttpClient.Builder()
             .dispatcher(Dispatcher().apply { maxRequestsPerHost = MAX_REQUESTS_PER_HOST })
+            .addInterceptor(ServerInterceptor)
             .addInterceptor(BundledAssetInterceptor(context.applicationContext))
             .addNetworkInterceptor { chain ->
                 chain.proceed(chain.request().newBuilder().header("User-Agent", userAgent).build())
             }
             .build()
         HttpRequestUtil.setOkHttpClient(httpClient)
+    }
+}
+
+/** Sends requests for a default server to the user's own, when one is set (see [Server]). */
+private object ServerInterceptor : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val request = chain.request()
+        val url = request.url.toString()
+        val routed = ServerRoutes.rewrite(url)
+        if (routed == url) return chain.proceed(request)
+        return chain.proceed(request.newBuilder().url(routed).build())
     }
 }
 

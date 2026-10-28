@@ -33,6 +33,7 @@ data class Units(
 /** Glanceable numbers in a given unit: few digits, unit always shown. */
 object UnitFormat {
     const val FOOT_M = 0.3048
+    private const val INHG_PER_HPA = 0.0295299830714
     const val MILE_M = 1_609.344
     const val NAUTICAL_MILE_M = 1_852.0
 
@@ -61,6 +62,12 @@ object UnitFormat {
     fun elevation(meters: Double, unit: ElevationUnit): String = when (unit) {
         ElevationUnit.Meters -> "${meters.roundToInt()} m"
         ElevationUnit.Feet -> "${(meters / FOOT_M).roundToInt()} ft"
+    }
+
+    /** Air pressure: "812 hPa", or "23.98 inHg" with heights in feet. */
+    fun pressure(hPa: Double, unit: ElevationUnit): String = when (unit) {
+        ElevationUnit.Meters -> "${hPa.roundToInt()} hPa"
+        ElevationUnit.Feet -> String.format(Locale.ROOT, "%.2f inHg", hPa * INHG_PER_HPA)
     }
 
     /** "4.5 km/h", "12 km/h": one decimal only at walking pace. */

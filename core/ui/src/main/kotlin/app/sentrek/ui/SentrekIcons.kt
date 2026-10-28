@@ -131,6 +131,14 @@ object SentrekIcons {
         )
     }
 
+    /** The medical star: the emergency screen. */
+    val Emergency: ImageVector by lazy {
+        icon(
+            "Sentrek.Emergency",
+            "M20.79,9.23l-2,-3.46L14,8.54V3h-4v5.54L5.21,5.77l-2,3.46L8,12l-4.79,2.77l2,3.46L10,15.46V21h4v-5.54l4.79,2.77l2,-3.46L16,12L20.79,9.23z",
+        )
+    }
+
     /** A folder: tracks, places and maps kept on the phone. */
     val Library: ImageVector by lazy {
         icon("Sentrek.Library", "M10,4H4c-1.1,0 -1.99,0.9 -1.99,2L2,18c0,1.1 0.9,2 2,2h16c1.1,0 2,-0.9 2,-2V8c0,-1.1 -0.9,-2 -2,-2h-8l-2,-2z")

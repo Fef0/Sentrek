@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.io.File
 import javax.inject.Inject
 
 @HiltViewModel
@@ -28,10 +27,6 @@ class TracksViewModel @Inject constructor(
     val following: StateFlow<String?> = follow.state
         .map { it?.trackId }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
-
-    fun shareCopy(track: SavedTrack, onReady: (File) -> Unit) {
-        viewModelScope.launch { repository.shareCopy(track)?.let(onReady) }
-    }
 
     fun show(track: SavedTrack, onShown: (BoundingBox) -> Unit) {
         viewModelScope.launch { repository.show(track)?.let(onShown) }

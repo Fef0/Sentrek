@@ -11,6 +11,8 @@ import app.sentrek.geo.LatLon
 import app.sentrek.geo.RegionCell
 import app.sentrek.geo.dem.TerrainTiles
 import app.sentrek.geo.units.Units
+import app.sentrek.geo.Barometric
+import app.sentrek.record.BarometerRepository
 import app.sentrek.record.ElevationRepository
 import app.sentrek.ui.Format
 import app.sentrek.map.RasterOverlay
@@ -46,6 +48,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
@@ -62,7 +67,8 @@ class HomeViewModel @Inject constructor(
     private val recorder: RecordingRepository,
     private val follower: FollowRepository,
     private val placeRepository: PlaceRepository,
-    elevation: ElevationRepository,
+    private val elevation: ElevationRepository,
+    private val barometer: BarometerRepository,
 ) : ViewModel() {
     val powerMode: StateFlow<PowerMode> =
         settings.powerMode.stateIn(viewModelScope, SharingStarted.Eagerly, PowerMode.Normal)
@@ -129,6 +135,9 @@ class HomeViewModel @Inject constructor(
     val autoHideControls: StateFlow<Boolean> =
         settings.autoHideControls.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    val sosEnabled: StateFlow<Boolean> =
+        settings.sosEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
     val showLockButton: StateFlow<Boolean> =
         settings.showLockButton.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
@@ -147,6 +156,14 @@ class HomeViewModel @Inject constructor(
     }
 
     val places: StateFlow<List<Place>> = placeRepository.places
+
+    /** The place the arrow points to, if any. Kept while the app runs. */
+    private val _goTo = MutableStateFlow<GoTo?>(null)
+    val goTo: StateFlow<GoTo?> = _goTo.asStateFlow()
+
+    fun goTo(target: GoTo?) {
+        _goTo.value = target
+    }
 
     fun place(id: String): Place? = placeRepository.find(id)
 
@@ -203,6 +220,31 @@ class HomeViewModel @Inject constructor(
         flow { while (true) { emit(Unit); delay(GPS_CHECK_MS) } },
     ) { fix, satellites, _ -> GpsStatus.of(location.isGpsOn(), fix, satellites) }
         .distinctUntilChanged()
+
+    /** Pressure, and the height from it once set against the map's terrain. */
+    data class Barometer(val hPa: Double, val altitude: Double?)
+
+    /** Kept while the app runs: set once against the terrain, then it follows the pressure. */
+    private var barometerOffset: Double? = null
+
+    /**
+     * Only while collected (the position details open), and only in normal power mode: battery
+     * saver and stamina mode keep the sensor off. Null then, and on phones without the sensor.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun barometer(): Flow<Barometer?> = settings.powerMode.flatMapLatest { mode ->
+        if (mode == PowerMode.Normal) pressureReadings() else flowOf(null)
+    }
+
+    private fun pressureReadings(): Flow<Barometer> = barometer.pressures().onEach { hPa ->
+        if (barometerOffset == null) {
+            val fix = _lastFix.value ?: return@onEach
+            val ground = elevation.withElevation(listOf(LatLon(fix.latitude, fix.longitude))).firstOrNull()?.ele
+                ?: LocationRepository.altitude(fix)
+                ?: return@onEach
+            barometerOffset = Barometric.offset(hPa, ground)
+        }
+    }.map { hPa -> Barometer(hPa, barometerOffset?.let { Barometric.altitude(hPa) + it }) }
 
     fun startRecording() = recorder.start()
 

@@ -55,6 +55,7 @@ import app.sentrek.feature.planner.R as PlannerR
 import app.sentrek.maps.RegionsScreen
 import app.sentrek.record.PlacesScreen
 import app.sentrek.search.SearchScreen
+import app.sentrek.emergency.EmergencyScreen
 import app.sentrek.record.TrackRepository
 import app.sentrek.record.TracksScreen
 import app.sentrek.record.showImportResult
@@ -71,7 +72,7 @@ import org.maplibre.android.geometry.LatLng
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-private enum class Screen { Map, Maps, Tracks, Places, Search, Settings }
+private enum class Screen { Map, Maps, Tracks, Places, Search, Emergency, Settings }
 
 private const val CAMERA_SAVE_MS = 5_000L
 
@@ -209,6 +210,7 @@ class MainActivity : ComponentActivity() {
                                     onOpenTracks = { screen = Screen.Tracks },
                                     onOpenPlaces = { screen = Screen.Places },
                                     onOpenSearch = { screen = Screen.Search },
+                                    onOpenEmergency = { screen = Screen.Emergency },
                                     onOpenSettings = { screen = Screen.Settings },
                                     focus = focus,
                                     onFocusDone = { focus = null },
@@ -248,6 +250,7 @@ class MainActivity : ComponentActivity() {
                                     onBack = toMap,
                                     onShowOnMap = { box -> focus = box; screen = Screen.Map },
                                 )
+                                Screen.Emergency -> EmergencyScreen(onBack = toMap)
                                 Screen.Settings -> SettingsScreen(onBack = toMap)
                             }
                         }

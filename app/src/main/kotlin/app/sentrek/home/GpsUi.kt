@@ -1,5 +1,6 @@
 package app.sentrek.home
 
+import kotlinx.coroutines.flow.Flow
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -194,8 +195,10 @@ private fun Pill(
  * following [fix] live. A tap copies the coordinates, e.g. to pass them on to rescuers.
  */
 @Composable
-fun CoordinatesLabel(fix: StateFlow<Location?>, modifier: Modifier = Modifier) {
+fun CoordinatesLabel(fix: StateFlow<Location?>, barometer: Flow<HomeViewModel.Barometer?>, modifier: Modifier = Modifier) {
     val location by fix.collectAsStateWithLifecycle()
+    // Asked for by opening this label: the sensor runs only while it's shown.
+    val pressure by remember(barometer) { barometer }.collectAsStateWithLifecycle(initialValue = null)
     val here = location ?: return
     val context = LocalContext.current
     val coordinates = formatCoordinates(LatLon(here.latitude, here.longitude))
@@ -227,6 +230,13 @@ fun CoordinatesLabel(fix: StateFlow<Location?>, modifier: Modifier = Modifier) {
             Text(coordinates, style = MaterialTheme.typography.titleMedium)
             if (details.isNotEmpty()) Text(details, style = MaterialTheme.typography.labelLarge)
             if (motion.isNotEmpty()) Text(motion, style = MaterialTheme.typography.labelLarge)
+            pressure?.let { b ->
+                val air = listOfNotNull(
+                    b.altitude?.let { stringResource(R.string.gps_barometer_altitude, Format.elevation(it)) },
+                    Format.pressure(b.hPa),
+                ).joinToString(" · ")
+                Text(air, style = MaterialTheme.typography.labelLarge)
+            }
             sunsetToday(LatLon(here.latitude, here.longitude))?.let {
                 Text(stringResource(R.string.sun_sunset, it), style = MaterialTheme.typography.labelLarge)
             }

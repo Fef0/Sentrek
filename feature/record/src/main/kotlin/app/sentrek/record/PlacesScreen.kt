@@ -62,6 +62,7 @@ fun PlacesScreen(
     var creating by remember { mutableStateOf<Place?>(null) }
     var deleting by remember { mutableStateOf<Place?>(null) }
     var waitingForFix by remember { mutableStateOf(false) }
+    val sharing = rememberSharing()
     val unnamed = stringResource(R.string.places_unnamed)
 
     val saveHere = {
@@ -140,7 +141,7 @@ fun PlacesScreen(
                         distance = here?.let { Geo.distance(it, place.position) },
                         onShow = { onShowOnMap(around(place.position)) },
                         onEdit = { editing = place },
-                        onShare = { sharePlace(context, place) },
+                        onShare = { sharing.share(place) },
                         onDelete = { deleting = place },
                     )
                 }
@@ -168,6 +169,7 @@ fun PlacesScreen(
     deleting?.let { place ->
         DeletePlaceDialog(place, onDelete = { viewModel.delete(place); deleting = null }, onDismiss = { deleting = null })
     }
+    ShareDialog(sharing)
 }
 
 /** About 1 km around [p]: the map zooms in close enough to see the trails. */

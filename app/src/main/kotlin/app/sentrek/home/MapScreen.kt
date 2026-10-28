@@ -648,7 +648,13 @@ fun MapScreen(
                         BarItem(SentrekIcons.Stop, stringResource(R.string.bar_stop), { askStop = true }, highlighted = true)
                     } else {
                         BarItem(SentrekIcons.Record, stringResource(R.string.bar_record), {
-                            withLocation(AfterPermission.Record) { startRecording() }
+                            // A bumped button mustn't fill the phone with a track nobody meant to record.
+                            confirm = Confirmation(
+                                title = context.getString(R.string.record_confirm_title),
+                                text = context.getString(R.string.record_confirm_text),
+                                confirmLabel = context.getString(R.string.record_confirm),
+                                onConfirm = { withLocation(AfterPermission.Record) { startRecording() } },
+                            )
                         })
                     },
                     BarItem(SentrekIcons.Search, stringResource(R.string.search_open), { libraryOpen = false; onOpenSearch() }),
@@ -888,9 +894,14 @@ fun MapScreen(
             onBackToStart = {
                 askStop = false
                 val name = context.getString(R.string.record_way_back, viewModel.defaultTrackName(current))
-                viewModel.backToStart(name) { ok ->
-                    Toast.makeText(context, if (ok) R.string.record_back_started else R.string.record_back_nothing, Toast.LENGTH_SHORT).show()
+                val back = {
+                    viewModel.backToStart(name) { ok ->
+                        Toast.makeText(context, if (ok) R.string.record_back_started else R.string.record_back_nothing, Toast.LENGTH_SHORT).show()
+                    }
                 }
+                // It takes the place of the route being followed: ask, as for any other switch.
+                val followed = followedRoute
+                if (followed != null) confirm = FollowConfirmations.switch(context, followed.name, name, back) else back()
             }.takeIf { current.distance >= BACK_TO_START_MIN_M },
         )
     }

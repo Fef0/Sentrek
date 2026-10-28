@@ -27,12 +27,36 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[SHOW_TRAIL_DIFFICULTY] = show }
     }
 
-    /** Larger touch targets, wider long-press area, volume keys zoom the map. */
+    /** Biggest buttons, wider long-press area, and the volume keys zoom whatever [volumeKeysZoom] says. */
     val gloveMode: Flow<Boolean> =
         context.settings.data.map { it[GLOVE_MODE] ?: false }
 
     suspend fun setGloveMode(on: Boolean) {
         context.settings.edit { it[GLOVE_MODE] = on }
+    }
+
+    /** Volume keys zoom the map, without glove mode too. */
+    val volumeKeysZoom: Flow<Boolean> =
+        context.settings.data.map { it[VOLUME_KEYS_ZOOM] ?: false }
+
+    suspend fun setVolumeKeysZoom(on: Boolean) {
+        context.settings.edit { it[VOLUME_KEYS_ZOOM] = on }
+    }
+
+    val textSize: Flow<TextSize> =
+        context.settings.data.map { p -> p[TEXT_SIZE]?.let { runCatching { TextSize.valueOf(it) }.getOrNull() } ?: TextSize.Default }
+
+    suspend fun setTextSize(size: TextSize) {
+        context.settings.edit { it[TEXT_SIZE] = size.name }
+    }
+
+    val buttonSize: Flow<ButtonSize> =
+        context.settings.data.map { p ->
+            p[BUTTON_SIZE]?.let { runCatching { ButtonSize.valueOf(it) }.getOrNull() } ?: ButtonSize.Standard
+        }
+
+    suspend fun setButtonSize(size: ButtonSize) {
+        context.settings.edit { it[BUTTON_SIZE] = size.name }
     }
 
     /** Vibrate when leaving the followed route and when back on it. */
@@ -140,15 +164,14 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     }
 
     /** Everything in Settings > Advanced back as it came. */
-    suspend fun resetAdvanced() {
-        context.settings.edit {
-            it.remove(GPS_SCREEN_MS)
-            it.remove(GPS_FOLLOW_MS)
-            it.remove(GPS_RECORD_MS)
-            it.remove(MAP_MAX_FPS)
-            it.remove(AUTO_POWER)
-            it.remove(AUTO_SAVER_AT)
-            it.remove(AUTO_STAMINA_AT)
+    /**
+     * Every setting back to its default. Kept: where the map was left, and the automatic power
+     * modes' memory of what they did (not choices of the user's). Tracks, places and maps are
+     * files of their own, untouched.
+     */
+    suspend fun resetAll() {
+        context.settings.edit { prefs ->
+            for (key in prefs.asMap().keys - NOT_SETTINGS) prefs.remove(key)
         }
     }
 
@@ -294,6 +317,9 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     private companion object {
         val SHOW_TRAIL_DIFFICULTY = booleanPreferencesKey("show_trail_difficulty")
         val GLOVE_MODE = booleanPreferencesKey("glove_mode")
+        val TEXT_SIZE = stringPreferencesKey("text_size")
+        val BUTTON_SIZE = stringPreferencesKey("button_size")
+        val VOLUME_KEYS_ZOOM = booleanPreferencesKey("volume_keys_zoom")
         val OFF_ROUTE_VIBRATION = booleanPreferencesKey("off_route_vibration")
         val FOLLOW_PROFILE = booleanPreferencesKey("follow_profile")
         val FOLLOW_PLACES = booleanPreferencesKey("follow_places")
@@ -329,6 +355,12 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val CAMERA_LON = doublePreferencesKey("camera_lon")
         val CAMERA_ZOOM = doublePreferencesKey("camera_zoom")
         val CAMERA_BEARING = doublePreferencesKey("camera_bearing")
+
+        /** State kept in the same store that [resetAll] leaves alone. */
+        private val NOT_SETTINGS = setOf(
+            CAMERA_LAT, CAMERA_LON, CAMERA_ZOOM, CAMERA_BEARING,
+            AUTO_SAVER_ARMED, AUTO_STAMINA_ARMED, PHONE_SAVER_SEEN, SAVER_BY_PHONE,
+        )
     }
 }
 

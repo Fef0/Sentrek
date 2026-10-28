@@ -12,7 +12,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,7 +63,7 @@ fun BottomBar(items: List<BarItem>, modifier: Modifier = Modifier, edgeToEdge: B
                         modifier = Modifier.padding(vertical = 8.dp),
                     ) {
                         Icon(item.icon, contentDescription = null, modifier = Modifier.size(LocalTouch.current.icon - 4.dp))
-                        Text(item.label, style = MaterialTheme.typography.labelLarge)
+                        FitText(item.label, style = MaterialTheme.typography.labelLarge)
                     }
                 }
             }

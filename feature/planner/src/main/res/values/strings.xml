@@ -5,6 +5,9 @@
     <string name="plan_follow_trails">Follow paths</string>
     <string name="plan_editing">Editing: %s</string>
     <string name="plan_busy">Close the current route first.</string>
+    <string name="plan_blocked_following">Stop following the route to plan a new one.</string>
+    <string name="plan_blocked_recording">Stop the recording to plan a route.</string>
+    <string name="plan_blocked_both">Stop following the route and the recording to plan a new one.</string>
     <string name="plan_distance">Distance</string>
     <string name="plan_ascent">Ascent</string>
     <string name="plan_descent">Descent</string>

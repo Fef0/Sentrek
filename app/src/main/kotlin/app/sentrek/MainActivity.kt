@@ -217,7 +217,8 @@ class MainActivity : ComponentActivity() {
                                                     screen = Screen.Map
                                                 }
                                             } else {
-                                                Toast.makeText(this@MainActivity, PlannerR.string.plan_busy, Toast.LENGTH_LONG).show()
+                                                val why = planner.blockedBy.value?.message ?: PlannerR.string.plan_busy
+                                                Toast.makeText(this@MainActivity, why, Toast.LENGTH_LONG).show()
                                             }
                                         }
                                     },

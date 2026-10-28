@@ -28,6 +28,7 @@ import org.maplibre.android.style.expressions.Expression.stop
 import org.maplibre.android.style.expressions.Expression.zoom
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
+import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
 import org.maplibre.android.style.layers.PropertyFactory.iconImage
 import org.maplibre.android.style.layers.PropertyFactory.lineCap
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
@@ -85,6 +86,9 @@ object MapOverlays {
     private const val DETAIL_ZOOM = 12f
     private const val OVERVIEW_ZOOM = 10f
     private const val POINTS = "-points-z"
+
+    /** From here in, point icons may overlap (as the base style's, hiking.json). */
+    private const val ICONS_OVERLAP_ZOOM = 13f
 
     /** Base style layers the overlay replaces inside downloaded areas (hiking.json). */
     private const val BASE_HIKING_POIS = "poi-hiking"
@@ -154,6 +158,8 @@ object MapOverlays {
             val labelZoom = maxOf(minZoom + 2, 13)
             setProperties(
                 iconImage(concat(literal(MapIcons.PREFIX), get("k"))),
+                // Close in, a point never hides behind another: only its name gives way.
+                iconAllowOverlap(step(zoom(), literal(false), stop(ICONS_OVERLAP_ZOOM, literal(true)))),
                 symbolSortKey(match(get("k"), literal(99), *PoiKind.entries.map { stop(literal(it.icon), literal(it.ordinal)) }.toTypedArray())),
                 textField(step(zoom(), literal(""), stop(labelZoom, coalesce(get("n"), literal(""))))),
                 textFont(arrayOf("Noto Sans Bold")),

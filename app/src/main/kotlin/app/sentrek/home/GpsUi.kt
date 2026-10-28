@@ -8,6 +8,7 @@ import android.location.Location
 import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -24,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -59,6 +61,16 @@ class GpsLabelTiming {
 
     /** A good fix just arrived. */
     var announceGood by mutableStateOf(false)
+
+    /** The GPS is off, and the user is being told so for a moment. */
+    var remindOff by mutableStateOf(false)
+
+    internal var offReminders by mutableIntStateOf(0)
+
+    /** Says again that the GPS is off (e.g. the location button was tapped). */
+    fun remindOff() {
+        offReminders++
+    }
 }
 
 @Composable
@@ -84,12 +96,25 @@ fun rememberGpsLabelTiming(status: GpsStatus?): GpsLabelTiming {
             timing.announceGood = false
         }
     }
+    // A reminder, not a banner: it goes away by itself, and comes back at the next try.
+    val off = status == GpsStatus.Off
+    // Once per switch-off, not again each time the map screen comes back.
+    LaunchedEffect(off, timing.offReminders) {
+        if (!off) offReminded = false
+        timing.remindOff = off && (timing.offReminders > 0 || !offReminded)
+        if (timing.remindOff) {
+            offReminded = true
+            delay(OFF_REMINDER_MS)
+            timing.remindOff = false
+        }
+    }
     return timing
 }
 
 /**
  * A label beside the location button saying what the GPS is doing, so a missing position
- * has a reason: switched off, still searching (and how many satellites it hears), or weak.
+ * has a reason: switched off (for a moment, and again at each tap of the button), still
+ * searching (and how many satellites it hears), or weak.
  * A good fix is announced briefly ([problemsOnly] skips that) and then the label goes away.
  */
 @Composable
@@ -106,7 +131,7 @@ fun GpsIndicator(
 
     val colors = MaterialTheme.colorScheme
     when {
-        status == GpsStatus.Off -> Pill(
+        status == GpsStatus.Off && timing.remindOff -> Pill(
             stringResource(R.string.gps_off), colors.error, colors.onError, modifier, onClick = onTurnOn,
         )
         status is GpsStatus.Searching && showSearch -> Pill(
@@ -200,6 +225,9 @@ fun CoordinatesLabel(fix: StateFlow<Location?>, modifier: Modifier = Modifier) {
             Text(coordinates, style = MaterialTheme.typography.titleMedium)
             if (details.isNotEmpty()) Text(details, style = MaterialTheme.typography.labelLarge)
             if (motion.isNotEmpty()) Text(motion, style = MaterialTheme.typography.labelLarge)
+            sunsetToday(LatLon(here.latitude, here.longitude))?.let {
+                Text(stringResource(R.string.sun_sunset, it), style = MaterialTheme.typography.labelLarge)
+            }
             Text(stringResource(R.string.gps_copy_hint), style = MaterialTheme.typography.labelSmall)
         }
     }
@@ -215,9 +243,30 @@ fun openLocationSettings(context: Context) {
 private const val SEARCH_GRACE_MS = 3_000L
 private const val SPIN_MS = 30_000L
 private const val READY_MS = 3_000L
+private const val OFF_REMINDER_MS = 4_000L
+
+/** The user was told the GPS is off since it last went off (for the whole app, not one screen). */
+private var offReminded = false
 
 /** How long the position stays after the finger leaves the location button. */
 const val POSITION_LINGER_MS = 5_000L
 
 /** Slower than this is standing still (GPS noise): no speed or heading. */
 private const val MOVING_MPS = 0.5f
+
+/**
+ * Offline over an area that isn't downloaded: says why the map is empty there. Small and
+ * see-through, and it takes no touches: the map underneath works as ever.
+ */
+@Composable
+fun OfflineAreaNote(modifier: Modifier = Modifier) {
+    // A plain background, not a Surface: a Surface would swallow taps on the map under it.
+    Text(
+        stringResource(R.string.offline_area),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), RoundedCornerShape(50))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    )
+}

@@ -19,18 +19,14 @@ data class Units(
     val distance: DistanceUnit = DistanceUnit.Kilometers,
     val elevation: ElevationUnit = ElevationUnit.Meters,
     val speed: SpeedUnit = SpeedUnit.KilometersPerHour,
-    val slope: SlopeUnit = SlopeUnit.Degrees,
+    // Percent, as on road signs and in most hiking apps.
+    val slope: SlopeUnit = SlopeUnit.Percent,
     val bearing: BearingUnit = BearingUnit.Degrees,
     val coordinates: CoordinateFormat = CoordinateFormat.Decimal,
 ) {
     companion object {
         val Metric = Units()
         val Imperial = Units(DistanceUnit.Miles, ElevationUnit.Feet, SpeedUnit.MilesPerHour)
-
-        /** Imperial where it's the everyday system (US, Liberia, Myanmar), metric elsewhere. */
-        fun forCountry(country: String): Units = if (country.uppercase(Locale.ROOT) in IMPERIAL_COUNTRIES) Imperial else Metric
-
-        private val IMPERIAL_COUNTRIES = setOf("US", "LR", "MM")
     }
 }
 

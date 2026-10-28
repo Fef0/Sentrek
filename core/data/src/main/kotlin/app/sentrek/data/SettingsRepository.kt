@@ -10,7 +10,6 @@ import app.sentrek.geo.units.Units
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -41,6 +40,14 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[OFF_ROUTE_VIBRATION] = on }
     }
 
+    /** The places ahead in the followed route's panel. */
+    val followPlaces: Flow<Boolean> =
+        context.settings.data.map { it[FOLLOW_PLACES] ?: true }
+
+    suspend fun setFollowPlaces(show: Boolean) {
+        context.settings.edit { it[FOLLOW_PLACES] = show }
+    }
+
     /** The elevation profile in the follow panel; hidden for more map. */
     val followProfile: Flow<Boolean> =
         context.settings.data.map { it[FOLLOW_PROFILE] ?: true }
@@ -52,7 +59,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     /** Light (the default), dark, OLED black, or the phone's own choice. */
     val theme: Flow<AppTheme> =
         context.settings.data.map { prefs ->
-            AppTheme.entries.firstOrNull { it.name == prefs[THEME] } ?: AppTheme.Light
+            AppTheme.entries.firstOrNull { it.name == prefs[THEME] } ?: AppTheme.System
         }
 
     suspend fun setTheme(theme: AppTheme) {
@@ -74,7 +81,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
      * into an OLED screen. A swipe from the edge shows them for a moment.
      */
     val fullScreen: Flow<Boolean> =
-        context.settings.data.map { it[FULL_SCREEN] ?: true }
+        context.settings.data.map { it[FULL_SCREEN] ?: false }
 
     suspend fun setFullScreen(on: Boolean) {
         context.settings.edit { it[FULL_SCREEN] = on }
@@ -104,18 +111,26 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[SHOW_SCALE_BAR] = show }
     }
 
+    /** Contour lines on the map, drawn from the terrain data. */
+    val showContours: Flow<Boolean> =
+        context.settings.data.map { it[SHOW_CONTOURS] ?: true }
+
+    suspend fun setShowContours(show: Boolean) {
+        context.settings.edit { it[SHOW_CONTOURS] = show }
+    }
+
     /** Back on the map asks for a second press before leaving the app. */
     val confirmExit: Flow<Boolean> =
-        context.settings.data.map { it[CONFIRM_EXIT] ?: false }
+        context.settings.data.map { it[CONFIRM_EXIT] ?: true }
 
     suspend fun setConfirmExit(on: Boolean) {
         context.settings.edit { it[CONFIRM_EXIT] = on }
     }
 
-    /** Units for each quantity; until chosen, those of the phone's country. */
+    /** Units for each quantity; metric until chosen otherwise. */
     val units: Flow<Units> =
         context.settings.data.map { prefs ->
-            val default = Units.forCountry(Locale.getDefault().country)
+            val default = Units.Metric
             Units(
                 distance = prefs[DISTANCE_UNIT].toEnum(default.distance),
                 elevation = prefs[ELEVATION_UNIT].toEnum(default.elevation),
@@ -161,12 +176,14 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val GLOVE_MODE = booleanPreferencesKey("glove_mode")
         val OFF_ROUTE_VIBRATION = booleanPreferencesKey("off_route_vibration")
         val FOLLOW_PROFILE = booleanPreferencesKey("follow_profile")
+        val FOLLOW_PLACES = booleanPreferencesKey("follow_places")
         val THEME = stringPreferencesKey("theme")
         val MAP_THEME = stringPreferencesKey("map_theme")
         val FULL_SCREEN = booleanPreferencesKey("full_screen")
         val AUTO_HIDE_CONTROLS = booleanPreferencesKey("auto_hide_controls")
         val CONFIRM_EXIT = booleanPreferencesKey("confirm_exit")
         val SHOW_SCALE_BAR = booleanPreferencesKey("show_scale_bar")
+        val SHOW_CONTOURS = booleanPreferencesKey("show_contours")
         val ROTATION_LOCKED = booleanPreferencesKey("rotation_locked")
         val DISTANCE_UNIT = stringPreferencesKey("distance_unit")
         val ELEVATION_UNIT = stringPreferencesKey("elevation_unit")

@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.sentrek.R
+import app.sentrek.geo.LatLon
 import app.sentrek.record.Following
 import app.sentrek.ui.ElevationProfile
 import app.sentrek.ui.Format
@@ -40,11 +41,16 @@ fun FollowPanel(
     following: Following,
     showProfile: Boolean,
     onToggleProfile: () -> Unit,
+    /** The places ahead ([onTogglePlaces] hides them, as the profile). */
+    showPlaces: Boolean,
+    onTogglePlaces: () -> Unit,
     /** Opens the route's sheet (reverse direction and the rest). */
     onOpen: () -> Unit,
     /** Asks first (see FollowConfirmations): a stray tap mustn't end navigation. */
     onStop: (Following) -> Unit,
     modifier: Modifier = Modifier,
+    /** Where the user is (or the map, before a fix): for the time of sunset. */
+    position: LatLon? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val off = following.offRoute
@@ -70,6 +76,18 @@ fun FollowPanel(
                         .clickable(onClickLabel = stringResource(R.string.follow_route_options), onClick = onOpen)
                         .wrapContentHeight(Alignment.CenterVertically),
                 )
+                if (following.upcoming.isNotEmpty()) {
+                    IconToggleButton(
+                        checked = showPlaces,
+                        onCheckedChange = { onTogglePlaces() },
+                        modifier = Modifier.size(TouchTarget),
+                        colors = IconButtonDefaults.iconToggleButtonColors(
+                            checkedContainerColor = if (off) colors.onError.copy(alpha = 0.2f) else colors.primaryContainer,
+                        ),
+                    ) {
+                        Icon(SentrekIcons.Place, contentDescription = stringResource(R.string.follow_places))
+                    }
+                }
                 if (following.profile.size >= 2) {
                     IconToggleButton(
                         checked = showProfile,
@@ -94,6 +112,8 @@ fun FollowPanel(
                 }
                 FollowStat(stringResource(R.string.follow_time_left), Format.duration(left.millis), Modifier.weight(1f))
             }
+            SunsetLine(position, following.remaining.millis, Modifier.padding(bottom = 8.dp))
+            if (showPlaces) PlacesAhead(following.upcoming, showClimb = following.hasElevation, modifier = Modifier.padding(bottom = 4.dp))
             if (showProfile && following.profile.size >= 2) {
                 ElevationProfile(
                     profile = following.profile,

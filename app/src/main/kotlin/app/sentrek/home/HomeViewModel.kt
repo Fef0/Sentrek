@@ -1,15 +1,23 @@
 package app.sentrek.home
 
+import android.content.Context
 import android.location.Location
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.sentrek.data.SettingsRepository
 import app.sentrek.geo.LatLon
+import app.sentrek.geo.RegionCell
+import app.sentrek.geo.dem.TerrainTiles
+import app.sentrek.geo.units.Units
+import app.sentrek.record.ElevationRepository
+import app.sentrek.ui.Format
 import app.sentrek.map.RasterOverlay
 import app.sentrek.maps.ImportedMap
 import app.sentrek.maps.ImportedMapsRepository
 import app.sentrek.maps.RegionRepository
+import app.sentrek.maps.MapDownload
 import app.sentrek.maps.TrailsDownload
+import app.sentrek.maps.onlineFlow
 import app.sentrek.geo.place.Place
 import app.sentrek.record.FollowRepository
 import app.sentrek.record.GpsStatus
@@ -31,6 +39,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -42,6 +51,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
+    @ApplicationContext context: Context,
     regions: RegionRepository,
     importedMaps: ImportedMapsRepository,
     private val settings: SettingsRepository,
@@ -50,7 +60,24 @@ class HomeViewModel @Inject constructor(
     private val recorder: RecordingRepository,
     private val follower: FollowRepository,
     private val placeRepository: PlaceRepository,
+    elevation: ElevationRepository,
 ) : ViewModel() {
+    /** Terrain for the contour lines, or null with them switched off. */
+    val contourTerrain: StateFlow<TerrainTiles?> = settings.showContours
+        .map { show -> elevation.takeIf { show } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    val units: StateFlow<Units> = settings.units
+        .stateIn(viewModelScope, SharingStarted.Eagerly, Format.units)
+
+    /** Areas whose map is on the phone: offline, the rest of the world stays blank. */
+    val downloadedCells: StateFlow<Set<RegionCell>> = regions.state
+        .map { all -> all.values.filter { it.map is MapDownload.Ready }.map { it.cell }.toSet() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    val online: StateFlow<Boolean> = onlineFlow(context)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
     /** Hiking overlay files to draw (trail difficulty + points), by cell id. */
     val overlays: StateFlow<Map<String, File>> = regions.state
         .map { all ->
@@ -77,6 +104,13 @@ class HomeViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val following: StateFlow<Following?> = follower.state
+
+    val followPlaces: StateFlow<Boolean> =
+        settings.followPlaces.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setFollowPlaces(show: Boolean) {
+        viewModelScope.launch { settings.setFollowPlaces(show) }
+    }
 
     val followProfile: StateFlow<Boolean> =
         settings.followProfile.stateIn(viewModelScope, SharingStarted.Eagerly, true)
@@ -167,6 +201,18 @@ class HomeViewModel @Inject constructor(
     }
 
     fun discardRecording() = recorder.discard()
+
+    /**
+     * Follows the way walked so far back to where the recording started (as TracBack does on
+     * GPS units). The recording goes on, the way back included. [onDone] gets false when
+     * there was nothing to go back along.
+     */
+    fun backToStart(name: String, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val track = recorder.saveSoFar(name)
+            onDone(track != null && follower.start(track, reversed = true))
+        }
+    }
 
     fun defaultTrackName(recording: Recording) = tracks.defaultName(recording.startTime)
 

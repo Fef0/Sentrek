@@ -85,6 +85,10 @@ object SentrekIcons {
         icon("Sentrek.Profile", "M14,6l-3.75,5 2.85,3.8 -1.6,1.2C9.81,13.75 7,10 7,10l-6,8h22L14,6z")
     }
 
+    val ExpandMore: ImageVector by lazy { icon("Sentrek.ExpandMore", "M16.59,8.59L12,13.17 7.41,8.59 6,10l6,6 6,-6z") }
+
+    val ExpandLess: ImageVector by lazy { icon("Sentrek.ExpandLess", "M12,8l-6,6 1.41,1.41L12,10.83l4.59,4.58L18,14z") }
+
     /** Builds a 24dp Material-style icon from SVG path data. */
     private fun icon(name: String, pathData: String): ImageVector =
         ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f)

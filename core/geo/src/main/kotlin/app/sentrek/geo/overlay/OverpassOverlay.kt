@@ -15,7 +15,8 @@ import kotlin.math.roundToLong
  * request returns both, converted into one compact GeoJSON file:
  * - trail lines (every footpath and track): `s` = SAC grade 1–6 (absent when ungraded),
  *   `v` = visibility 1–6 (0 when unknown), `t` = 1 on tracks, `id` = "way/…";
- * - hiking points (huts, water, caves, guideposts, crosses…): `k` = [PoiKind.icon], `n` = name,
+ * - hiking points (huts, water, caves, guideposts, crosses, named peaks and passes…):
+ *   `k` = [PoiKind.icon], `n` = name,
  *   `id` = "node/…" (or way/relation), plus every other OSM tag of the point except mapper
  *   bookkeeping ([isBookkeeping]), shown when the user long-presses it.
  */
@@ -41,6 +42,9 @@ object OverpassOverlay {
             "node[\"information\"~\"^(guidepost|board|map)$\"];" +
             "node[\"waterway\"=\"waterfall\"];" +
             "node[\"emergency\"=\"phone\"];" +
+            // Named only: an unnamed bump means nothing in a list of places ahead.
+            "node[\"natural\"~\"^(peak|saddle)$\"][\"name\"];" +
+            "node[\"mountain_pass\"=\"yes\"][\"name\"];" +
             ");" +
             "convert poi ::=::,::id=id(),$OSM_TYPE=type(),::geom=center(geom());" +
             "out geom;"

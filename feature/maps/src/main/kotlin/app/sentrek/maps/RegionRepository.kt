@@ -2,8 +2,12 @@ package app.sentrek.maps
 
 import android.content.Context
 import android.util.Log
+import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.RegionCell
 import app.sentrek.geo.RegionGrid
+import app.sentrek.geo.overlay.OverlayPoi
+import app.sentrek.geo.overlay.OverlayPoiSource
+import app.sentrek.geo.overlay.OverlayPois
 import app.sentrek.map.MapStyle
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -14,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.maplibre.android.geometry.LatLngBounds
@@ -48,7 +53,7 @@ data class RegionState(val cell: RegionCell, val map: MapDownload, val trails: T
 class RegionRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val trailSource: TrailOverlaySource,
-) {
+) : OverlayPoiSource {
     private val offline = OfflineManager.getInstance(context)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val trailsDir = File(context.filesDir, "trails").apply {
@@ -75,6 +80,19 @@ class RegionRepository @Inject constructor(
     }
 
     fun trailFile(cell: RegionCell): File = File(trailsDir, cell.id + OVERLAY_SUFFIX)
+
+    /** Hiking points of the downloaded areas in [box], e.g. for the places along a route. */
+    override suspend fun pois(box: BoundingBox): List<OverlayPoi> = withContext(Dispatchers.IO) {
+        // From the files themselves: at startup (a route followed when the app was closed)
+        // the regions may not be listed yet.
+        val files = trailsDir.listFiles { f -> f.name.endsWith(OVERLAY_SUFFIX) }.orEmpty()
+        files.filter { f -> RegionCell.parse(f.name.removeSuffix(OVERLAY_SUFFIX))?.bbox?.intersects(box) == true }
+            .flatMap { file ->
+                runCatching { file.bufferedReader().use { OverlayPois.read(it, box) } }
+                    .onFailure { Log.w(TAG, "Cannot read points of ${file.name}", it) }
+                    .getOrDefault(emptyList())
+            }
+    }
 
     fun download(cells: Collection<RegionCell>) {
         for (cell in cells) {
@@ -239,6 +257,6 @@ class RegionRepository @Inject constructor(
         const val TAG = "RegionRepository"
 
         /** Bump when the overlay file format changes (v2: points, v3: huts, v4: all hiking points, v5: all tags, v6: all paths and tracks). */
-        const val OVERLAY_SUFFIX = ".v7.geojson"
+        const val OVERLAY_SUFFIX = ".v8.geojson"
     }
 }

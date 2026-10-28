@@ -37,18 +37,20 @@ enum class TrailVisibility(val osm: String, val level: Int) {
  * them below z14 (or entirely), so downloaded areas show them from [minZoom].
  * [icon] is the map icon name (core/map MapIcons); declaration order is display priority when
  * icons compete for space: huts first, then water, landmarks, signs.
+ * [onMap] false: the base style draws them already (peaks, passes); they are fetched only to
+ * be listed along a route. [landmark]: worth listing as a place ahead on a followed route.
  */
-enum class PoiKind(val icon: String, val minZoom: Int) {
-    AlpineHut("alpine_hut", 11),
-    WildernessHut("wilderness_hut", 11),
-    Shelter("shelter", 11),
-    Spring("spring", 12),
-    DrinkingWater("drinking_water", 12),
-    Cave("cave", 12),
-    Viewpoint("viewpoint", 12),
-    Waterfall("waterfall", 12),
+enum class PoiKind(val icon: String, val minZoom: Int, val onMap: Boolean = true, val landmark: Boolean = false) {
+    AlpineHut("alpine_hut", 11, landmark = true),
+    WildernessHut("wilderness_hut", 11, landmark = true),
+    Shelter("shelter", 11, landmark = true),
+    Spring("spring", 12, landmark = true),
+    DrinkingWater("drinking_water", 12, landmark = true),
+    Cave("cave", 12, landmark = true),
+    Viewpoint("viewpoint", 12, landmark = true),
+    Waterfall("waterfall", 12, landmark = true),
     Castle("castle", 12),
-    Camping("camping", 12),
+    Camping("camping", 12, landmark = true),
     Guidepost("guidepost", 13),
     Cross("cross", 13),
     Shrine("shrine", 13),
@@ -56,7 +58,9 @@ enum class PoiKind(val icon: String, val minZoom: Int) {
     Monument("monument", 13),
     Memorial("memorial", 13),
     Board("board", 13),
-    EmergencyPhone("emergency_phone", 13);
+    EmergencyPhone("emergency_phone", 13, landmark = true),
+    Peak("peak", 12, onMap = false, landmark = true),
+    Pass("saddle", 12, onMap = false, landmark = true);
 
     companion object {
         /** Classifies a feature from its OSM tags; null when it isn't one we show. */
@@ -79,6 +83,8 @@ enum class PoiKind(val icon: String, val minZoom: Int) {
             tags["historic"] == "memorial" -> Memorial
             tags["information"] == "board" || tags["information"] == "map" -> Board
             tags["emergency"] == "phone" -> EmergencyPhone
+            tags["natural"] == "peak" -> Peak
+            tags["natural"] == "saddle" || tags["mountain_pass"] == "yes" -> Pass
             else -> null
         }
 

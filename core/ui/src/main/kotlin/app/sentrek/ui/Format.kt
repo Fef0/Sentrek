@@ -13,7 +13,7 @@ object Format {
      * Set at startup and whenever the setting changes (SentrekApp). Compose state, so anything
      * drawn with these functions redraws in the new units.
      */
-    var units by mutableStateOf(Units.forCountry(Locale.getDefault().country))
+    var units by mutableStateOf(Units.Metric)
 
     fun distance(meters: Double): String = UnitFormat.distance(meters, units.distance)
 

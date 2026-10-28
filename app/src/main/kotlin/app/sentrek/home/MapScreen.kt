@@ -69,6 +69,8 @@ import app.sentrek.feature.record.R as RecordR
 import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.Geo
 import app.sentrek.geo.LatLon
+import app.sentrek.geo.RegionCell
+import app.sentrek.geo.RegionGrid
 import app.sentrek.geo.place.Place
 import app.sentrek.geo.place.PlaceKind
 import app.sentrek.map.LocalNightMap
@@ -76,6 +78,8 @@ import app.sentrek.map.FollowMode
 import app.sentrek.map.MapFeatureInfo
 import app.sentrek.map.MapFeatures
 import app.sentrek.map.MapLocation
+import app.sentrek.map.MapContours
+import app.sentrek.map.MapHeights
 import app.sentrek.map.MapOverlays
 import app.sentrek.map.MapStyle
 import app.sentrek.map.PlaceLayers
@@ -129,6 +133,9 @@ private const val SNAP_NORTH_DEGREES = 5.0
 
 private const val NORTH_ANIMATION_MS = 300
 
+/** Shorter than this, there is no way back to follow: the start is in sight. */
+private const val BACK_TO_START_MIN_M = 50.0
+
 /** Ground distance across one screen pixel at the centre of the map. */
 private fun metersPerPixel(map: MapLibreMap): Double {
     val x = map.width / 2
@@ -171,6 +178,7 @@ fun MapScreen(
     val shownTracks by viewModel.shownTracks.collectAsStateWithLifecycle()
     val followedRoute by viewModel.following.collectAsStateWithLifecycle()
     val followProfile by viewModel.followProfile.collectAsStateWithLifecycle()
+    val followPlaces by viewModel.followPlaces.collectAsStateWithLifecycle()
     val places by viewModel.places.collectAsStateWithLifecycle()
     val plan by planner.state.collectAsStateWithLifecycle()
     val planStats by planner.stats.collectAsStateWithLifecycle()
@@ -215,6 +223,9 @@ fun MapScreen(
     val controlsAlpha by animateFloatAsState(if (controlsHidden) 0f else 1f, label = "controls")
     val autoHideSetting by viewModel.autoHideControls.collectAsStateWithLifecycle()
     val showScaleBar by viewModel.showScaleBar.collectAsStateWithLifecycle()
+    val online by viewModel.online.collectAsStateWithLifecycle()
+    val downloadedCells by viewModel.downloadedCells.collectAsStateWithLifecycle()
+    val lastFixForSun by viewModel.lastFix.collectAsStateWithLifecycle()
     val autoHide = autoHideSetting && !plan.active
     LaunchedEffect(autoHide, touches) {
         controlsHidden = false
@@ -329,8 +340,14 @@ fun MapScreen(
     // For the scale bar and the compass, kept up to date while the map moves.
     var metersPerPx by remember { mutableDoubleStateOf(0.0) }
     var bearing by remember { mutableDoubleStateOf(0.0) }
+    // The area in the middle of the map, to tell whether it's downloaded.
+    var centreCell by remember { mutableStateOf<RegionCell?>(null) }
     DisposableEffect(map) {
         val m = map ?: return@DisposableEffect onDispose {}
+        fun updateCentre() {
+            val target = m.cameraPosition.target ?: return
+            centreCell = RegionGrid.cellAt(LatLon(target.latitude, target.longitude.coerceIn(-180.0, 180.0)))
+        }
         val onMove = MapLibreMap.OnCameraMoveListener {
             metersPerPx = metersPerPixel(m)
             bearing = m.cameraPosition.bearing
@@ -338,6 +355,7 @@ fun MapScreen(
         val onIdle = MapLibreMap.OnCameraIdleListener {
             metersPerPx = metersPerPixel(m)
             bearing = m.cameraPosition.bearing
+            updateCentre()
             // Left a few degrees off north: almost certainly meant to be north.
             val off = minOf(bearing, 360 - bearing)
             if (followMode != FollowMode.Heading && off > 0.0 && off < SNAP_NORTH_DEGREES) {
@@ -346,6 +364,7 @@ fun MapScreen(
         }
         metersPerPx = metersPerPixel(m)
         bearing = m.cameraPosition.bearing
+        updateCentre()
         m.addOnCameraMoveListener(onMove)
         m.addOnCameraIdleListener(onIdle)
         onDispose {
@@ -391,21 +410,33 @@ fun MapScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (plan.active) PlanPanel(planStats, plan.editing?.name, Modifier.fillMaxWidth())
-                recording?.let { RecordingStats(recording = it, modifier = Modifier.fillMaxWidth()) }
+                // Where the sun sets for the user: their position, or the map's before a fix.
+                val sunPosition = lastFixForSun?.let { LatLon(it.latitude, it.longitude) }
+                    ?: map?.cameraPosition?.target?.let { LatLon(it.latitude, it.longitude) }
+                recording?.let {
+                    // While following, the route's panel says it, against the time left.
+                    RecordingStats(recording = it, modifier = Modifier.fillMaxWidth(), position = sunPosition.takeIf { followedRoute == null })
+                }
                 followedRoute?.let {
                     FollowPanel(
                         following = it,
                         showProfile = followProfile,
                         onToggleProfile = { viewModel.setFollowProfile(!followProfile) },
+                        showPlaces = followPlaces,
+                        onTogglePlaces = { viewModel.setFollowPlaces(!followPlaces) },
                         onOpen = {
                             pressed = MapFeatureInfo(name = null, kind = "track", position = LatLng(0.0, 0.0), osmId = null, trackId = it.trackId)
                         },
                         onStop = { confirm = FollowConfirmations.stop(context, it.name, viewModel::stopFollowing) },
                         modifier = Modifier.fillMaxWidth(),
+                        position = sunPosition,
                     )
                 }
                 // Top left, under any panel. It stays when the other controls fade out.
                 if (showScaleBar) ScaleBar(metersPerPx, night = LocalNightMap.current)
+                // A reminder, not a block: the map still moves and answers taps, it just has
+                // nothing to draw here until the area is downloaded or the network is back.
+                if (!online && centreCell?.let { it !in downloadedCells } == true) OfflineAreaNote()
             }
 
             MapCompass(
@@ -494,8 +525,9 @@ fun MapScreen(
                         onClick = {
                             showPosition = false
                             when {
-                                // Following a position that can't come is pointless: help switch the GPS on.
-                                hasLocation && gps == GpsStatus.Off -> openLocationSettings(context)
+                                // Following a position that can't come is pointless: say why (the
+                                // reminder itself opens the location settings).
+                                hasLocation && gps == GpsStatus.Off -> gpsTiming.remindOff()
                                 followMode == FollowMode.Off -> withLocation(AfterPermission.Follow) { follow() }
                                 // With rotation locked there is no heading up: straight to off.
                                 followMode == FollowMode.North && !rotationLocked -> followRequest = FollowMode.Heading
@@ -775,6 +807,13 @@ fun MapScreen(
             onSave = { askStop = false; askName = true },
             onDiscard = { askStop = false; askDiscard = true },
             onDismiss = { askStop = false },
+            onBackToStart = {
+                askStop = false
+                val name = context.getString(R.string.record_way_back, viewModel.defaultTrackName(current))
+                viewModel.backToStart(name) { ok ->
+                    Toast.makeText(context, if (ok) R.string.record_back_started else R.string.record_back_nothing, Toast.LENGTH_SHORT).show()
+                }
+            }.takeIf { current.distance >= BACK_TO_START_MIN_M },
         )
     }
     if (askName && current != null) {
@@ -810,6 +849,16 @@ fun MapScreen(
 
     LaunchedEffect(style, rasters, overlays, showDifficulty) {
         style?.let { MapOverlays.sync(it, rasters, overlays, showDifficulty) }
+    }
+
+    val contourTerrain by viewModel.contourTerrain.collectAsStateWithLifecycle()
+    val elevationUnit = viewModel.units.collectAsStateWithLifecycle().value.elevation
+    val nightMap = LocalNightMap.current
+    LaunchedEffect(style, contourTerrain, elevationUnit) {
+        style?.let { MapContours.sync(it, contourTerrain, elevationUnit, nightMap) }
+    }
+    LaunchedEffect(style, elevationUnit) {
+        style?.let { MapHeights.apply(it, elevationUnit) }
     }
 
     LaunchedEffect(style, plan, planLegs, planPreview) {

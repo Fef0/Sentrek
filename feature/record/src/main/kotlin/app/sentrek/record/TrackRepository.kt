@@ -352,6 +352,11 @@ class TrackRepository @Inject constructor(
         }.onFailure { Log.w(TAG, "Cannot load route ${track.id}", it) }.getOrNull()
     }
 
+    /** The waypoints saved with [track] (from its GPX file); empty when it can't be read. */
+    suspend fun waypoints(track: SavedTrack): List<GpxWaypoint> = withContext(Dispatchers.IO) {
+        runCatching { read(track).waypoints }.getOrDefault(emptyList())
+    }
+
     /**
      * Elevation against distance along [track], for its profile. Read from the track's own file,
      * so it works offline. A track without any heights gets them from the terrain once (online,

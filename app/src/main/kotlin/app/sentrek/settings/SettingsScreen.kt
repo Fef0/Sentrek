@@ -85,7 +85,7 @@ class SettingsViewModel @Inject constructor(private val settings: SettingsReposi
     }
 
     val theme: StateFlow<AppTheme> =
-        settings.theme.stateIn(viewModelScope, SharingStarted.Eagerly, AppTheme.Light)
+        settings.theme.stateIn(viewModelScope, SharingStarted.Eagerly, AppTheme.System)
 
     fun setTheme(theme: AppTheme) {
         viewModelScope.launch { settings.setTheme(theme) }
@@ -106,7 +106,7 @@ class SettingsViewModel @Inject constructor(private val settings: SettingsReposi
     }
 
     val fullScreen: StateFlow<Boolean> =
-        settings.fullScreen.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+        settings.fullScreen.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     fun setFullScreen(on: Boolean) {
         viewModelScope.launch { settings.setFullScreen(on) }
@@ -119,6 +119,13 @@ class SettingsViewModel @Inject constructor(private val settings: SettingsReposi
         viewModelScope.launch { settings.setShowScaleBar(show) }
     }
 
+    val showContours: StateFlow<Boolean> =
+        settings.showContours.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setShowContours(show: Boolean) {
+        viewModelScope.launch { settings.setShowContours(show) }
+    }
+
     val rotationLocked: StateFlow<Boolean> =
         settings.rotationLocked.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
@@ -127,7 +134,7 @@ class SettingsViewModel @Inject constructor(private val settings: SettingsReposi
     }
 
     val confirmExit: StateFlow<Boolean> =
-        settings.confirmExit.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+        settings.confirmExit.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     fun setConfirmExit(on: Boolean) {
         viewModelScope.launch { settings.setConfirmExit(on) }
@@ -152,6 +159,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
     val autoHideControls by viewModel.autoHideControls.collectAsStateWithLifecycle()
     val confirmExit by viewModel.confirmExit.collectAsStateWithLifecycle()
     val showScaleBar by viewModel.showScaleBar.collectAsStateWithLifecycle()
+    val showContours by viewModel.showContours.collectAsStateWithLifecycle()
     val rotationLocked by viewModel.rotationLocked.collectAsStateWithLifecycle()
     val units by viewModel.units.collectAsStateWithLifecycle()
 
@@ -284,6 +292,11 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 title = stringResource(R.string.settings_scale_bar),
                 checked = showScaleBar,
                 onChange = viewModel::setShowScaleBar,
+            )
+            ToggleRow(
+                title = stringResource(R.string.settings_contours),
+                checked = showContours,
+                onChange = viewModel::setShowContours,
             )
             ToggleRow(
                 title = stringResource(R.string.settings_lock_north),

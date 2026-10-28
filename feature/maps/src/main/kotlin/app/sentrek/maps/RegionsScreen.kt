@@ -58,6 +58,8 @@ import app.sentrek.ui.Confirmation
 import app.sentrek.ui.ConfirmDialog
 import app.sentrek.ui.TouchTarget
 import app.sentrek.ui.MapButton
+import app.sentrek.map.MapHeights
+import app.sentrek.ui.Format
 import app.sentrek.ui.MapCredit
 import app.sentrek.ui.safeTopPadding
 import app.sentrek.ui.SentrekIcons
@@ -79,6 +81,7 @@ fun RegionsScreen(
     val imported by viewModel.imported.collectAsStateWithLifecycle()
     val importing by viewModel.importing.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
+    val online by viewModel.online.collectAsStateWithLifecycle()
     val flyTo by viewModel.flyTo.collectAsStateWithLifecycle()
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var style by remember { mutableStateOf<Style?>(null) }
@@ -107,6 +110,7 @@ fun RegionsScreen(
             onMapReady = { m, s ->
                 initialCamera?.let { m.cameraPosition = it }
                 RegionGridLayer.install(s)
+                MapHeights.apply(s, Format.units.elevation)
                 map = m
                 style = s
             },
@@ -161,6 +165,7 @@ fun RegionsScreen(
             importedCount = imported.size,
             importing = importing,
             message = message,
+            online = online,
             onDownload = download,
             onDelete = {
                 val count = selection.count { it in regions }
@@ -241,6 +246,7 @@ private fun RegionsPanel(
     importedCount: Int,
     importing: Boolean,
     @StringRes message: Int?,
+    online: Boolean,
     onDownload: () -> Unit,
     onDelete: () -> Unit,
     onClear: () -> Unit,
@@ -278,6 +284,9 @@ private fun RegionsPanel(
 
             message?.let {
                 Text(stringResource(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
+            }
+            if (!online && (pending > 0 || regions.values.any { it.trails == TrailsDownload.Downloading }) && message == null) {
+                Text(stringResource(R.string.regions_waiting_network), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
             }
 
             if (selection.isNotEmpty()) {

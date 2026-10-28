@@ -130,6 +130,13 @@ class RecordingRepository @Inject constructor(
         return saved
     }
 
+    /** Saves the way so far as [name] and keeps recording, e.g. to follow it back to the start. */
+    suspend fun saveSoFar(name: String): SavedTrack? {
+        if (_state.value == null) return null
+        val kept = segments.map { it.toList() }.filter { it.isNotEmpty() }
+        return if (kept.isNotEmpty()) tracks.save(kept, name) else null
+    }
+
     fun discard() {
         if (_state.value != null) end()
     }

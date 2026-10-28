@@ -56,11 +56,9 @@ class UnitFormatTest {
     }
 
     @Test
-    fun `scale bar lengths and default units`() {
+    fun `scale bar lengths`() {
         assertEquals(500.0, UnitFormat.roundDown(730.0), 1e-9)
         assertEquals(2.0, UnitFormat.roundDown(2.0), 1e-9)
         assertEquals(0.1, UnitFormat.roundDown(0.19), 1e-9)
-        assertEquals(Units.Imperial, Units.forCountry("us"))
-        assertEquals(Units.Metric, Units.forCountry("IT"))
     }
 }

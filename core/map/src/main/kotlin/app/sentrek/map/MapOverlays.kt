@@ -138,7 +138,7 @@ object MapOverlays {
             }
             // One layer per zoom tier (filters can't use zoom). Symbols collide with base labels
             // whatever their order, so these can sit on top.
-            for ((minZoom, kinds) in PoiKind.entries.groupBy { it.minZoom }) {
+            for ((minZoom, kinds) in PoiKind.entries.filter { it.onMap }.groupBy { it.minZoom }) {
                 PlaceLayers.addBelow(style, pointLayer(sourceId, sourceId + POINTS + minZoom, minZoom, kinds))
             }
         }

@@ -47,6 +47,8 @@
     <string name="import_vector">Vector map files are not supported yet. Use a raster MBTiles or PMTiles file.</string>
     <string name="import_unknown">Unsupported file. Use .mbtiles or .pmtiles.</string>
     <string name="import_failed">Import failed</string>
+    <string name="regions_offline">No network. Connect to the internet to download maps.</string>
+    <string name="regions_waiting_network">No network: downloads continue once you’re back online.</string>
     <string name="download_channel">Map downloads</string>
     <string name="download_notification_title">Downloading maps</string>
     <string name="download_notification_area">%1$d left, current %2$d%%</string>

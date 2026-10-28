@@ -59,3 +59,9 @@ object Terrarium {
         return top * (1 - fy) + bottom * fy
     }
 }
+
+/** Decoded terrain tiles, from wherever the app keeps them. Blocking: call off the main thread. */
+fun interface TerrainTiles {
+    /** Null where the tile can't be had (offline, outside the downloaded areas). */
+    fun tile(key: Terrarium.TileKey): Terrarium.Tile?
+}

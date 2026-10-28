@@ -23,6 +23,9 @@ data class BoundingBox(val south: Double, val west: Double, val north: Double, v
         p.lat in south..north && p.lon in west..east
 
     val center: LatLon get() = LatLon((south + north) / 2, (west + east) / 2)
+
+    fun intersects(other: BoundingBox): Boolean =
+        south <= other.north && other.south <= north && west <= other.east && other.west <= east
 }
 
 object Geo {

@@ -1,6 +1,7 @@
 package app.sentrek.maps
 
 import app.sentrek.geo.BoundingBox
+import app.sentrek.geo.overlay.OverlayPoiSource
 import app.sentrek.geo.overlay.OverpassOverlay
 import app.sentrek.map.MapEngine
 import dagger.Binds
@@ -84,4 +85,7 @@ class OverpassTrailSource @Inject constructor() : TrailOverlaySource {
 internal abstract class TrailSourceModule {
     @Binds
     abstract fun bindTrailSource(impl: OverpassTrailSource): TrailOverlaySource
+
+    @Binds
+    abstract fun bindPoiSource(impl: RegionRepository): OverlayPoiSource
 }

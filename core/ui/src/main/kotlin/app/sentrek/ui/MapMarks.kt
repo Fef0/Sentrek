@@ -97,15 +97,18 @@ private fun number(value: Double): String =
     if (value >= 1 && value == Math.rint(value)) value.toLong().toString() else value.toBigDecimal().stripTrailingZeros().toPlainString()
 
 /**
- * The map data credit, shown when the map opens and faded out after a few seconds, as the
- * OpenStreetMap attribution guidelines allow. The full credits stay in Settings > About.
+ * The map data credit, shown on the first map after the app starts and faded out after a few
+ * seconds, as the OpenStreetMap attribution guidelines allow. The full credits stay in
+ * Settings > About.
  */
 @Composable
 fun MapCredit(modifier: Modifier = Modifier) {
-    var shown by remember { mutableStateOf(true) }
+    var shown by remember { mutableStateOf(!creditShown) }
     LaunchedEffect(Unit) {
+        if (!shown) return@LaunchedEffect
         delay(CREDIT_MS)
         shown = false
+        creditShown = true
     }
     AnimatedVisibility(shown, modifier, exit = fadeOut()) {
         Text(
@@ -122,4 +125,7 @@ fun MapCredit(modifier: Modifier = Modifier) {
 private val SCALE_MAX_WIDTH = 110.dp
 private const val FEET_PER_MILE = 5_280.0
 private const val CREDIT_MS = 5_000L
+
+/** Once per start of the app, not on every screen that draws a map. */
+private var creditShown = false
 private const val MAP_CREDIT = "© OpenFreeMap © OpenMapTiles © OpenStreetMap contributors"

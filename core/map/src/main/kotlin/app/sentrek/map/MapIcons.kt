@@ -60,6 +60,9 @@ object MapIcons {
         "toilets" to (R.drawable.poi_toilets to Group.Services),
     )
 
+    /** The symbol of the map icon [name] and its colour, to show the same badge outside the map. */
+    fun symbol(name: String): Pair<Int, Int>? = ICONS[name]?.let { (res, group) -> res to group.color }
+
     /** Call after each style load: images belong to the style. */
     fun install(context: Context, style: Style) {
         val density = context.resources.displayMetrics.density

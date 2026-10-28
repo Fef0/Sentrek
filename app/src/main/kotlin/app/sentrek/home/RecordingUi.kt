@@ -24,6 +24,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.sentrek.R
+import app.sentrek.geo.LatLon
 import app.sentrek.record.Recording
 import app.sentrek.ui.Format
 import app.sentrek.ui.TouchTarget
@@ -31,7 +32,7 @@ import kotlinx.coroutines.delay
 
 /** Live numbers while recording: time (without pauses), distance, climb. */
 @Composable
-fun RecordingStats(recording: Recording, modifier: Modifier = Modifier) {
+fun RecordingStats(recording: Recording, modifier: Modifier = Modifier, position: LatLon? = null) {
     val now by produceState(System.currentTimeMillis()) {
         while (true) {
             value = System.currentTimeMillis()
@@ -46,7 +47,8 @@ fun RecordingStats(recording: Recording, modifier: Modifier = Modifier) {
         contentColor = MaterialTheme.colorScheme.onSurface,
         shadowElevation = 4.dp,
     ) {
-        Row(Modifier.padding(horizontal = 8.dp, vertical = 8.dp)) {
+        Column(Modifier.padding(horizontal = 8.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Row {
             if (recording.isPaused) {
                 Stat(stringResource(R.string.record_paused), Format.duration(recording.activeMillis(now)), Modifier.weight(1f), MaterialTheme.colorScheme.primary)
             } else {
@@ -54,6 +56,8 @@ fun RecordingStats(recording: Recording, modifier: Modifier = Modifier) {
             }
             Stat(stringResource(R.string.record_distance), Format.distance(recording.distance), Modifier.weight(1f))
             Stat(stringResource(R.string.record_ascent), "↑ " + Format.elevation(recording.ascent), Modifier.weight(1f))
+        }
+        SunsetLine(position, remainingMillis = null, Modifier.padding(top = 4.dp))
         }
     }
 }
@@ -77,6 +81,8 @@ fun RecordingDialog(
     onSave: () -> Unit,
     onDiscard: () -> Unit,
     onDismiss: () -> Unit,
+    /** Null until there is a way to go back along. */
+    onBackToStart: (() -> Unit)? = null,
 ) {
     val wide = Modifier.fillMaxWidth().heightIn(min = TouchTarget)
     AlertDialog(
@@ -91,6 +97,9 @@ fun RecordingDialog(
                     Button(onClick = onSave, modifier = wide) { Text(stringResource(R.string.record_save)) }
                     OutlinedButton(onClick = onPauseResume, modifier = wide) { Text(stringResource(R.string.record_pause)) }
                     OutlinedButton(onClick = onDismiss, modifier = wide) { Text(stringResource(R.string.record_continue)) }
+                }
+                if (onBackToStart != null) {
+                    OutlinedButton(onClick = onBackToStart, modifier = wide) { Text(stringResource(R.string.record_back_to_start)) }
                 }
                 TextButton(onClick = onDiscard, modifier = wide) {
                     Text(stringResource(R.string.record_discard), color = MaterialTheme.colorScheme.error)

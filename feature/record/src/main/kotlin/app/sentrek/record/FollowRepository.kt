@@ -10,9 +10,14 @@ import android.util.Log
 import app.sentrek.data.SettingsRepository
 import app.sentrek.geo.LatLon
 import app.sentrek.geo.route.OffRouteDetector
+import app.sentrek.geo.overlay.OverlayPoiSource
 import app.sentrek.geo.route.Route
+import app.sentrek.geo.route.RoutePlace
+import app.sentrek.geo.route.RoutePlaces
+import app.sentrek.geo.route.UpcomingPlace
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -41,6 +47,8 @@ data class Following(
     val profile: List<Pair<Double, Double>> = emptyList(),
     /** Metres along the route to the point nearest the user, or null before the first fix. */
     val along: Double? = null,
+    /** Huts, water, passes, the user's places… still ahead, nearest first. */
+    val upcoming: List<UpcomingPlace> = emptyList(),
 ) {
     /**
      * Where the user is along the route, only while actually on it: off it, the nearest
@@ -59,6 +67,8 @@ data class Following(
 class FollowRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val tracks: TrackRepository,
+    private val places: PlaceRepository,
+    private val pois: OverlayPoiSource,
     settings: SettingsRepository,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -69,6 +79,8 @@ class FollowRepository @Inject constructor(
 
     private var route: Route? = null
     private var along: Double? = null
+    private var routePlaces: List<RoutePlace> = emptyList()
+    private var placesJob: Job? = null
     private var detector = OffRouteDetector()
 
     private val _state = MutableStateFlow<Following?>(null)
@@ -91,6 +103,7 @@ class FollowRepository @Inject constructor(
         val loaded = tracks.route(track) ?: return false
         route = if (reversed) loaded.reversed() else loaded
         along = null
+        routePlaces = emptyList()
         detector = OffRouteDetector()
         tracks.show(track)
         runCatching { saved.writeText("${track.id}\n$reversed") }
@@ -104,8 +117,33 @@ class FollowRepository @Inject constructor(
             hasElevation = route!!.hasElevation,
             profile = route!!.profile(),
         )
+        findPlaces(track, route!!)
         ensureService()
         return true
+    }
+
+    /**
+     * Looks up the places along [r] once, in the background: the route's waypoints, then the
+     * user's places, then the hiking points of the downloaded areas (listed in that order, the
+     * first wins where two name the same spot).
+     */
+    private fun findPlaces(track: SavedTrack, r: Route) {
+        placesJob?.cancel()
+        placesJob = scope.launch {
+            val box = RoutePlaces.box(r) ?: return@launch
+            val candidates = buildList {
+                tracks.waypoints(track).forEach { add(RoutePlaces.Candidate(it.name, RoutePlace.Kind.Waypoint, it.position)) }
+                places.places.value.forEach {
+                    add(RoutePlaces.Candidate(it.name, RoutePlace.Kind.Saved(it.kind, it.displayColor), it.position))
+                }
+                pois.pois(box).filter { it.kind.landmark }
+                    .forEach { add(RoutePlaces.Candidate(it.name, RoutePlace.Kind.Osm(it.kind), it.position)) }
+            }
+            val found = withContext(Dispatchers.Default) { RoutePlaces.along(r, candidates) }
+            if (route !== r) return@launch
+            routePlaces = found
+            _state.value = _state.value?.copy(upcoming = RoutePlaces.upcoming(r, found, along ?: 0.0))
+        }
     }
 
     /** Starts the tracking service if following. Only from the foreground (see [RecordingRepository.ensureService]). */
@@ -128,8 +166,10 @@ class FollowRepository @Inject constructor(
     }
 
     fun stop() {
+        placesJob?.cancel()
         route = null
         along = null
+        routePlaces = emptyList()
         saved.delete()
         _state.value = null
     }
@@ -153,6 +193,7 @@ class FollowRepository @Inject constructor(
             offset = position.offset,
             offRoute = detector.isOff,
             along = position.along,
+            upcoming = RoutePlaces.upcoming(r, routePlaces, position.along),
         )
     }
 

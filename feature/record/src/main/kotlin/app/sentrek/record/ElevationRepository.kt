@@ -2,14 +2,19 @@ package app.sentrek.record
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteDatabaseLockedException
+import android.database.sqlite.SQLiteException
+import android.database.sqlite.SQLiteReadOnlyDatabaseException
 import android.graphics.BitmapFactory
 import android.util.Log
 import android.util.LruCache
 import app.sentrek.geo.LatLon
+import app.sentrek.geo.dem.TerrainTiles
 import app.sentrek.geo.dem.Terrarium
 import app.sentrek.map.MapEngine
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -29,7 +34,7 @@ import javax.inject.Singleton
  * kept in an HTTP disk cache, so a route planned once can be replanned there offline.
  */
 @Singleton
-class ElevationRepository @Inject constructor(@ApplicationContext private val context: Context) {
+class ElevationRepository @Inject constructor(@ApplicationContext private val context: Context) : TerrainTiles {
     private val client: OkHttpClient by lazy {
         MapEngine.httpClient.newBuilder()
             .cache(Cache(File(context.cacheDir, "dem"), CACHE_BYTES))
@@ -43,26 +48,42 @@ class ElevationRepository @Inject constructor(@ApplicationContext private val co
     suspend fun withElevation(points: List<LatLon>): List<LatLon> = withContext(Dispatchers.IO) {
         points.map { p ->
             val sample = Terrarium.locate(p.lat, p.lon)
-            val tile = tile(sample.key) ?: return@map p.copy(ele = null)
+            val tile = cachedTile(sample.key) ?: return@map p.copy(ele = null)
             p.copy(ele = Terrarium.height(tile, sample).toDouble())
         }
     }
 
-    private suspend fun tile(key: Terrarium.TileKey): Terrarium.Tile? = lock.withLock {
+    /** For the map's contour lines, on MapLibre's worker threads. */
+    override fun tile(key: Terrarium.TileKey): Terrarium.Tile? = runBlocking { cachedTile(key) }
+
+    private suspend fun cachedTile(key: Terrarium.TileKey): Terrarium.Tile? = lock.withLock {
         tiles.get(key)?.let { return it }
         if (key in missing) return null
-        val tile = load(key)
-        if (tile != null) tiles.put(key, tile) else missing += key
+        val (tile, busy) = load(key)
+        if (tile != null) tiles.put(key, tile) else if (!busy) missing += key
         tile
     }
 
-    /** Downloaded areas first, then the network (the cache revalidates), then the cache alone. */
-    private fun load(key: Terrarium.TileKey): Terrarium.Tile? {
+    /**
+     * Downloaded areas first, then the network (the cache revalidates), then the cache alone.
+     * Also says whether the offline database was busy: then the tile is worth asking for again.
+     */
+    private fun load(key: Terrarium.TileKey): Pair<Terrarium.Tile?, Boolean> {
         val url = URL_TEMPLATE.replace("{z}", "${key.zoom}").replace("{x}", "${key.x}").replace("{y}", "${key.y}")
-        val bytes = downloaded(key)
+        var busy = false
+        val bytes = try {
+            downloaded(key)
+        } catch (e: DatabaseBusy) {
+            busy = true
+            null
+        }
             ?: fetch(Request.Builder().url(url).build())
             ?: fetch(Request.Builder().url(url).cacheControl(CacheControl.FORCE_CACHE).build())
-            ?: return null
+            ?: return null to busy
+        return decode(bytes) to false
+    }
+
+    private fun decode(bytes: ByteArray): Terrarium.Tile? {
         val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
         if (bitmap.width != Terrarium.TILE_SIZE || bitmap.height != Terrarium.TILE_SIZE) return null
         val pixels = IntArray(Terrarium.TILE_SIZE * Terrarium.TILE_SIZE)
@@ -73,11 +94,28 @@ class ElevationRepository @Inject constructor(@ApplicationContext private val co
 
     /**
      * The tile from MapLibre's offline database (areas downloaded on the Maps screen), read-only.
-     * MapLibre zlib-compresses most tiles there. Null when it isn't there or the database is busy.
+     * MapLibre zlib-compresses most tiles there. Null when it isn't there; [DatabaseBusy] when
+     * MapLibre kept it busy (it writes its cache there too) through a few short tries.
      */
     private fun downloaded(key: Terrarium.TileKey): ByteArray? {
         val file = File(context.filesDir, OFFLINE_DB)
         if (!file.exists()) return null
+        repeat(DB_ATTEMPTS) {
+            try {
+                return query(file, key)
+            } catch (e: SQLiteException) {
+                if (e !is SQLiteReadOnlyDatabaseException && e !is SQLiteDatabaseLockedException) throw e
+                // Mid-write, MapLibre's journal makes the file unreadable from here for a moment.
+                Log.d(TAG, "Offline database busy for $key: ${e.message}")
+                Thread.sleep(DB_RETRY_MS)
+            }
+        }
+        throw DatabaseBusy()
+    }
+
+    private class DatabaseBusy : Exception()
+
+    private fun query(file: File, key: Terrarium.TileKey): ByteArray? {
         return try {
             SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
                 db.rawQuery(
@@ -89,8 +127,12 @@ class ElevationRepository @Inject constructor(@ApplicationContext private val co
                     if (c.getInt(1) != 0) InflaterInputStream(data.inputStream()).use { it.readBytes() } else data
                 }
             }
+        } catch (e: SQLiteReadOnlyDatabaseException) {
+            throw e
+        } catch (e: SQLiteDatabaseLockedException) {
+            throw e
         } catch (e: Exception) {
-            // Locked while MapLibre writes, or a schema we don't know: the network may still have it.
+            // A schema we don't know: the network may still have it.
             Log.d(TAG, "No downloaded terrain tile $key: ${e.message}")
             null
         }
@@ -116,8 +158,10 @@ class ElevationRepository @Inject constructor(@ApplicationContext private val co
 
         /** MapLibre's default offline database, in the app's files directory. */
         private const val OFFLINE_DB = "mbgl-offline.db"
+        private const val DB_ATTEMPTS = 3
+        private const val DB_RETRY_MS = 150L
         private const val CACHE_BYTES = 100L * 1024 * 1024
-        // 256 KB each.
-        private const val MEMORY_TILES = 24
+        // 256 KB each. Contours need the tiles around the ones on screen too.
+        private const val MEMORY_TILES = 48
     }
 }

@@ -1,5 +1,6 @@
 package app.sentrek.maps
 
+import android.content.Context
 import android.net.Uri
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
@@ -8,17 +9,25 @@ import app.sentrek.feature.maps.R
 import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.RegionCell
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class RegionsViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val repository: RegionRepository,
     private val importedMaps: ImportedMapsRepository,
 ) : ViewModel() {
+    /** Offline, downloads wait (MapLibre resumes them by itself): the panel says so. */
+    val online: StateFlow<Boolean> = onlineFlow(context)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
     val regions: StateFlow<Map<RegionCell, RegionState>> = repository.state
     val imported: StateFlow<List<ImportedMap>> = importedMaps.maps
 
@@ -46,6 +55,9 @@ class RegionsViewModel @Inject constructor(
     }
 
     fun downloadSelected() {
+        // Nothing would come: say why, and keep the selection for when the network is back.
+        if (!isOnline(context)) return show(R.string.regions_offline)
+        _message.value = null
         repository.download(_selection.value.filter { it !in regions.value })
         clearSelection()
     }
@@ -55,7 +67,11 @@ class RegionsViewModel @Inject constructor(
         clearSelection()
     }
 
-    fun retryTrails() = repository.retryTrails(regions.value.keys)
+    fun retryTrails() {
+        if (!isOnline(context)) return show(R.string.regions_offline)
+        _message.value = null
+        repository.retryTrails(regions.value.keys)
+    }
 
     fun import(uri: Uri) {
         _message.value = null

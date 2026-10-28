@@ -33,15 +33,18 @@ class LocationRepository @Inject constructor(@ApplicationContext private val con
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
             PackageManager.PERMISSION_GRANTED
 
-    /** One fix per second at most; completes at once without permission. */
+    /**
+     * A fix every [intervalMs] at most; completes at once without permission. With several
+     * requests at once, Android serves them all at the fastest rate asked.
+     */
     @SuppressLint("MissingPermission")
-    fun locations(): Flow<Location> = callbackFlow {
+    fun locations(intervalMs: Long = INTERVAL_MS): Flow<Location> = callbackFlow {
         if (!hasPermission() || manager == null) {
             close()
             return@callbackFlow
         }
         val listener = LocationListenerCompat { trySend(it) }
-        val request = LocationRequestCompat.Builder(INTERVAL_MS)
+        val request = LocationRequestCompat.Builder(intervalMs)
             .setQuality(LocationRequestCompat.QUALITY_HIGH_ACCURACY)
             .build()
         manager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
@@ -91,7 +94,8 @@ class LocationRepository @Inject constructor(@ApplicationContext private val con
     }
 
     companion object {
-        private const val INTERVAL_MS = 1_000L
+        /** Callers pass their own (see GpsTiming); this is the on-screen default. */
+        const val INTERVAL_MS = 1_000L
         private const val STALE_MS = 60_000L
 
         /**

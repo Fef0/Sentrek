@@ -23,6 +23,9 @@ import org.maplibre.android.maps.Style
 /** Whether maps use night colours; set once for the whole app (see the map theme setting). */
 val LocalNightMap = staticCompositionLocalOf { false }
 
+/** Frames per second the maps may draw at most; 0 for as many as the screen shows (battery saver sets it). */
+val LocalMapMaxFps = staticCompositionLocalOf { 0 }
+
 /**
  * MapLibre map bound to the composition's lifecycle. [onMapReady] runs once the style has loaded.
  * [onTouch] sees every touch first; returning true keeps it from the map (e.g. to drag a point).
@@ -41,13 +44,15 @@ fun SentrekMap(
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val currentOnMapReady = rememberUpdatedState(onMapReady)
     val currentOnTouch = rememberUpdatedState(onTouch)
+    val maxFps = LocalMapMaxFps.current
 
-    val mapView = remember(night) {
+    val mapView = remember(night, maxFps) {
         // Black while the style loads, not a light grey flash.
         val options = MapLibreMapOptions.createFromAttributes(context)
             .apply { if (night) foregroundLoadColor(Color.BLACK) }
         MapView(context, options).apply {
             onCreate(null)
+            if (maxFps > 0) setMaximumFps(maxFps)
             setOnTouchListener { _, event -> currentOnTouch.value?.invoke(event) ?: false }
             getMapAsync { map ->
                 map.uiSettings.apply {

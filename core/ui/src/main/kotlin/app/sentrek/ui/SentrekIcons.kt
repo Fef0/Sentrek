@@ -85,6 +85,30 @@ object SentrekIcons {
         icon("Sentrek.Profile", "M14,6l-3.75,5 2.85,3.8 -1.6,1.2C9.81,13.75 7,10 7,10l-6,8h22L14,6z")
     }
 
+    /** Battery with a plus: battery saver. */
+    val BatterySaver: ImageVector by lazy {
+        icon(
+            "Sentrek.BatterySaver",
+            "M16,4h-2V2h-4v2H8C7.45,4 7,4.45 7,5v16c0,0.55 0.45,1 1,1h8c0.55,0 1,-0.45 1,-1V5C17,4.45 16.55,4 16,4zM15,14h-2v2h-2v-2H9v-2h2v-2h2v2h2V14z",
+        )
+    }
+
+    /** Battery with an exclamation mark: stamina mode. */
+    val BatteryAlert: ImageVector by lazy {
+        icon(
+            "Sentrek.BatteryAlert",
+            "M15.67,4H14V2h-4v2H8.33C7.6,4 7,4.6 7,5.33v15.33C7,21.4 7.6,22 8.33,22h7.33c0.74,0 1.34,-0.6 1.34,-1.33V5.33C17,4.6 16.4,4 15.67,4zM13,18h-2v-2h2v2zM13,14h-2V9h2v5z",
+        )
+    }
+
+    /** Crossed-out cloud: no network. */
+    val CloudOff: ImageVector by lazy {
+        icon(
+            "Sentrek.CloudOff",
+            "M19.35,10.04C18.67,6.59 15.64,4 12,4c-1.48,0 -2.85,0.43 -4.01,1.17l1.46,1.46C10.21,6.23 11.08,6 12,6c3.04,0 5.5,2.46 5.5,5.5v0.5H19c1.66,0 3,1.34 3,3c0,1.13 -0.64,2.11 -1.56,2.62l1.45,1.45C23.16,18.16 24,16.68 24,15c0,-2.64 -2.05,-4.78 -4.65,-4.96zM3,5.27l2.75,2.74C2.56,8.15 0,10.77 0,14c0,3.31 2.69,6 6,6h11.73l2,2L21,20.73 4.27,4 3,5.27zM7.73,10l8,8H6c-2.21,0 -4,-1.79 -4,-4s1.79,-4 4,-4h1.73z",
+        )
+    }
+
     val ExpandMore: ImageVector by lazy { icon("Sentrek.ExpandMore", "M16.59,8.59L12,13.17 7.41,8.59 6,10l6,6 6,-6z") }
 
     val ExpandLess: ImageVector by lazy { icon("Sentrek.ExpandLess", "M12,8l-6,6 1.41,1.41L12,10.83l4.59,4.58L18,14z") }

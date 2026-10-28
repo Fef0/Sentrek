@@ -31,6 +31,7 @@ import org.maplibre.android.style.layers.PropertyFactory.textHaloColor
 import org.maplibre.android.style.layers.PropertyFactory.textHaloWidth
 import org.maplibre.android.style.layers.PropertyFactory.textMaxAngle
 import org.maplibre.android.style.layers.PropertyFactory.textSize
+import org.maplibre.android.style.layers.PropertyFactory.visibility
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.CustomGeometrySource
 import org.maplibre.android.style.sources.CustomGeometrySourceOptions
@@ -63,6 +64,11 @@ object MapContours {
     /** Above the relief, below water, roads and trails (hiking.json). */
     private const val ABOVE_LAYER = "hillshade"
     private const val BELOW_LABELS = "water-name"
+
+    /** The hillshade of the base style; hidden, the night map is almost all black pixels. */
+    fun showRelief(style: Style, show: Boolean) {
+        style.getLayer(ABOVE_LAYER)?.setProperties(visibility(if (show) Property.VISIBLE else Property.NONE))
+    }
 
     /** [terrain] null removes the contours. Call again when [unit] or the map colours change. */
     fun sync(style: Style, terrain: TerrainTiles?, unit: ElevationUnit, night: Boolean) {

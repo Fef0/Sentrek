@@ -1,6 +1,7 @@
 package app.sentrek.map
 
 import app.sentrek.geo.RegionCell
+import app.sentrek.geo.overlay.OverpassOverlay
 import app.sentrek.geo.overlay.PoiKind
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
@@ -21,6 +22,7 @@ import org.maplibre.android.style.expressions.Expression.match
 import org.maplibre.android.style.expressions.Expression.not
 import org.maplibre.android.style.expressions.Expression.rgb
 import org.maplibre.android.style.expressions.Expression.step
+import org.maplibre.android.style.expressions.Expression.subtract
 import org.maplibre.android.style.expressions.Expression.switchCase
 import org.maplibre.android.style.expressions.Expression.toColor
 import org.maplibre.android.style.expressions.Expression.within
@@ -30,12 +32,17 @@ import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
 import org.maplibre.android.style.layers.PropertyFactory.iconImage
+import org.maplibre.android.style.layers.PropertyFactory.iconRotationAlignment
 import org.maplibre.android.style.layers.PropertyFactory.lineCap
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
 import org.maplibre.android.style.layers.PropertyFactory.lineDasharray
+import org.maplibre.android.style.layers.PropertyFactory.lineJoin
 import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
+import org.maplibre.android.style.layers.PropertyFactory.lineSortKey
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
+import org.maplibre.android.style.layers.PropertyFactory.symbolPlacement
 import org.maplibre.android.style.layers.PropertyFactory.symbolSortKey
+import org.maplibre.android.style.layers.PropertyFactory.symbolSpacing
 import org.maplibre.android.style.layers.PropertyFactory.textAnchor
 import org.maplibre.android.style.layers.PropertyFactory.textColor
 import org.maplibre.android.style.layers.PropertyFactory.textField
@@ -45,6 +52,7 @@ import org.maplibre.android.style.layers.PropertyFactory.textHaloWidth
 import org.maplibre.android.style.layers.PropertyFactory.textOffset
 import org.maplibre.android.style.layers.PropertyFactory.textOptional
 import org.maplibre.android.style.layers.PropertyFactory.textSize
+import org.maplibre.android.style.layers.PropertyValue
 import org.maplibre.android.style.layers.RasterLayer
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
@@ -71,7 +79,10 @@ data class RasterOverlay(val id: String, val url: String)
  *      look like the base style's own;
  *    - hiking points (huts, water, caves, guideposts, crosses…) as icons, from lower zooms
  *      than the base tiles allow. Inside downloaded areas the base tiles' own copies of these
- *      points are hidden, so nothing is drawn twice.
+ *      points are hidden, so nothing is drawn twice;
+ *    - waymarked routes, under the trails like the base style's, never broken (roads
+ *      included) and with their waymark along the line from zoom 12. The base tiles' own
+ *      routes are hidden there.
  */
 object MapOverlays {
     private const val RASTER = "import-"
@@ -86,6 +97,9 @@ object MapOverlays {
     private const val DETAIL_ZOOM = 12f
     private const val OVERVIEW_ZOOM = 10f
     private const val POINTS = "-points-z"
+    private const val ROUTES = "-routes"
+    private const val MARKS = "-marks"
+    private const val MARKS_ZOOM = 12f
 
     /** From here in, point icons may overlap (as the base style's, hiking.json). */
     private const val ICONS_OVERLAP_ZOOM = 13f
@@ -94,6 +108,8 @@ object MapOverlays {
     private const val BASE_HIKING_POIS = "poi-hiking"
     private const val BASE_PATH = "path"
     private const val BASE_TRACK = "track"
+    private const val BASE_ROUTE = "hiking-route"
+    private const val BASE_ROUTE_REF = "hiking-route-ref"
     private const val PATH_RED = "#c0262d"
     private const val TRACK_BROWN = "#8b5a2b"
     private val baseFilters = WeakHashMap<Style, MutableMap<String, Expression>>()
@@ -132,6 +148,7 @@ object MapOverlays {
             }
             // The base tiles carry paths only from zoom 12; the overlay has every path, so in
             // downloaded areas trails show from further out.
+            style.addLayerBelow(routeLayer(style, sourceId, sourceId + ROUTES), BELOW_LAYER)
             style.addLayerBelow(overviewLayer(style, sourceId, sourceId + OVERVIEW, showDifficulty), BELOW_LAYER)
             style.addLayerBelow(plainLayer(style, sourceId, sourceId + PLAIN_TRACK, track = true, showDifficulty), BELOW_LAYER)
             style.addLayerBelow(plainLayer(style, sourceId, sourceId + PLAIN_PATH, track = false, showDifficulty), BELOW_LAYER)
@@ -140,13 +157,15 @@ object MapOverlays {
                 style.addLayerBelow(trailLayer(sourceId, sourceId + CLEAR, faint = false), BELOW_LAYER)
                 style.addLayerBelow(trailLayer(sourceId, sourceId + FAINT, faint = true), BELOW_LAYER)
             }
+            // Below every label: names and points win the space, the marks repeat anyway.
+            style.addLayerBelow(markLayer(sourceId, sourceId + MARKS), BELOW_LAYER)
             // One layer per zoom tier (filters can't use zoom). Symbols collide with base labels
             // whatever their order, so these can sit on top.
             for ((minZoom, kinds) in PoiKind.entries.filter { it.onMap }.groupBy { it.minZoom }) {
                 PlaceLayers.addBelow(style, pointLayer(sourceId, sourceId + POINTS + minZoom, minZoom, kinds))
             }
         }
-        for (layer in listOf(BASE_HIKING_POIS, BASE_PATH, BASE_TRACK)) hideInDownloaded(style, layer, overlays.keys)
+        for (layer in listOf(BASE_HIKING_POIS, BASE_PATH, BASE_TRACK, BASE_ROUTE, BASE_ROUTE_REF)) hideInDownloaded(style, layer, overlays.keys)
     }
 
     private fun pointLayer(sourceId: String, layerId: String, minZoom: Int, kinds: List<PoiKind>) =
@@ -227,7 +246,7 @@ object MapOverlays {
         LineLayer(layerId, sourceId).apply {
             minZoom = OVERVIEW_ZOOM
             maxZoom = DETAIL_ZOOM
-            setFilter(eq(geometryType(), literal("LineString")))
+            setFilter(trailLines())
             setProperties(
                 lineColor(if (showDifficulty) switchCase(has("s"), difficultyColor(), plainColor(style)) else plainColor(style)),
                 lineWidth(interpolate(linear(), zoom(), stop(OVERVIEW_ZOOM, 0.6f), stop(DETAIL_ZOOM, 1.6f))),
@@ -240,12 +259,44 @@ object MapOverlays {
         LineLayer(layerId, sourceId).apply {
             minZoom = DETAIL_ZOOM
             val kind = if (track) has("t") else not(has("t"))
-            val lines = all(eq(geometryType(), literal("LineString")), kind)
+            val lines = all(trailLines(), kind)
             setFilter(if (showDifficulty) all(lines, not(has("s"))) else lines)
             setProperties(
                 lineColor(plainColor(style)),
                 lineWidth(interpolate(linear(), zoom(), stop(DETAIL_ZOOM, 1.5f), stop(14, 2.5f), stop(17, 4f))),
                 lineDasharray(if (track) arrayOf(4f, 2f) else arrayOf(3f, 1.5f)),
+            )
+        }
+
+    /** Paths and tracks, not the route lines laid over them. */
+    private fun trailLines() = all(eq(geometryType(), literal("LineString")), not(has(OverpassOverlay.NETWORK)))
+
+    /** Routes look like the base style's (night colours included): its paint is copied. */
+    private fun routeLayer(style: Style, sourceId: String, layerId: String) =
+        LineLayer(layerId, sourceId).apply {
+            val base = style.getLayer(BASE_ROUTE) as? LineLayer
+            minZoom = base?.minZoom ?: OVERVIEW_ZOOM
+            setFilter(has(OverpassOverlay.NETWORK))
+            base?.let { b ->
+                val paint = listOf(b.lineColor, b.lineOpacity, b.lineWidth)
+                    .mapNotNull { p -> (if (p.isExpression) p.expression else p.value)?.let { PropertyValue(p.name, it) } }
+                setProperties(*paint.toTypedArray())
+            }
+            // The most important route on top where they share a path.
+            setProperties(lineCap(Property.LINE_CAP_ROUND), lineJoin(Property.LINE_JOIN_ROUND), lineSortKey(get("w")))
+        }
+
+    /** The route's waymark along its line, the most important route's first. */
+    private fun markLayer(sourceId: String, layerId: String) =
+        SymbolLayer(layerId, sourceId).apply {
+            minZoom = MARKS_ZOOM
+            setFilter(has("m"))
+            setProperties(
+                symbolPlacement(Property.SYMBOL_PLACEMENT_LINE),
+                symbolSpacing(220f),
+                symbolSortKey(subtract(literal(10), get("w"))),
+                iconImage(concat(literal(RouteMarks.PREFIX), get("m"))),
+                iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_VIEWPORT),
             )
         }
 

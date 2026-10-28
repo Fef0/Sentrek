@@ -54,7 +54,12 @@ fun SentrekMap(
             onCreate(null)
             if (maxFps > 0) setMaximumFps(maxFps)
             setOnTouchListener { _, event -> currentOnTouch.value?.invoke(event) ?: false }
+            val density = context.resources.displayMetrics.density
             getMapAsync { map ->
+                // Route waymarks are drawn as the map meets them: there are thousands of kinds.
+                addOnStyleImageMissingListener { id ->
+                    RouteMarks.image(id, density)?.let { map.style?.addImage(id, it) }
+                }
                 map.uiSettings.apply {
                     // One-finger zoom (double-tap and drag): pinching with gloves is hard.
                     isQuickZoomGesturesEnabled = true

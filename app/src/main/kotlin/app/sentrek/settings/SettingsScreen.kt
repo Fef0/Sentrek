@@ -13,6 +13,9 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -29,6 +32,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.sentrek.BuildConfig
 import app.sentrek.R
+import app.sentrek.data.AppTheme
+import app.sentrek.data.MapTheme
 import app.sentrek.data.SettingsRepository
 import app.sentrek.ui.TouchTarget
 import app.sentrek.ui.MapButton
@@ -62,6 +67,34 @@ class SettingsViewModel @Inject constructor(private val settings: SettingsReposi
     fun setOffRouteVibration(on: Boolean) {
         viewModelScope.launch { settings.setOffRouteVibration(on) }
     }
+
+    val theme: StateFlow<AppTheme> =
+        settings.theme.stateIn(viewModelScope, SharingStarted.Eagerly, AppTheme.System)
+
+    fun setTheme(theme: AppTheme) {
+        viewModelScope.launch { settings.setTheme(theme) }
+    }
+
+    val mapTheme: StateFlow<MapTheme> =
+        settings.mapTheme.stateIn(viewModelScope, SharingStarted.Eagerly, MapTheme.Auto)
+
+    fun setMapTheme(theme: MapTheme) {
+        viewModelScope.launch { settings.setMapTheme(theme) }
+    }
+
+    val autoHideControls: StateFlow<Boolean> =
+        settings.autoHideControls.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setAutoHideControls(on: Boolean) {
+        viewModelScope.launch { settings.setAutoHideControls(on) }
+    }
+
+    val fullScreen: StateFlow<Boolean> =
+        settings.fullScreen.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setFullScreen(on: Boolean) {
+        viewModelScope.launch { settings.setFullScreen(on) }
+    }
 }
 
 @Composable
@@ -69,6 +102,10 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
     val showTrailDifficulty by viewModel.showTrailDifficulty.collectAsStateWithLifecycle()
     val gloveMode by viewModel.gloveMode.collectAsStateWithLifecycle()
     val offRouteVibration by viewModel.offRouteVibration.collectAsStateWithLifecycle()
+    val theme by viewModel.theme.collectAsStateWithLifecycle()
+    val mapTheme by viewModel.mapTheme.collectAsStateWithLifecycle()
+    val fullScreen by viewModel.fullScreen.collectAsStateWithLifecycle()
+    val autoHideControls by viewModel.autoHideControls.collectAsStateWithLifecycle()
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
@@ -82,6 +119,43 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 MapButton(SentrekIcons.Back, stringResource(R.string.settings_back), onBack, Modifier.padding(vertical = 12.dp))
                 Text(stringResource(R.string.bar_settings), style = MaterialTheme.typography.headlineMedium)
             }
+
+            SectionTitle(stringResource(R.string.settings_appearance))
+            ChoiceRow(
+                title = stringResource(R.string.settings_app_theme),
+                hint = stringResource(R.string.settings_theme_hint),
+                options = listOf(
+                    AppTheme.System to stringResource(R.string.settings_theme_system),
+                    AppTheme.Light to stringResource(R.string.settings_theme_light),
+                    AppTheme.Dark to stringResource(R.string.settings_theme_dark),
+                    AppTheme.Black to stringResource(R.string.settings_theme_black),
+                ),
+                selected = theme,
+                onChange = viewModel::setTheme,
+            )
+            ChoiceRow(
+                title = stringResource(R.string.settings_map_theme),
+                hint = stringResource(R.string.settings_map_theme_hint),
+                options = listOf(
+                    MapTheme.Auto to stringResource(R.string.settings_map_theme_auto),
+                    MapTheme.Day to stringResource(R.string.settings_map_theme_day),
+                    MapTheme.Night to stringResource(R.string.settings_map_theme_night),
+                ),
+                selected = mapTheme,
+                onChange = viewModel::setMapTheme,
+            )
+            ToggleRow(
+                title = stringResource(R.string.settings_full_screen),
+                hint = stringResource(R.string.settings_full_screen_hint),
+                checked = fullScreen,
+                onChange = viewModel::setFullScreen,
+            )
+            ToggleRow(
+                title = stringResource(R.string.settings_auto_hide),
+                hint = stringResource(R.string.settings_auto_hide_hint),
+                checked = autoHideControls,
+                onChange = viewModel::setAutoHideControls,
+            )
 
             SectionTitle(stringResource(R.string.settings_controls))
             ToggleRow(
@@ -131,6 +205,26 @@ private fun ToggleRow(title: String, hint: String, checked: Boolean, onChange: (
         }
         // The whole row toggles; the switch only shows the state.
         Switch(checked = checked, onCheckedChange = null)
+    }
+}
+
+/** A row of large segments, one per option, with a [title] above and a [hint] below. */
+@Composable
+private fun <T> ChoiceRow(title: String, hint: String?, options: List<Pair<T, String>>, selected: T, onChange: (T) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            options.forEachIndexed { i, (option, label) ->
+                SegmentedButton(
+                    selected = option == selected,
+                    onClick = { onChange(option) },
+                    shape = SegmentedButtonDefaults.itemShape(i, options.size),
+                    modifier = Modifier.heightIn(min = TouchTarget),
+                    icon = {},
+                ) { Text(label, maxLines = 1) }
+            }
+        }
+        if (hint != null) Text(hint, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

@@ -42,6 +42,8 @@ fun RecordingStats(recording: Recording, modifier: Modifier = Modifier) {
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+        // See-through, so not matched to a theme colour: name the text colour.
+        contentColor = MaterialTheme.colorScheme.onSurface,
         shadowElevation = 4.dp,
     ) {
         Row(Modifier.padding(horizontal = 8.dp, vertical = 8.dp)) {

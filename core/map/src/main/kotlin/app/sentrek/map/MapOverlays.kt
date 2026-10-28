@@ -29,6 +29,7 @@ import org.maplibre.android.style.layers.PropertyFactory.iconImage
 import org.maplibre.android.style.layers.PropertyFactory.lineCap
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
 import org.maplibre.android.style.layers.PropertyFactory.lineDasharray
+import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
 import org.maplibre.android.style.layers.PropertyFactory.symbolSortKey
 import org.maplibre.android.style.layers.PropertyFactory.textAnchor
@@ -69,6 +70,11 @@ object MapOverlays {
     private const val TRAILS = "trails-"
     private const val CLEAR = "-clear"
     private const val FAINT = "-faint"
+    private const val OVERVIEW = "-overview"
+
+    /** Where the base tiles' own paths begin, and the overlay's detailed trails with them. */
+    private const val DETAIL_ZOOM = 12f
+    private const val OVERVIEW_ZOOM = 9f
     private const val POINTS = "-points-z"
 
     /** Base style layer with the hiking points the overlay also carries (hiking.json). */
@@ -83,7 +89,8 @@ object MapOverlays {
     /** A downloaded area's hiking overlay (trails with difficulty, and points). */
     internal fun isOverlaySource(id: String) = id.startsWith(TRAILS)
 
-    internal fun isTrailLayer(id: String) = id.startsWith(TRAILS) && (id.endsWith(CLEAR) || id.endsWith(FAINT))
+    internal fun isTrailLayer(id: String) =
+        id.startsWith(TRAILS) && (id.endsWith(CLEAR) || id.endsWith(FAINT) || id.endsWith(OVERVIEW))
 
     /** [overlays]: cell id → overlay file. [showDifficulty] hides only the trail colours, not the points. */
     fun sync(style: Style, rasters: List<RasterOverlay>, overlays: Map<String, File>, showDifficulty: Boolean) {
@@ -106,6 +113,9 @@ object MapOverlays {
                 // MapLibre needs "file://" + absolute path; File.toURI() yields "file:/…", which it rejects.
                 style.addSource(GeoJsonSource(sourceId, URI("file://${file.absolutePath}")))
             }
+            // The base tiles carry paths only from zoom 12; the overlay has no such limit, so in
+            // downloaded areas trails show from much further out.
+            style.addLayerBelow(overviewLayer(sourceId, sourceId + OVERVIEW, showDifficulty), BELOW_LAYER)
             if (showDifficulty) {
                 // Visibility 0 (unknown) to 3 (intermediate) is a trail you can follow.
                 style.addLayerBelow(trailLayer(sourceId, sourceId + CLEAR, faint = false), BELOW_LAYER)
@@ -170,20 +180,34 @@ object MapOverlays {
         layer.setFilter(all(original, not(inDownloaded)))
     }
 
+    private fun difficultyColor() = step(
+        get("s"), rgb(230, 175, 0),
+        stop(2, rgb(200, 30, 40)),
+        stop(4, rgb(30, 80, 200)),
+    )
+
+    /** Thin solid lines for zoomed-out views, where dashes would just be noise. */
+    private fun overviewLayer(sourceId: String, layerId: String, showDifficulty: Boolean) =
+        LineLayer(layerId, sourceId).apply {
+            minZoom = OVERVIEW_ZOOM
+            maxZoom = DETAIL_ZOOM
+            setFilter(eq(geometryType(), literal("LineString")))
+            setProperties(
+                // Without difficulty colours: the red of the style's own paths (hiking.json).
+                lineColor(if (showDifficulty) difficultyColor() else rgb(192, 38, 45)),
+                lineWidth(interpolate(linear(), zoom(), stop(OVERVIEW_ZOOM, 0.7f), stop(DETAIL_ZOOM, 1.6f))),
+                lineOpacity(interpolate(linear(), zoom(), stop(OVERVIEW_ZOOM, 0.7f), stop(DETAIL_ZOOM, 0.9f))),
+            )
+        }
+
     private fun trailLayer(sourceId: String, layerId: String, faint: Boolean) =
         LineLayer(layerId, sourceId).apply {
-            minZoom = 11f
+            minZoom = DETAIL_ZOOM
             val visibility = if (faint) gte(get("v"), literal(4)) else lt(get("v"), literal(4))
             setFilter(all(eq(geometryType(), literal("LineString")), visibility))
             setProperties(
-                lineColor(
-                    step(
-                        get("s"), rgb(230, 175, 0),
-                        stop(2, rgb(200, 30, 40)),
-                        stop(4, rgb(30, 80, 200)),
-                    ),
-                ),
-                lineWidth(interpolate(linear(), zoom(), stop(11, 1.5f), stop(14, 3f), stop(17, 5f))),
+                lineColor(difficultyColor()),
+                lineWidth(interpolate(linear(), zoom(), stop(DETAIL_ZOOM, 1.8f), stop(14, 3f), stop(17, 5f))),
                 lineDasharray(if (faint) arrayOf(1f, 2.5f) else arrayOf(3f, 1.5f)),
                 lineCap(Property.LINE_CAP_BUTT),
             )

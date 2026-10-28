@@ -1,6 +1,7 @@
 package app.sentrek.ui
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -21,22 +22,47 @@ private val LightColors = lightColorScheme(
     onPrimary = Color.White,
     surface = Color.White,
     onSurface = Color(0xFF111111),
+    primaryContainer = Color(0xFFFFDBC8),
+    onPrimaryContainer = Color(0xFF331200),
+    secondaryContainer = Color(0xFFE6E6E6),
+    onSecondaryContainer = Color(0xFF111111),
     surfaceVariant = Color(0xFFF1F1F1),
     onSurfaceVariant = Color(0xFF222222),
     background = Color.White,
     onBackground = Color(0xFF111111),
 )
 
-// Pure black backgrounds save battery on OLED screens.
+// Dark grey rather than black: softer, and elevation still shows as lighter surfaces.
 private val DarkColors = darkColorScheme(
     primary = Color(0xFFFF8A3D),
     onPrimary = Color.Black,
-    surface = Color(0xFF000000),
+    primaryContainer = Color(0xFF5C2300),
+    onPrimaryContainer = Color(0xFFFFDBC8),
+    secondaryContainer = Color(0xFF3A3A3A),
+    onSecondaryContainer = Color(0xFFF0F0F0),
+    surface = Color(0xFF1E1E1E),
     onSurface = Color(0xFFF5F5F5),
-    surfaceVariant = Color(0xFF1C1C1C),
+    surfaceVariant = Color(0xFF2C2C2C),
     onSurfaceVariant = Color(0xFFE0E0E0),
-    background = Color.Black,
+    surfaceContainerLowest = Color(0xFF0F0F0F),
+    surfaceContainerLow = Color(0xFF1A1A1A),
+    surfaceContainer = Color(0xFF1E1E1E),
+    surfaceContainerHigh = Color(0xFF262626),
+    surfaceContainerHighest = Color(0xFF303030),
+    background = Color(0xFF121212),
     onBackground = Color(0xFFF5F5F5),
+)
+
+// Pure black backgrounds: OLED screens switch those pixels off, saving battery.
+private val BlackColors = DarkColors.copy(
+    surface = Color.Black,
+    surfaceVariant = Color(0xFF1C1C1C),
+    surfaceContainerLowest = Color.Black,
+    surfaceContainerLow = Color(0xFF0A0A0A),
+    surfaceContainer = Color(0xFF111111),
+    surfaceContainerHigh = Color(0xFF1A1A1A),
+    surfaceContainerHighest = Color(0xFF222222),
+    background = Color.Black,
 )
 
 private val SentrekTypography = Typography().run {
@@ -48,16 +74,27 @@ private val SentrekTypography = Typography().run {
     )
 }
 
+/**
+ * [darkTheme] picks dark colours; with [black] too, pure black backgrounds for OLED screens.
+ */
 @Composable
 fun SentrekTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    black: Boolean = false,
     gloves: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    CompositionLocalProvider(LocalTouch provides Touch(gloves)) {
-        MaterialTheme(
-            colorScheme = if (darkTheme) DarkColors else LightColors,
-            typography = SentrekTypography,
+    val colors = when {
+        !darkTheme -> LightColors
+        black -> BlackColors
+        else -> DarkColors
+    }
+    MaterialTheme(colorScheme = colors, typography = SentrekTypography) {
+        // Text outside any Surface (or on a see-through one) would otherwise default to black,
+        // invisible on dark backgrounds.
+        CompositionLocalProvider(
+            LocalTouch provides Touch(gloves),
+            LocalContentColor provides colors.onBackground,
             content = content,
         )
     }

@@ -1,5 +1,15 @@
 package app.sentrek.home
 
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.draw.alpha
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.AnimatedVisibility
+import android.view.MotionEvent
 import android.Manifest
 import android.os.Build
 import android.widget.Toast
@@ -8,10 +18,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
@@ -24,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -68,6 +81,7 @@ import app.sentrek.map.SentrekMap
 import app.sentrek.map.TrackLayers
 import app.sentrek.record.DeletePlaceDialog
 import app.sentrek.record.FollowConfirmations
+import app.sentrek.record.GpsStatus
 import app.sentrek.ui.Confirmation
 import app.sentrek.ui.ConfirmDialog
 import app.sentrek.record.PlaceDialog
@@ -81,6 +95,7 @@ import app.sentrek.ui.LocalTouch
 import app.sentrek.ui.TouchTarget
 import app.sentrek.ui.MapButton
 import app.sentrek.ui.SentrekIcons
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -94,6 +109,12 @@ val DefaultCamera: CameraPosition = CameraPosition.Builder()
     .target(LatLng(45.9763, 7.6586))
     .zoom(11.0)
     .build()
+
+/** Space between the bottom bar and the map's attribution button, in pixels. */
+private const val ATTRIBUTION_GAP_PX = 16
+
+/** How long without touches before buttons and bar fade out. */
+private const val HIDE_CONTROLS_MS = 8_000L
 
 /** What a location permission request was for, to carry on once granted. */
 private enum class AfterPermission { Follow, Record, FollowRoute }
@@ -138,7 +159,30 @@ fun MapScreen(
     var style by remember { mutableStateOf<Style?>(null) }
     var pressed by remember { mutableStateOf<MapFeatureInfo?>(null) }
     var hasLocation by remember { mutableStateOf(viewModel.hasLocationPermission()) }
+    // Restarted once permission comes: the satellite count needs it.
+    val gps by remember(hasLocation) { viewModel.gps() }.collectAsStateWithLifecycle(initialValue = null)
+    val gpsTiming = rememberGpsLabelTiming(gps.takeIf { hasLocation })
+    // Counts taps on the location button with a fix; each shows the coordinates for a while.
+    var coordinatesTaps by remember { mutableIntStateOf(0) }
+    LaunchedEffect(coordinatesTaps) {
+        if (coordinatesTaps == 0) return@LaunchedEffect
+        delay(COORDINATES_MS)
+        coordinatesTaps = 0
+    }
     var following by remember { mutableStateOf(false) }
+    // Buttons and bar fade out after a while without touches: more map, and nothing static to
+    // burn into OLED screens. A touch brings them back. Not while planning: that needs them.
+    var touches by remember { mutableIntStateOf(0) }
+    var controlsHidden by remember { mutableStateOf(false) }
+    val controlsAlpha by animateFloatAsState(if (controlsHidden) 0f else 1f, label = "controls")
+    val autoHideSetting by viewModel.autoHideControls.collectAsStateWithLifecycle()
+    val autoHide = autoHideSetting && !plan.active
+    LaunchedEffect(autoHide, touches) {
+        controlsHidden = false
+        if (!autoHide) return@LaunchedEffect
+        delay(HIDE_CONTROLS_MS)
+        controlsHidden = true
+    }
     var askStop by remember { mutableStateOf(false) }
     var askDiscard by remember { mutableStateOf(false) }
     var askName by remember { mutableStateOf(false) }
@@ -187,6 +231,16 @@ fun MapScreen(
             },
         )
     }
+    // The touch that brings the controls back does nothing else (no pan, no feature sheet).
+    var swallowing by remember { mutableStateOf(false) }
+    val onMapTouch: (MotionEvent) -> Boolean = { event ->
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            swallowing = controlsHidden
+        }
+        val swallow = swallowing
+        if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) swallowing = false
+        swallow || planGestures.onTouch(event)
+    }
     planGestures.map = map
     planGestures.points = if (plan.active) plan.positions else emptyList()
     planGestures.midpoints = if (plan.active) planLegs.map { it.middle } else emptyList()
@@ -229,8 +283,29 @@ fun MapScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
-        Box(Modifier.weight(1f)) {
+    // The bottom bar is drawn over the map, so showing and hiding it never resizes the map.
+    // Its last height keeps the buttons above it either way.
+    var barHeightPx by remember { mutableIntStateOf(0) }
+    val barHeight = with(LocalDensity.current) { barHeightPx.toDp() }
+    LaunchedEffect(map, barHeightPx) {
+        val ui = map?.uiSettings ?: return@LaunchedEffect
+        ui.setAttributionMargins(ui.attributionMarginLeft, ui.attributionMarginTop, ui.attributionMarginRight, barHeightPx + ATTRIBUTION_GAP_PX)
+    }
+
+    // Every touch on the screen (map or buttons) restarts the hide timer; nothing is consumed.
+    Box(
+        Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.type == PointerEventType.Press) touches++
+                    }
+                }
+            },
+    ) {
+        Box(Modifier.fillMaxSize()) {
             SentrekMap(
                 style = MapStyle.Hiking,
                 modifier = Modifier.fillMaxSize(),
@@ -239,7 +314,7 @@ fun MapScreen(
                     map = m
                     style = s
                 },
-                onTouch = planGestures::onTouch,
+                onTouch = onMapTouch,
             )
 
             Column(
@@ -266,12 +341,28 @@ fun MapScreen(
                 }
             }
 
+            // With the controls hidden, GPS trouble must still show.
+            if (controlsHidden) {
+                GpsIndicator(
+                    status = gps.takeIf { hasLocation },
+                    timing = gpsTiming,
+                    onTurnOn = { openLocationSettings(context) },
+                    problemsOnly = true,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 12.dp, bottom = barHeight + 24.dp)
+                        .widthIn(max = 240.dp),
+                )
+            }
+
             // Map controls stay on the right edge, in the lower half: reachable with the thumb.
-            Column(
+            if (controlsAlpha > 0f) Column(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 12.dp, bottom = 24.dp),
+                    .alpha(controlsAlpha)
+                    .padding(end = 12.dp, bottom = barHeight + 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.End,
             ) {
                 if (plan.active) {
                     MapButton(
@@ -287,12 +378,32 @@ fun MapScreen(
                         onClick = planner::start,
                     )
                 }
-                MapButton(
-                    icon = SentrekIcons.MyLocation,
-                    contentDescription = stringResource(R.string.my_location),
-                    onClick = { withLocation(AfterPermission.Follow) { follow() } },
-                    active = following,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (coordinatesTaps > 0 && gps is GpsStatus.Fix) {
+                        CoordinatesLabel(viewModel.lastFix, Modifier.widthIn(max = 260.dp))
+                    } else {
+                        GpsIndicator(
+                            status = gps.takeIf { hasLocation },
+                            timing = gpsTiming,
+                            onTurnOn = { openLocationSettings(context) },
+                            modifier = Modifier.widthIn(max = 240.dp),
+                        )
+                    }
+                    MapButton(
+                        icon = SentrekIcons.MyLocation,
+                        contentDescription = stringResource(R.string.my_location),
+                        onClick = {
+                            // Following a position that can't come is pointless: help switch the GPS on.
+                            if (hasLocation && gps == GpsStatus.Off) {
+                                openLocationSettings(context)
+                            } else {
+                                if (gps is GpsStatus.Fix) coordinatesTaps++
+                                withLocation(AfterPermission.Follow) { follow() }
+                            }
+                        },
+                        active = following,
+                    )
+                }
                 MapButton(
                     icon = SentrekIcons.Plus,
                     contentDescription = stringResource(R.string.zoom_in),
@@ -306,37 +417,43 @@ fun MapScreen(
             }
         }
 
-        if (plan.active) {
-            BottomBar(
+        Box(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .onSizeChanged { if (it.height > 0) barHeightPx = it.height },
+        ) {
+            if (plan.active) {
+                BottomBar(
+                    items = listOf(
+                        BarItem(SentrekIcons.Undo, stringResource(PlannerR.string.plan_undo), planner::undo, enabled = plan.canUndo),
+                        BarItem(SentrekIcons.Redo, stringResource(PlannerR.string.plan_redo), planner::redo, enabled = plan.canRedo),
+                        BarItem(SentrekIcons.Delete, stringResource(PlannerR.string.plan_remove), planner::removePoint, enabled = plan.points.isNotEmpty()),
+                        BarItem(SentrekIcons.Check, stringResource(PlannerR.string.plan_save), { askPlanName = true }, enabled = plan.points.size >= 2),
+                        BarItem(SentrekIcons.Close, stringResource(PlannerR.string.plan_close), {
+                            // Nothing to lose: an empty plan, or a saved route opened and left as it was.
+                            val unchanged = plan.editing != null && !plan.canUndo
+                            if (plan.points.isEmpty() || unchanged) planner.close() else askPlanDiscard = true
+                        }),
+                    ),
+                )
+            } else AnimatedVisibility(visible = !controlsHidden, enter = fadeIn(), exit = fadeOut()) { BottomBar(
                 items = listOf(
-                    BarItem(SentrekIcons.Undo, stringResource(PlannerR.string.plan_undo), planner::undo, enabled = plan.canUndo),
-                    BarItem(SentrekIcons.Redo, stringResource(PlannerR.string.plan_redo), planner::redo, enabled = plan.canRedo),
-                    BarItem(SentrekIcons.Delete, stringResource(PlannerR.string.plan_remove), planner::removePoint, enabled = plan.points.isNotEmpty()),
-                    BarItem(SentrekIcons.Check, stringResource(PlannerR.string.plan_save), { askPlanName = true }, enabled = plan.points.size >= 2),
-                    BarItem(SentrekIcons.Close, stringResource(PlannerR.string.plan_close), {
-                        // Nothing to lose: an empty plan, or a saved route opened and left as it was.
-                        val unchanged = plan.editing != null && !plan.canUndo
-                        if (plan.points.isEmpty() || unchanged) planner.close() else askPlanDiscard = true
-                    }),
+                    BarItem(SentrekIcons.Layers, stringResource(R.string.bar_maps), onOpenMaps),
+                    BarItem(SentrekIcons.Tracks, stringResource(R.string.bar_tracks), onOpenTracks),
+                    if (recording?.isPaused == true) {
+                        BarItem(SentrekIcons.Pause, stringResource(R.string.bar_paused), { askStop = true }, highlighted = true)
+                    } else if (recording != null) {
+                        BarItem(SentrekIcons.Stop, stringResource(R.string.bar_stop), { askStop = true }, highlighted = true)
+                    } else {
+                        BarItem(SentrekIcons.Record, stringResource(R.string.bar_record), {
+                            withLocation(AfterPermission.Record) { startRecording() }
+                        })
+                    },
+                    BarItem(SentrekIcons.Place, stringResource(R.string.bar_places), onOpenPlaces),
+                    BarItem(Icons.Filled.Settings, stringResource(R.string.bar_settings), onOpenSettings),
                 ),
-            )
-        } else BottomBar(
-            items = listOf(
-                BarItem(SentrekIcons.Layers, stringResource(R.string.bar_maps), onOpenMaps),
-                BarItem(SentrekIcons.Tracks, stringResource(R.string.bar_tracks), onOpenTracks),
-                if (recording?.isPaused == true) {
-                    BarItem(SentrekIcons.Pause, stringResource(R.string.bar_paused), { askStop = true }, highlighted = true)
-                } else if (recording != null) {
-                    BarItem(SentrekIcons.Stop, stringResource(R.string.bar_stop), { askStop = true }, highlighted = true)
-                } else {
-                    BarItem(SentrekIcons.Record, stringResource(R.string.bar_record), {
-                        withLocation(AfterPermission.Record) { startRecording() }
-                    })
-                },
-                BarItem(SentrekIcons.Place, stringResource(R.string.bar_places), onOpenPlaces),
-                BarItem(Icons.Filled.Settings, stringResource(R.string.bar_settings), onOpenSettings),
-            ),
-        )
+            ) }
+        }
     }
 
     DisposableEffect(map) {

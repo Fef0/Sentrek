@@ -8,7 +8,8 @@
 
     <string name="tracks_title">Tracks</string>
     <string name="tracks_back">Back to map</string>
-    <string name="tracks_empty">No tracks yet.\nTap Record on the map to record your hike.</string>
+    <string name="tracks_empty">No tracks yet.
+Record a hike or import a GPX/KML file.</string>
     <!-- Distance, duration, ascent, descent. -->
     <string name="tracks_stats">%1$s · %2$s · ↑ %3$s ↓ %4$s</string>
     <string name="tracks_show">Map</string>
@@ -30,8 +31,8 @@
         <item quantity="other">Imported %d tracks</item>
     </plurals>
     <plurals name="tracks_import_failed_many">
-        <item quantity="one">, %d file could not be read</item>
-        <item quantity="other">, %d files could not be read</item>
+        <item quantity="one">, %d file failed</item>
+        <item quantity="other">, %d files failed</item>
     </plurals>
     <string name="tracks_color">Track colour</string>
     <string name="tracks_color_custom">Custom colour</string>
@@ -44,9 +45,9 @@
         <item quantity="one">, %d place</item>
         <item quantity="other">, %d places</item>
     </plurals>
-    <string name="tracks_import_empty">No track, route or waypoint in this file</string>
-    <string name="tracks_import_unknown">Not a GPX, KML or KMZ file</string>
-    <string name="tracks_import_failed">Could not import the file</string>
+    <string name="tracks_import_empty">No tracks, routes or waypoints in this file</string>
+    <string name="tracks_import_unknown">Unsupported file. Use GPX, KML or KMZ.</string>
+    <string name="tracks_import_failed">Import failed</string>
 
     <string name="follow_notification_title">Following %s</string>
     <string name="follow_notification_off_route">Off route · %s</string>
@@ -54,25 +55,26 @@
     <string name="follow_notification_left">%1$s left · %2$s</string>
     <string name="tracks_delete_title">Delete this track?</string>
     <string name="tracks_saved">Track saved</string>
-    <string name="tracks_save_failed">Could not save the track</string>
+    <string name="tracks_save_failed">Save failed</string>
     <string name="tracks_edit">Edit</string>
     <string name="confirm_stop_following_title">Stop following this route?</string>
-    <string name="confirm_stop_following_text">%s. You can follow it again from Tracks.</string>
+    <string name="confirm_stop_following_text">%s</string>
     <string name="confirm_stop_following">Stop following</string>
-    <string name="confirm_switch_title">Follow this route instead?</string>
+    <string name="confirm_switch_title">Switch route?</string>
     <!-- Route being followed, then the new one. -->
-    <string name="confirm_switch_text">You are following %1$s. Following %2$s stops it.</string>
+    <string name="confirm_switch_text">Stop following %1$s and follow %2$s.</string>
     <string name="confirm_switch">Follow</string>
-    <string name="confirm_hide_followed_title">Hide and stop following?</string>
-    <string name="confirm_hide_followed_text">%s is the route you are following. Hiding it stops following.</string>
+    <string name="confirm_hide_followed_title">Hide route?</string>
+    <string name="confirm_hide_followed_text">This also stops following %s.</string>
     <string name="confirm_hide">Hide</string>
     <string name="tracks_save_as">Save as</string>
-    <string name="tracks_save_as_text">GPX works in most hiking apps and GPS devices. KML opens in Google Earth and Google My Maps.</string>
+    <string name="tracks_save_as_text">GPX: hiking apps and GPS devices. KML: Google Earth.</string>
     <string name="tracks_format_gpx">GPX</string>
     <string name="tracks_format_kml">KML</string>
 
     <string name="places_title">Places</string>
-    <string name="places_empty">No places yet.\nLong-press the map to save one, or save where you are now.</string>
+    <string name="places_empty">No places yet.
+Long-press the map to add one.</string>
     <string name="places_unnamed">Place</string>
     <string name="places_new">New place</string>
     <string name="places_edit">Edit place</string>
@@ -84,15 +86,15 @@
     <string name="places_save">Save</string>
     <string name="places_save_here">Save my location</string>
     <string name="places_waiting_gps">Waiting for GPS…</string>
-    <string name="places_no_gps">No GPS fix yet. Try again under open sky.</string>
+    <string name="places_no_gps">No GPS fix. Try again outdoors.</string>
     <string name="places_show">Map</string>
     <string name="places_edit_short">Edit</string>
     <string name="places_share">Share</string>
     <string name="places_delete">Delete</string>
     <string name="places_delete_title">Delete this place?</string>
     <string name="places_export">Export</string>
-    <string name="places_exported">Places saved</string>
-    <string name="places_export_failed">Could not save the places</string>
+    <string name="places_exported">Exported</string>
+    <string name="places_export_failed">Export failed</string>
     <string name="places_coordinates">Coordinates</string>
     <string name="places_elevation">Elevation</string>
     <string name="places_distance">Distance</string>

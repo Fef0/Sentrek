@@ -47,10 +47,10 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[FOLLOW_PROFILE] = show }
     }
 
-    /** Light, dark or OLED black; by default the phone's own choice. */
+    /** Light (the default), dark, OLED black, or the phone's own choice. */
     val theme: Flow<AppTheme> =
         context.settings.data.map { prefs ->
-            AppTheme.entries.firstOrNull { it.name == prefs[THEME] } ?: AppTheme.System
+            AppTheme.entries.firstOrNull { it.name == prefs[THEME] } ?: AppTheme.Light
         }
 
     suspend fun setTheme(theme: AppTheme) {
@@ -60,7 +60,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     /** Day or night map colours, on their own or following the app theme. */
     val mapTheme: Flow<MapTheme> =
         context.settings.data.map { prefs ->
-            MapTheme.entries.firstOrNull { it.name == prefs[MAP_THEME] } ?: MapTheme.Auto
+            MapTheme.entries.firstOrNull { it.name == prefs[MAP_THEME] } ?: MapTheme.Day
         }
 
     suspend fun setMapTheme(theme: MapTheme) {
@@ -72,7 +72,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
      * into an OLED screen. A swipe from the edge shows them for a moment.
      */
     val fullScreen: Flow<Boolean> =
-        context.settings.data.map { it[FULL_SCREEN] ?: false }
+        context.settings.data.map { it[FULL_SCREEN] ?: true }
 
     suspend fun setFullScreen(on: Boolean) {
         context.settings.edit { it[FULL_SCREEN] = on }
@@ -80,7 +80,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** Map buttons and bar fade out after a while without touches (OLED burn-in). */
     val autoHideControls: Flow<Boolean> =
-        context.settings.data.map { it[AUTO_HIDE_CONTROLS] ?: true }
+        context.settings.data.map { it[AUTO_HIDE_CONTROLS] ?: false }
 
     suspend fun setAutoHideControls(on: Boolean) {
         context.settings.edit { it[AUTO_HIDE_CONTROLS] = on }

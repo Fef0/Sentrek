@@ -82,7 +82,7 @@ class HomeViewModel @Inject constructor(
         settings.followProfile.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     val autoHideControls: StateFlow<Boolean> =
-        settings.autoHideControls.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+        settings.autoHideControls.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     fun setFollowProfile(show: Boolean) {
         viewModelScope.launch { settings.setFollowProfile(show) }

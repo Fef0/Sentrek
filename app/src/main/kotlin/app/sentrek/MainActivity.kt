@@ -104,9 +104,9 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) importFrom(intent)
         setContent {
             val gloves by settings.gloveMode.collectAsStateWithLifecycle(initialValue = false)
-            val theme by settings.theme.collectAsStateWithLifecycle(initialValue = AppTheme.System)
-            val fullScreen by settings.fullScreen.collectAsStateWithLifecycle(initialValue = false)
-            val mapTheme by settings.mapTheme.collectAsStateWithLifecycle(initialValue = MapTheme.Auto)
+            val theme by settings.theme.collectAsStateWithLifecycle(initialValue = AppTheme.Light)
+            val fullScreen by settings.fullScreen.collectAsStateWithLifecycle(initialValue = true)
+            val mapTheme by settings.mapTheme.collectAsStateWithLifecycle(initialValue = MapTheme.Day)
             LaunchedEffect(fullScreen) {
                 hideSystemBars = fullScreen
                 applySystemBars()

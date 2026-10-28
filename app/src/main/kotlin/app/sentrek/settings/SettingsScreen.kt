@@ -69,28 +69,28 @@ class SettingsViewModel @Inject constructor(private val settings: SettingsReposi
     }
 
     val theme: StateFlow<AppTheme> =
-        settings.theme.stateIn(viewModelScope, SharingStarted.Eagerly, AppTheme.System)
+        settings.theme.stateIn(viewModelScope, SharingStarted.Eagerly, AppTheme.Light)
 
     fun setTheme(theme: AppTheme) {
         viewModelScope.launch { settings.setTheme(theme) }
     }
 
     val mapTheme: StateFlow<MapTheme> =
-        settings.mapTheme.stateIn(viewModelScope, SharingStarted.Eagerly, MapTheme.Auto)
+        settings.mapTheme.stateIn(viewModelScope, SharingStarted.Eagerly, MapTheme.Day)
 
     fun setMapTheme(theme: MapTheme) {
         viewModelScope.launch { settings.setMapTheme(theme) }
     }
 
     val autoHideControls: StateFlow<Boolean> =
-        settings.autoHideControls.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+        settings.autoHideControls.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     fun setAutoHideControls(on: Boolean) {
         viewModelScope.launch { settings.setAutoHideControls(on) }
     }
 
     val fullScreen: StateFlow<Boolean> =
-        settings.fullScreen.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+        settings.fullScreen.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     fun setFullScreen(on: Boolean) {
         viewModelScope.launch { settings.setFullScreen(on) }

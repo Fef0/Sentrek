@@ -238,7 +238,7 @@ class RegionRepository @Inject constructor(
     private companion object {
         const val TAG = "RegionRepository"
 
-        /** Bump when the overlay file format changes (v2: points, v3: huts, v4: all hiking points, v5: all tags). */
-        const val OVERLAY_SUFFIX = ".v5.geojson"
+        /** Bump when the overlay file format changes (v2: points, v3: huts, v4: all hiking points, v5: all tags, v6: all paths and tracks). */
+        const val OVERLAY_SUFFIX = ".v7.geojson"
     }
 }

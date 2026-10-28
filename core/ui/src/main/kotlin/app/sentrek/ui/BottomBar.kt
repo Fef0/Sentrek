@@ -20,13 +20,17 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 
-/** [highlighted]: an ongoing action (e.g. recording), filled with the signal colour. */
+/**
+ * [highlighted]: an ongoing action (e.g. recording), filled with the signal colour.
+ * [dimmed]: looks disabled but still answers a tap, to say why it can't be used now.
+ */
 data class BarItem(
     val icon: ImageVector,
     val label: String,
     val onClick: () -> Unit,
     val highlighted: Boolean = false,
     val enabled: Boolean = true,
+    val dimmed: Boolean = false,
 )
 
 /**
@@ -49,7 +53,7 @@ fun BottomBar(items: List<BarItem>, modifier: Modifier = Modifier, edgeToEdge: B
                 Surface(
                     onClick = item.onClick,
                     enabled = item.enabled,
-                    modifier = Modifier.weight(1f).heightIn(min = TouchTarget + 8.dp).alpha(if (item.enabled) 1f else 0.38f),
+                    modifier = Modifier.weight(1f).heightIn(min = TouchTarget + 8.dp).alpha(if (item.enabled && !item.dimmed) 1f else 0.38f),
                     shape = RoundedCornerShape(12.dp),
                     color = if (item.highlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
                     contentColor = if (item.highlighted) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,

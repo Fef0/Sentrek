@@ -190,6 +190,7 @@ fun MapScreen(
     val followPlaces by viewModel.followPlaces.collectAsStateWithLifecycle()
     val places by viewModel.places.collectAsStateWithLifecycle()
     val plan by planner.state.collectAsStateWithLifecycle()
+    val planBlock by planner.blockedBy.collectAsStateWithLifecycle()
     val planStats by planner.stats.collectAsStateWithLifecycle()
     val planLegs by planner.legs.collectAsStateWithLifecycle()
     val planning by rememberUpdatedState(plan.active)
@@ -636,7 +637,11 @@ fun MapScreen(
                 BottomBar(
                 items = listOf(
                     BarItem(SentrekIcons.Library, stringResource(R.string.bar_library), { libraryOpen = !libraryOpen }, highlighted = libraryOpen),
-                    BarItem(SentrekIcons.Plan, stringResource(R.string.bar_plan), { libraryOpen = false; planner.start() }),
+                    BarItem(SentrekIcons.Plan, stringResource(R.string.bar_plan), {
+                        libraryOpen = false
+                        val block = planBlock
+                        if (block != null) Toast.makeText(context, block.message, Toast.LENGTH_LONG).show() else planner.start()
+                    }, dimmed = planBlock != null),
                     if (recording?.isPaused == true) {
                         BarItem(SentrekIcons.Pause, stringResource(R.string.bar_paused), { askStop = true }, highlighted = true)
                     } else if (recording != null) {
@@ -840,7 +845,8 @@ fun MapScreen(
                     {
                         pressed = null
                         planner.editRoute(track) { opened ->
-                            if (!opened) Toast.makeText(context, PlannerR.string.plan_busy, Toast.LENGTH_LONG).show()
+                            val why = planner.blockedBy.value?.message ?: PlannerR.string.plan_busy
+                            if (!opened) Toast.makeText(context, why, Toast.LENGTH_LONG).show()
                         }
                     }
                 } else {

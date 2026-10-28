@@ -2,6 +2,7 @@ package app.sentrek.planner
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.sentrek.feature.planner.R
 import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.Geo
 import app.sentrek.geo.LatLon
@@ -17,6 +18,8 @@ import app.sentrek.geo.route.Route
 import app.sentrek.geo.track.TrackPoint
 import app.sentrek.record.SavedTrack
 import app.sentrek.record.ElevationRepository
+import app.sentrek.record.FollowRepository
+import app.sentrek.record.RecordingRepository
 import app.sentrek.record.TrackRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +28,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
@@ -39,6 +43,13 @@ import java.util.Date
 import javax.inject.Inject
 import kotlin.math.cos
 import kotlin.math.max
+
+/** What keeps the planner closed: see [PlannerViewModel.blockedBy]. */
+enum class PlanBlock(val message: Int) {
+    Following(R.string.plan_blocked_following),
+    Recording(R.string.plan_blocked_recording),
+    Both(R.string.plan_blocked_both),
+}
 
 /** Where the planner finds paths to follow: the lines of the map around a box. */
 interface TrailSource {
@@ -85,7 +96,22 @@ data class PlanStats(
 class PlannerViewModel @Inject constructor(
     private val elevation: ElevationRepository,
     private val tracks: TrackRepository,
+    recording: RecordingRepository,
+    following: FollowRepository,
 ) : ViewModel() {
+    /**
+     * Why a plan can't be opened now, or null when it can. Out on the trail, planning would
+     * cover the map with a second line and take the Stop button out of the bar: it waits.
+     */
+    val blockedBy: StateFlow<PlanBlock?> = combine(recording.state, following.state) { r, f ->
+        when {
+            r != null && f != null -> PlanBlock.Both
+            r != null -> PlanBlock.Recording
+            f != null -> PlanBlock.Following
+            else -> null
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     private val editor = PlanEditor<PlanPoint>()
     private val _state = MutableStateFlow(PlanState())
     val state: StateFlow<PlanState> = _state.asStateFlow()
@@ -118,6 +144,7 @@ class PlannerViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     fun start() {
+        if (blockedBy.value != null) return
         _state.value = _state.value.copy(active = true)
         // Terrain that couldn't be loaded last time (offline) may load now.
         viewModelScope.launch { elevation.retryMissing() }
@@ -136,10 +163,11 @@ class PlannerViewModel @Inject constructor(
 
     /**
      * Opens a saved route in the planner, with its points and legs as they were. False (and
-     * nothing changes) while another plan with points is open, or for a recorded track.
+     * nothing changes) while another plan with points is open, for a recorded track, or while
+     * [blockedBy] says not now.
      */
     fun editRoute(track: SavedTrack, onOpened: (Boolean) -> Unit) {
-        if (_state.value.active && _state.value.points.isNotEmpty()) {
+        if (blockedBy.value != null || (_state.value.active && _state.value.points.isNotEmpty())) {
             onOpened(false)
             return
         }

@@ -65,6 +65,49 @@ class OverpassOverlayTest {
         assertEquals(PoiKind.Guidepost, PoiKind.classify(mapOf("tourism" to "information", "information" to "guidepost")))
         assertEquals(PoiKind.DrinkingWater, PoiKind.classify(mapOf("amenity" to "water_point")))
     }
+
+    @Test
+    fun `turns route relations into lines with their waymark`() {
+        val input = """{"elements":[
+            {"type":"relation","id":1,"members":[{"type":"way","ref":10,"role":""},{"type":"node","ref":5,"role":""}],
+             "tags":{"route":"hiking","network":"lwn","ref":"708","osmc:symbol":"red:red:white_stripe:708:black"}},
+            {"type":"relation","id":2,"members":[{"type":"way","ref":10,"role":""}],"tags":{"route":"hiking","network":"nwn","ref":"SI"}},
+            {"type":"relation","id":3,"members":[{"type":"way","ref":11,"role":""}],"tags":{"route":"hiking","name":"Nothing to show"}},
+            {"type":"route","id":10,"geometry":{"type":"LineString","coordinates":[[14.9,37.7],[14.91,37.71]]}},
+            {"type":"route","id":11,"geometry":{"type":"LineString","coordinates":[[14.9,37.7],[14.91,37.71]]}},
+            {"type":"route","id":12,"geometry":{"type":"LineString","coordinates":[[14.9,37.7],[14.91,37.71]]}}
+        ]}"""
+        val out = StringWriter()
+        assertEquals(2, OverpassOverlay.convert(input.reader(), out))
+        val json = out.toString()
+        assertTrue(json.contains(""""properties":{"route_1_network":"lwn","w":1,"m":"red:red:white_stripe:708:black"}"""))
+        // No waymark: a badge in the network's colour with the number.
+        assertTrue(json.contains(""""properties":{"route_1_network":"nwn","w":3,"m":"purple:purple::SI:white"}"""))
+    }
+
+    @Test
+    fun `query asks for routes and their ways within the cell`() {
+        val q = OverpassOverlay.query(BoundingBox(37.5, 14.5, 38.0, 15.0))
+        assertTrue(q.contains(".routes out body;way(r.routes)(37.5,14.5,38.0,15.0);"))
+    }
+
+    @Test
+    fun `reads waymarks`() {
+        val cai = OsmcSymbol.parse("red:red:white_stripe:708:black")!!
+        assertEquals(OsmcSymbol.Shape("red", ""), cai.background)
+        assertEquals(listOf(OsmcSymbol.Shape("white", "stripe")), cai.foregrounds)
+        assertEquals("708", cai.text)
+        assertEquals("black", cai.textColor)
+
+        val two = OsmcSymbol.parse("blue:white:blue_bar:red_dot")!!
+        assertEquals(listOf(OsmcSymbol.Shape("blue", "bar"), OsmcSymbol.Shape("red", "dot")), two.foregrounds)
+        assertNull(two.text)
+
+        assertEquals("E1", OsmcSymbol.parse("purple:purple::E1:white")!!.text)
+        assertEquals(OsmcSymbol.Shape("white", "round"), OsmcSymbol.parse("yellow:white_round:yellow_dot")!!.background)
+        assertNull(OsmcSymbol.parse("red"))
+        assertNull(OsmcSymbol.parse("pink:sparkle"))
+    }
 }
 
 class SimplifyTest {
@@ -84,4 +127,5 @@ class SimplifyTest {
         assertArrayEquals(intArrayOf(0, 1, 2), Simplify.douglasPeucker(lons, lats, 2.0))
         assertArrayEquals(intArrayOf(0, 2), Simplify.douglasPeucker(lons, lats, 20.0))
     }
+
 }

@@ -24,6 +24,9 @@ import kotlin.math.roundToLong
  *   `route_1_network` = iwn/nwn/rwn/lwn (named as in the base tiles, so the base style's
  *   colours apply), `w` = 4 (international) to 1 (local), and `m` = the waymark as an
  *   `osmc:symbol` ([OsmcSymbol]; a badge with the number when the route has none).
+ *   For the long-press sheet: `rid` = the relation id, `n` = its name, `p` = the routes it
+ *   is part of (stage → region → Sentiero Italia), one per line, and the route's own
+ *   [ROUTE_FACTS] tags (from, to, distance…) under their OSM keys.
  */
 object OverpassOverlay {
     /** About 1 m: plenty for trails, keeps lines visually intact at z17. */
@@ -53,9 +56,11 @@ object OverpassOverlay {
             ");" +
             "convert poi ::=::,::id=id(),$OSM_TYPE=type(),::geom=center(geom());" +
             "out geom;" +
-            // Routes first (their ways by id), then the ways, only within the cell.
+            // Routes and the routes they're part of (their members by id), then the ways,
+            // only within the cell.
             "rel[\"route\"~\"^(hiking|foot)$\"]->.routes;" +
-            ".routes out body;" +
+            "rel(br.routes)->.up1;rel(br.up1)->.up2;" +
+            "(.routes;.up1;.up2;);out body;" +
             "way(r.routes)(${box.south},${box.west},${box.north},${box.east});" +
             "convert route ::id=id(),::geom=geom();" +
             "out geom;"
@@ -63,7 +68,8 @@ object OverpassOverlay {
     /** Streams [input] (Overpass JSON) to [output] (GeoJSON FeatureCollection). Returns the feature count. */
     fun convert(input: Reader, output: Writer, toleranceM: Double = SIMPLIFY_TOLERANCE_M): Int {
         var count = 0
-        val routes = HashMap<Long, MutableList<Route>>()
+        val relations = ArrayList<Element>()
+        var routes: Map<Long, List<Route>>? = null
         output.write("""{"type":"FeatureCollection","features":[""")
         JsonReader(input).use { json ->
             json.beginObject()
@@ -76,10 +82,13 @@ object OverpassOverlay {
                         "trail" -> listOfNotNull(trailFeature(element, toleranceM))
                         "poi" -> listOfNotNull(poiFeature(element))
                         "relation" -> {
-                            route(element.tags)?.let { r -> for (way in element.ways) routes.getOrPut(way) { ArrayList(1) } += r }
+                            relations += element
                             emptyList()
                         }
-                        "route" -> routeFeatures(element, element.id?.let(routes::get).orEmpty(), toleranceM)
+                        "route" -> {
+                            val byWay = routes ?: routesByWay(relations).also { routes = it }
+                            routeFeatures(element, element.id?.let(byWay::get).orEmpty(), toleranceM)
+                        }
                         else -> emptyList()
                     }
                     for (feature in features) {
@@ -105,9 +114,17 @@ object OverpassOverlay {
         val lons: DoubleArray,
         val lats: DoubleArray,
         val ways: List<Long>,
+        val relations: List<Long>,
     )
 
-    private data class Route(val network: String, val mark: String?)
+    private data class Route(
+        val id: Long,
+        val network: String,
+        val mark: String?,
+        val name: String?,
+        val partOf: List<String>,
+        val facts: Map<String, String>,
+    )
 
     private fun readElement(json: JsonReader): Element {
         var type: String? = null
@@ -117,6 +134,7 @@ object OverpassOverlay {
         var lons = DoubleArray(0)
         var lats = DoubleArray(0)
         val ways = ArrayList<Long>()
+        val relations = ArrayList<Long>()
         json.beginObject()
         while (json.hasNext()) {
             when (json.nextName()) {
@@ -132,7 +150,10 @@ object OverpassOverlay {
                 }
                 "members" -> {
                     json.beginArray()
-                    while (json.hasNext()) readWayMember(json)?.let(ways::add)
+                    while (json.hasNext()) {
+                        val (memberType, ref) = readMember(json) ?: continue
+                        if (memberType == "way") ways += ref else if (memberType == "relation") relations += ref
+                    }
                     json.endArray()
                 }
                 "geometry" -> {
@@ -150,11 +171,11 @@ object OverpassOverlay {
             }
         }
         json.endObject()
-        return Element(type, id, tags, geometryType, lons, lats, ways)
+        return Element(type, id, tags, geometryType, lons, lats, ways, relations)
     }
 
-    /** A relation member's id when it's a way. */
-    private fun readWayMember(json: JsonReader): Long? {
+    /** A relation member's type and id. */
+    private fun readMember(json: JsonReader): Pair<String, Long>? {
         var type: String? = null
         var ref: Long? = null
         json.beginObject()
@@ -166,7 +187,7 @@ object OverpassOverlay {
             }
         }
         json.endObject()
-        return ref.takeIf { type == "way" }
+        return if (type != null && ref != null) type to ref else null
     }
 
     /** Reads a Point (`[x, y]`) or LineString (`[[x, y], …]`) coordinate array. */
@@ -205,13 +226,51 @@ object OverpassOverlay {
             """"geometry":{"type":"LineString","coordinates":[$coords]}}"""
     }
 
+    /** Way id → the routes running on it, each with the routes it's part of. */
+    private fun routesByWay(relations: List<Element>): Map<Long, List<Route>> {
+        val byId = relations.filter { it.id != null }.associateBy { it.id!! }
+        val parents = HashMap<Long, MutableList<Element>>()
+        for (r in relations) for (child in r.relations) parents.getOrPut(child) { ArrayList(1) } += r
+        val result = HashMap<Long, MutableList<Route>>()
+        for (r in relations) {
+            if (r.ways.isEmpty()) continue
+            val route = route(r, partOf(r, parents, byId)) ?: continue
+            for (way in r.ways) result.getOrPut(way) { ArrayList(1) } += route
+        }
+        return result
+    }
+
+    /** Names of the routes [r] belongs to, nearest first, without repeats. */
+    private fun partOf(r: Element, parents: Map<Long, List<Element>>, byId: Map<Long, Element>): List<String> {
+        val names = LinkedHashSet<String>()
+        var level = listOfNotNull(r.id).flatMap { parents[it].orEmpty() }
+        repeat(PARENT_LEVELS) {
+            level.mapNotNullTo(names) { displayName(it.tags) }
+            level = level.flatMap { p -> p.id?.let { parents[it] }.orEmpty() }.filter { it.id in byId }
+        }
+        displayName(r.tags)?.let(names::remove)
+        return names.toList()
+    }
+
     /** A hiking route with something to show: a known network, a waymark or a number. */
-    private fun route(tags: Map<String, String>): Route? {
+    private fun route(r: Element, partOf: List<String>): Route? {
+        val tags = r.tags
         val osmc = tags["osmc:symbol"]?.trim()?.takeIf { OsmcSymbol.parse(it) != null }
         val ref = tags["ref"]?.trim()?.takeIf { it.isNotEmpty() && it.length <= MAX_REF }
         val network = tags["network"]?.takeIf { it in NETWORKS } ?: if (osmc != null || ref != null) "lwn" else return null
-        return Route(network, osmc ?: ref?.let { OsmcSymbol.fallback(network, it) })
+        return Route(
+            id = r.id ?: return null,
+            network = network,
+            mark = osmc ?: ref?.let { OsmcSymbol.fallback(network, it) },
+            name = displayName(tags),
+            partOf = partOf,
+            facts = ROUTE_FACTS.mapNotNull { key -> tags[key]?.takeIf { it.isNotBlank() }?.let { key to it } }.toMap(),
+        )
     }
+
+    /** Many stages have no name, only a description ("Sentiero Italia - Tappa V23B"). */
+    private fun displayName(tags: Map<String, String>): String? =
+        (tags["name"] ?: tags["description"]?.takeIf { it.length <= MAX_NAME })?.trim()?.takeIf { it.isNotEmpty() }
 
     private fun routeFeatures(e: Element, routes: List<Route>, toleranceM: Double): List<String> {
         if (routes.isEmpty() || e.geometryType != "LineString" || e.lons.size < 2) return emptyList()
@@ -224,6 +283,10 @@ object OverpassOverlay {
                 json.name(NETWORK).value(r.network)
                 json.name("w").value(NETWORKS.size - NETWORKS.indexOf(r.network))
                 r.mark?.let { json.name("m").value(it) }
+                json.name("rid").value(r.id)
+                r.name?.let { json.name("n").value(it) }
+                if (r.partOf.isNotEmpty()) json.name("p").value(r.partOf.joinToString("\n"))
+                for ((key, value) in r.facts) json.name(key).value(value)
                 json.endObject()
             }
             """{"type":"Feature","properties":$properties,"geometry":{"type":"LineString","coordinates":[$coords]}}"""
@@ -258,6 +321,18 @@ object OverpassOverlay {
 
     /** Longer "refs" are descriptions, not numbers painted on a rock. */
     private const val MAX_REF = 5
+
+    /** Longer descriptions are prose, not a name. */
+    private const val MAX_NAME = 80
+
+    /** Stage → region → whole route, as Sentiero Italia and E1 are mapped. */
+    private const val PARENT_LEVELS = 2
+
+    /** Route tags worth showing on the trail, kept as in OSM. */
+    val ROUTE_FACTS = listOf(
+        "ref", "from", "to", "distance", "ascent", "descent", "duration:forward", "duration:backward",
+        "cai_scale", "operator", "website",
+    )
 
     /** Overpass-side helper tag carrying the element type (node/way/relation). */
     private const val OSM_TYPE = "osm_type"

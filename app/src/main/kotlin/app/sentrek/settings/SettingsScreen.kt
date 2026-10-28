@@ -278,6 +278,20 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setShowContours(show) }
     }
 
+    val autoUpdateMaps: StateFlow<Boolean> =
+        settings.autoUpdateMaps.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setAutoUpdateMaps(on: Boolean) {
+        viewModelScope.launch { settings.setAutoUpdateMaps(on) }
+    }
+
+    val mapUpdateReminders: StateFlow<Boolean> =
+        settings.mapUpdateReminders.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setMapUpdateReminders(on: Boolean) {
+        viewModelScope.launch { settings.setMapUpdateReminders(on) }
+    }
+
     val rotationLocked: StateFlow<Boolean> =
         settings.rotationLocked.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
@@ -329,6 +343,8 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
     val batterySaver by viewModel.batterySaver.collectAsStateWithLifecycle()
     val staminaMode by viewModel.staminaMode.collectAsStateWithLifecycle()
     val rotationLocked by viewModel.rotationLocked.collectAsStateWithLifecycle()
+    val mapUpdateReminders by viewModel.mapUpdateReminders.collectAsStateWithLifecycle()
+    val autoUpdateMaps by viewModel.autoUpdateMaps.collectAsStateWithLifecycle()
     val units by viewModel.units.collectAsStateWithLifecycle()
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -381,6 +397,22 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 hint = stringResource(R.string.settings_lock_north_hint),
                 checked = rotationLocked,
                 onChange = viewModel::setRotationLocked,
+            )
+
+            SectionTitle(stringResource(R.string.settings_map_updates))
+            ToggleRow(
+                title = stringResource(R.string.settings_auto_update_maps),
+                hint = stringResource(R.string.settings_auto_update_maps_hint),
+                checked = autoUpdateMaps,
+                onChange = viewModel::setAutoUpdateMaps,
+            )
+            ToggleRow(
+                // Maps that update themselves need no reminder.
+                enabled = !autoUpdateMaps,
+                title = stringResource(R.string.settings_map_reminders),
+                hint = stringResource(R.string.settings_map_reminders_hint),
+                checked = mapUpdateReminders,
+                onChange = viewModel::setMapUpdateReminders,
             )
 
             SectionTitle(stringResource(R.string.settings_controls))

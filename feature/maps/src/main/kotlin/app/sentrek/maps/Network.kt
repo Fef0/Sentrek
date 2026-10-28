@@ -16,6 +16,13 @@ fun isOnline(context: Context): Boolean {
     return manager.getNetworkCapabilities(network)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
 }
 
+/** Whether the connection is Wi-Fi: big downloads that nobody asked for wait for it. */
+fun isOnWifi(context: Context): Boolean {
+    val manager = context.getSystemService(ConnectivityManager::class.java) ?: return false
+    val network = manager.activeNetwork ?: return false
+    return manager.getNetworkCapabilities(network)?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+}
+
 /** [isOnline], as it changes. */
 fun onlineFlow(context: Context): Flow<Boolean> = callbackFlow {
     val manager = context.getSystemService(ConnectivityManager::class.java)

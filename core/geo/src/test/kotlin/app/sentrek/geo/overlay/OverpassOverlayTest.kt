@@ -80,15 +80,38 @@ class OverpassOverlayTest {
         val out = StringWriter()
         assertEquals(2, OverpassOverlay.convert(input.reader(), out))
         val json = out.toString()
-        assertTrue(json.contains(""""properties":{"route_1_network":"lwn","w":1,"m":"red:red:white_stripe:708:black"}"""))
+        assertTrue(json.contains(""""properties":{"route_1_network":"lwn","w":1,"m":"red:red:white_stripe:708:black","rid":1,"ref":"708"}"""))
         // No waymark: a badge in the network's colour with the number.
-        assertTrue(json.contains(""""properties":{"route_1_network":"nwn","w":3,"m":"purple:purple::SI:white"}"""))
+        assertTrue(json.contains(""""properties":{"route_1_network":"nwn","w":3,"m":"purple:purple::SI:white","rid":2,"ref":"SI"}"""))
+    }
+
+    @Test
+    fun `routes know what they are part of`() {
+        // A stage of Sentiero Italia, in its region, in the whole route; parents come after.
+        val input = """{"elements":[
+            {"type":"relation","id":2,"members":[{"type":"way","ref":10,"role":""}],
+             "tags":{"route":"hiking","network":"nwn","ref":"SI","description":"Sentiero Italia - Tappa V23B",
+                     "from":"Randazzo","to":"Monte Scavo","distance":"15.43","ascent":"955","survey:date":"2018"}},
+            {"type":"relation","id":3,"members":[{"type":"relation","ref":2,"role":""}],
+             "tags":{"route":"hiking","network":"nwn","description":"Sentiero Italia - Regione Sicilia V00"}},
+            {"type":"relation","id":4,"members":[{"type":"relation","ref":3,"role":""}],
+             "tags":{"type":"superroute","name":"Sentiero Italia","website":"https://sentieroitalia.cai.it/"}},
+            {"type":"route","id":10,"geometry":{"type":"LineString","coordinates":[[14.9,37.7],[14.91,37.71]]}}
+        ]}"""
+        val out = StringWriter()
+        assertEquals(1, OverpassOverlay.convert(input.reader(), out))
+        assertTrue(
+            out.toString().contains(
+                """"rid":2,"n":"Sentiero Italia - Tappa V23B","p":"Sentiero Italia - Regione Sicilia V00\nSentiero Italia",""" +
+                    """"ref":"SI","from":"Randazzo","to":"Monte Scavo","distance":"15.43","ascent":"955"}""",
+            ),
+        )
     }
 
     @Test
     fun `query asks for routes and their ways within the cell`() {
         val q = OverpassOverlay.query(BoundingBox(37.5, 14.5, 38.0, 15.0))
-        assertTrue(q.contains(".routes out body;way(r.routes)(37.5,14.5,38.0,15.0);"))
+        assertTrue(q.contains("(.routes;.up1;.up2;);out body;way(r.routes)(37.5,14.5,38.0,15.0);"))
     }
 
     @Test

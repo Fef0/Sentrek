@@ -20,6 +20,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -57,6 +58,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -79,6 +81,7 @@ import app.sentrek.geo.place.PlaceKind
 import app.sentrek.map.LocalNightMap
 import app.sentrek.map.FollowMode
 import app.sentrek.map.MapFeatureInfo
+import app.sentrek.maps.RegionState
 import app.sentrek.map.MapFeatures
 import app.sentrek.map.MapLocation
 import app.sentrek.map.MapContours
@@ -185,9 +188,12 @@ fun MapScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val overlays by viewModel.overlays.collectAsStateWithLifecycle()
+    val overlaysVersion by viewModel.overlaysVersion.collectAsStateWithLifecycle()
     val showDifficulty by viewModel.showDifficulty.collectAsStateWithLifecycle()
     val rasters by viewModel.rasters.collectAsStateWithLifecycle()
     val recording by viewModel.recording.collectAsStateWithLifecycle()
+    val oldMaps by viewModel.oldMaps.collectAsStateWithLifecycle()
+    val failingMaps by viewModel.failingMaps.collectAsStateWithLifecycle()
     val shownTracks by viewModel.shownTracks.collectAsStateWithLifecycle()
     val followedRoute by viewModel.following.collectAsStateWithLifecycle()
     val followProfile by viewModel.followProfile.collectAsStateWithLifecycle()
@@ -969,7 +975,7 @@ fun MapScreen(
         )
     }
 
-    LaunchedEffect(style, rasters, overlays, showDifficulty) {
+    LaunchedEffect(style, rasters, overlays, overlaysVersion, showDifficulty) {
         style?.let { MapOverlays.sync(it, rasters, overlays, showDifficulty) }
     }
 
@@ -1030,6 +1036,45 @@ fun MapScreen(
     }
     confirm?.let { ConfirmDialog(it) { confirm = null } }
     ShareDialog(sharing)
+
+    // Not mid-hike: only when nothing is being recorded. Failures first.
+    if (failingMaps.isNotEmpty() && recording == null) {
+        AlertDialog(
+            onDismissRequest = viewModel::failingMapsSeen,
+            title = { Text(stringResource(R.string.map_update_failed_title)) },
+            text = {
+                Text(
+                    pluralStringResource(
+                        R.plurals.map_update_failed_text, failingMaps.size, failingMaps.size, RegionState.FAILURES_TO_WARN,
+                    ),
+                )
+            },
+            confirmButton = {
+                Button(onClick = viewModel::failingMapsSeen, modifier = Modifier.heightIn(min = TouchTarget)) {
+                    Text(stringResource(R.string.map_update_failed_ok))
+                }
+            },
+        )
+    } else if (oldMaps.isNotEmpty() && recording == null) {
+        AlertDialog(
+            onDismissRequest = viewModel::snoozeMapReminder,
+            title = { Text(stringResource(R.string.map_reminder_title)) },
+            text = { Text(stringResource(R.string.map_reminder_text)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (!viewModel.updateOldMaps()) Toast.makeText(context, R.string.map_reminder_offline, Toast.LENGTH_LONG).show()
+                    },
+                    modifier = Modifier.heightIn(min = TouchTarget),
+                ) { Text(stringResource(R.string.map_reminder_update)) }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::snoozeMapReminder, modifier = Modifier.heightIn(min = TouchTarget)) {
+                    Text(stringResource(R.string.map_reminder_later))
+                }
+            },
+        )
+    }
 
     if (askPlanDiscard) {
         DiscardPlanDialog(

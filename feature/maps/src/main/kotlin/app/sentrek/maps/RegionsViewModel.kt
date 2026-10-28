@@ -67,6 +67,21 @@ class RegionsViewModel @Inject constructor(
         clearSelection()
     }
 
+    /** The selected areas already on the phone, downloaded again. */
+    fun updateSelected() {
+        if (!isOnline(context)) return show(R.string.regions_offline)
+        _message.value = null
+        repository.update(_selection.value.filter { regions.value[it]?.map is MapDownload.Ready })
+        clearSelection()
+    }
+
+    fun updateOld() {
+        if (!isOnline(context)) return show(R.string.regions_offline)
+        _message.value = null
+        val now = System.currentTimeMillis()
+        repository.update(regions.value.values.filter { it.isOld(now) }.map(RegionState::cell))
+    }
+
     fun retryTrails() {
         if (!isOnline(context)) return show(R.string.regions_offline)
         _message.value = null

@@ -23,4 +23,11 @@ class PowerModeTest {
         assertEquals(GpsTiming(2_000, 10_000, 10_000), chosen.forMode(PowerMode.Saver))
         assertEquals(GpsTiming.Stamina, chosen.forMode(PowerMode.Stamina))
     }
+
+    @Test
+    fun `only stamina mode forces black screens`() {
+        assertEquals(false, PowerMode.Normal.blackScreens)
+        assertEquals(false, PowerMode.Saver.blackScreens)
+        assertEquals(true, PowerMode.Stamina.blackScreens)
+    }
 }

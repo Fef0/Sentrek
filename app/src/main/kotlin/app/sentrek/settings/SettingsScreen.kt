@@ -278,6 +278,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setShowContours(show) }
     }
 
+    val showSlopes: StateFlow<Boolean> =
+        settings.showSlopes.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setShowSlopes(show: Boolean) {
+        viewModelScope.launch { settings.setShowSlopes(show) }
+    }
+
     val autoUpdateMaps: StateFlow<Boolean> =
         settings.autoUpdateMaps.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
@@ -340,6 +347,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
     val showScaleBar by viewModel.showScaleBar.collectAsStateWithLifecycle()
     val showLockButton by viewModel.showLockButton.collectAsStateWithLifecycle()
     val showContours by viewModel.showContours.collectAsStateWithLifecycle()
+    val showSlopes by viewModel.showSlopes.collectAsStateWithLifecycle()
     val batterySaver by viewModel.batterySaver.collectAsStateWithLifecycle()
     val staminaMode by viewModel.staminaMode.collectAsStateWithLifecycle()
     val rotationLocked by viewModel.rotationLocked.collectAsStateWithLifecycle()
@@ -380,6 +388,13 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 title = stringResource(R.string.settings_contours),
                 checked = showContours,
                 onChange = viewModel::setShowContours,
+            )
+            ToggleRow(
+                enabled = !saving,
+                title = stringResource(R.string.settings_slopes),
+                hint = stringResource(R.string.settings_slopes_hint),
+                checked = showSlopes,
+                onChange = viewModel::setShowSlopes,
             )
             ToggleRow(
                 title = stringResource(R.string.settings_trail_difficulty),

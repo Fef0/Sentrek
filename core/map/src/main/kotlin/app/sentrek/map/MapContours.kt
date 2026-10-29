@@ -61,8 +61,9 @@ object MapContours {
     /** The densest spacing; closer in, MapLibre scales these tiles up. */
     private const val MAX_ZOOM = 15
 
-    /** Above the relief, below water, roads and trails (hiking.json). */
+    /** Above the relief and the steep slopes ([MapSlopes]), below water, roads and trails (hiking.json). */
     private const val ABOVE_LAYER = "hillshade"
+    private const val BELOW_LAYER = "water"
     private const val BELOW_LABELS = "water-name"
 
     /** The hillshade of the base style; hidden, the night map is almost all black pixels. */
@@ -85,7 +86,7 @@ object MapContours {
 
         val line = if (night) "#7a5c40" else "#a5784c"
         val index = eq(get(INDEX), literal(true))
-        style.addLayerAbove(
+        style.addLayerBelow(
             LineLayer(LINES, SOURCE).withProperties(
                 lineColor(line),
                 lineJoin(Property.LINE_JOIN_ROUND),
@@ -98,7 +99,7 @@ object MapContours {
                     ),
                 ),
             ),
-            ABOVE_LAYER,
+            BELOW_LAYER,
         )
         style.addLayerBelow(
             SymbolLayer(LABELS, SOURCE).withFilter(index).withProperties(

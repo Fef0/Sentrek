@@ -142,6 +142,12 @@ class HomeViewModel @Inject constructor(
     }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    /** Terrain for the steep slope shading, or null with it switched off (or saving power). */
+    val slopeTerrain: StateFlow<TerrainTiles?> = combine(settings.showSlopes, settings.powerMode) { show, mode ->
+        elevation.takeIf { show && mode == PowerMode.Normal }
+    }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     val units: StateFlow<Units> = settings.units
         .stateIn(viewModelScope, SharingStarted.Eagerly, Format.units)
 
@@ -191,6 +197,13 @@ class HomeViewModel @Inject constructor(
 
     fun setFollowPlaces(show: Boolean) {
         viewModelScope.launch { settings.setFollowPlaces(show) }
+    }
+
+    val followPlacesExpanded: StateFlow<Boolean> =
+        settings.followPlacesExpanded.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setFollowPlacesExpanded(expanded: Boolean) {
+        viewModelScope.launch { settings.setFollowPlacesExpanded(expanded) }
     }
 
     val followProfile: StateFlow<Boolean> =

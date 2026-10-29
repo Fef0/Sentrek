@@ -117,8 +117,8 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     }
 
     /**
-     * For long trips: GPS fixes further apart, the map capped at a lower frame rate, no contour
-     * lines, and black screens (OLED pixels that are black use no power).
+     * For long trips: GPS fixes further apart, the map capped at a lower frame rate and no
+     * contour lines. The theme and map stay as the user chose them.
      */
     val batterySaver: Flow<Boolean> =
         context.settings.data.map { it[BATTERY_SAVER] ?: false }
@@ -232,6 +232,14 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[FOLLOW_PLACES] = show }
     }
 
+    /** The whole list of places ahead open, rather than just the next one. */
+    val followPlacesExpanded: Flow<Boolean> =
+        context.settings.data.map { it[FOLLOW_PLACES_EXPANDED] ?: false }
+
+    suspend fun setFollowPlacesExpanded(expanded: Boolean) {
+        context.settings.edit { it[FOLLOW_PLACES_EXPANDED] = expanded }
+    }
+
     /** The elevation profile in the follow panel; hidden for more map. */
     val followProfile: Flow<Boolean> =
         context.settings.data.map { it[FOLLOW_PROFILE] ?: true }
@@ -309,6 +317,14 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     suspend fun setShowContours(show: Boolean) {
         context.settings.edit { it[SHOW_CONTOURS] = show }
+    }
+
+    /** Slopes of 30° and more shaded on the map, as on avalanche maps. */
+    val showSlopes: Flow<Boolean> =
+        context.settings.data.map { it[SHOW_SLOPES] ?: false }
+
+    suspend fun setShowSlopes(show: Boolean) {
+        context.settings.edit { it[SHOW_SLOPES] = show }
     }
 
     /** Downloaded areas updated by themselves at startup, on Wi-Fi only. */
@@ -401,6 +417,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val OFF_ROUTE_VIBRATION = booleanPreferencesKey("off_route_vibration")
         val FOLLOW_PROFILE = booleanPreferencesKey("follow_profile")
         val FOLLOW_PLACES = booleanPreferencesKey("follow_places")
+        val FOLLOW_PLACES_EXPANDED = booleanPreferencesKey("follow_places_expanded")
         val BATTERY_SAVER = booleanPreferencesKey("battery_saver")
         val STAMINA_MODE = booleanPreferencesKey("stamina_mode")
         val AUTO_POWER = booleanPreferencesKey("auto_power")
@@ -422,6 +439,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val SHOW_SCALE_BAR = booleanPreferencesKey("show_scale_bar")
         val SHOW_LOCK_BUTTON = booleanPreferencesKey("show_lock_button")
         val SHOW_CONTOURS = booleanPreferencesKey("show_contours")
+        val SHOW_SLOPES = booleanPreferencesKey("show_slopes")
         val MAP_REMINDERS = booleanPreferencesKey("map_reminders")
         val AUTO_UPDATE_MAPS = booleanPreferencesKey("auto_update_maps")
         val MAP_REMINDER_SNOOZED = longPreferencesKey("map_reminder_snoozed")

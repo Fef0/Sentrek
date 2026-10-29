@@ -136,7 +136,7 @@ class MainActivity : ComponentActivity() {
                 hideSystemBars = fullScreen
                 applySystemBars()
             }
-            // Saving power: black screens, whatever the theme (black OLED pixels use no power).
+            // Stamina mode: black screens, whatever the theme (black OLED pixels use no power).
             val dark = power.blackScreens || when (theme) {
                 AppTheme.System -> isSystemInDarkTheme()
                 AppTheme.Light -> false

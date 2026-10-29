@@ -85,6 +85,7 @@ import app.sentrek.maps.RegionState
 import app.sentrek.map.MapFeatures
 import app.sentrek.map.MapLocation
 import app.sentrek.map.MapContours
+import app.sentrek.map.MapSlopes
 import app.sentrek.map.MapHeights
 import app.sentrek.map.MapOverlays
 import app.sentrek.map.MapStyle
@@ -198,6 +199,7 @@ fun MapScreen(
     val followedRoute by viewModel.following.collectAsStateWithLifecycle()
     val followProfile by viewModel.followProfile.collectAsStateWithLifecycle()
     val followPlaces by viewModel.followPlaces.collectAsStateWithLifecycle()
+    val followPlacesExpanded by viewModel.followPlacesExpanded.collectAsStateWithLifecycle()
     val places by viewModel.places.collectAsStateWithLifecycle()
     val plan by planner.state.collectAsStateWithLifecycle()
     val planBlock by planner.blockedBy.collectAsStateWithLifecycle()
@@ -243,6 +245,7 @@ fun MapScreen(
     val controlsAlpha by animateFloatAsState(if (controlsHidden) 0f else 1f, label = "controls")
     val autoHideSetting by viewModel.autoHideControls.collectAsStateWithLifecycle()
     val showScaleBar by viewModel.showScaleBar.collectAsStateWithLifecycle()
+    val slopeTerrain by viewModel.slopeTerrain.collectAsStateWithLifecycle()
     val powerMode by viewModel.powerMode.collectAsStateWithLifecycle()
     val online by viewModel.online.collectAsStateWithLifecycle()
     val downloadedCells by viewModel.downloadedCells.collectAsStateWithLifecycle()
@@ -389,6 +392,7 @@ fun MapScreen(
     // For the scale bar and the compass, kept up to date while the map moves.
     var metersPerPx by remember { mutableDoubleStateOf(0.0) }
     var bearing by remember { mutableDoubleStateOf(0.0) }
+    var zoom by remember { mutableDoubleStateOf(0.0) }
     // The area in the middle of the map, to tell whether it's downloaded.
     var centreCell by remember { mutableStateOf<RegionCell?>(null) }
     DisposableEffect(map) {
@@ -403,6 +407,7 @@ fun MapScreen(
         }
         val onIdle = MapLibreMap.OnCameraIdleListener {
             metersPerPx = metersPerPixel(m)
+            zoom = m.cameraPosition.zoom
             bearing = m.cameraPosition.bearing
             updateCentre()
             // Left a few degrees off north: almost certainly meant to be north.
@@ -413,6 +418,7 @@ fun MapScreen(
         }
         metersPerPx = metersPerPixel(m)
         bearing = m.cameraPosition.bearing
+        zoom = m.cameraPosition.zoom
         updateCentre()
         m.addOnCameraMoveListener(onMove)
         m.addOnCameraIdleListener(onIdle)
@@ -483,6 +489,8 @@ fun MapScreen(
                         onToggleProfile = { viewModel.setFollowProfile(!followProfile) },
                         showPlaces = followPlaces,
                         onTogglePlaces = { viewModel.setFollowPlaces(!followPlaces) },
+                        placesExpanded = followPlacesExpanded,
+                        onExpandPlaces = viewModel::setFollowPlacesExpanded,
                         onOpen = {
                             pressed = MapFeatureInfo(name = null, kind = "track", position = LatLng(0.0, 0.0), osmId = null, trackId = it.trackId)
                         },
@@ -493,6 +501,7 @@ fun MapScreen(
                 }
                 // Top left, under any panel. It stays when the other controls fade out.
                 if (showScaleBar) ScaleBar(metersPerPx, night = LocalNightMap.current)
+                if (slopeTerrain != null && zoom >= MapSlopes.MIN_ZOOM) SlopeLegend()
                 // A reminder, not a block: the map still moves and answers taps, it just has
                 // nothing to draw here until the area is downloaded or the network is back.
                 if (!online && centreCell?.let { it !in downloadedCells } == true) {
@@ -990,6 +999,9 @@ fun MapScreen(
     val nightMap = LocalNightMap.current
     LaunchedEffect(style, contourTerrain, elevationUnit) {
         style?.let { MapContours.sync(it, contourTerrain, elevationUnit, nightMap) }
+    }
+    LaunchedEffect(style, slopeTerrain) {
+        style?.let { MapSlopes.sync(it, slopeTerrain, nightMap) }
     }
     LaunchedEffect(style, elevationUnit) {
         style?.let { MapHeights.apply(it, elevationUnit) }

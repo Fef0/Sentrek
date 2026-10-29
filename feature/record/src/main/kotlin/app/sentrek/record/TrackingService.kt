@@ -16,13 +16,15 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import app.sentrek.feature.record.R
-import app.sentrek.ui.Format
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import app.sentrek.geo.LatLon
 import app.sentrek.data.SettingsRepository
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
@@ -30,7 +32,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.math.roundToInt
 
 /**
  * Keeps the GPS on while recording or following a route, with the screen off or another app
@@ -45,6 +46,12 @@ class TrackingService : Service() {
     @Inject lateinit var settings: SettingsRepository
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val live by lazy { LiveNotification(this, CHANNEL_ID) }
+
+    /** The last fix, for the time of sunset where the user is. */
+    private var at: LatLon? = null
+    private var shown: String? = null
+    private var disarm: Job? = null
 
     @OptIn(FlowPreview::class)
     override fun onCreate() {
@@ -70,6 +77,7 @@ class TrackingService : Service() {
         scope.launch {
             interval.collectLatest { ms ->
                 location.locations(ms).collect {
+                    at = runCatching { LatLon(it.latitude, it.longitude) }.getOrNull() ?: at
                     recording.onLocation(it)
                     following.onLocation(it)
                 }
@@ -81,18 +89,54 @@ class TrackingService : Service() {
         }
         scope.launch {
             // Android drops notification updates sent too often; every few seconds is plenty.
-            both.sample(NOTIFICATION_INTERVAL_MS)
-                .distinctUntilChanged { a, b -> summary(a.first, a.second) == summary(b.first, b.second) }
-                .collect { (r, f) ->
-                    val manager = NotificationManagerCompat.from(this@TrackingService)
-                    if ((r != null || f != null) && manager.areNotificationsEnabled()) {
-                        manager.notify(NOTIFICATION_ID, notification(r, f))
-                    }
-                }
+            both.sample(NOTIFICATION_INTERVAL_MS).collect { update() }
+        }
+        scope.launch {
+            // The time of sunset comes closer without anything else changing.
+            while (true) {
+                delay(CLOCK_INTERVAL_MS)
+                update()
+            }
         }
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
+    /** Sends the notification again, when anything it shows has changed (or [force]). */
+    private fun update(force: Boolean = false) {
+        val r = recording.state.value
+        val f = following.state.value
+        val manager = NotificationManagerCompat.from(this)
+        if ((r == null && f == null) || !manager.areNotificationsEnabled()) return
+        val summary = live.summary(r, f, at, System.currentTimeMillis())
+        if (!force && summary == shown) return
+        shown = summary
+        manager.notify(NOTIFICATION_ID, notification(r, f))
+    }
+
+    /**
+     * Pause/Resume from the notification. A pocket can press buttons too, so the first tap only
+     * arms it ("Tap again to pause") for a few seconds and the second one acts.
+     */
+    private fun toggle() {
+        val r = recording.state.value ?: return
+        disarm?.cancel()
+        if (!live.armed) {
+            live.armed = true
+            disarm = scope.launch {
+                delay(CONFIRM_MS)
+                live.armed = false
+                update()
+            }
+        } else {
+            live.armed = false
+            if (r.isPaused) recording.resume() else recording.pause()
+        }
+        update(force = true)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_TOGGLE) toggle()
+        return START_STICKY
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -101,56 +145,43 @@ class TrackingService : Service() {
         super.onDestroy()
     }
 
-    /** What the notification shows; it's only updated when this changes. */
-    private fun summary(r: Recording?, f: Following?): String = listOf(
-        r?.let { "${it.isPaused} ${it.distance.roundToInt() / 10}" },
-        f?.let { "${it.offRoute} ${it.remaining.distance.roundToInt() / 10}" },
-    ).joinToString()
-
     private fun notification(r: Recording?, f: Following?): Notification {
         val openApp = packageManager.getLaunchIntentForPackage(packageName)?.let {
             PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE)
         }
-        val title = when {
-            f?.offRoute == true -> getString(R.string.follow_notification_off_route, Format.distance(f.offset ?: 0.0))
-            r?.isPaused == true -> getString(R.string.record_notification_paused)
-            r != null -> getString(R.string.record_notification_title)
-            else -> getString(R.string.follow_notification_title, f?.name.orEmpty())
-        }
-        val text = listOfNotNull(
-            r?.let { getString(R.string.record_notification_text, Format.distance(it.distance), Format.elevation(it.ascent)) },
-            f?.let { getString(R.string.follow_notification_left, Format.distance(it.remaining.distance), Format.duration(it.remaining.millis)) },
-        ).joinToString(" · ")
-        val showChronometer = r != null && !r.isPaused
-        val now = System.currentTimeMillis()
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_record)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setContentIntent(openApp)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setSilent(true)
-            // The chronometer can't skip pauses: it counts from a start time shifted by them.
-            .setUsesChronometer(showChronometer)
-            .setWhen(if (r != null) now - r.activeMillis(now) else now)
-            .setShowWhen(showChronometer)
-            .build()
+        val toggle = PendingIntent.getService(
+            this, 1, Intent(this, TrackingService::class.java).setAction(ACTION_TOGGLE),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        return live.build(r, f, at, System.currentTimeMillis(), openApp, toggle)
     }
 
     private fun createChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        // Normal importance, but without sound or vibration: a low-importance ("silent")
+        // notification is hidden from the lock screen by default, and that's where it's read.
         val channel = NotificationChannel(
-            CHANNEL_ID, getString(R.string.record_channel), NotificationManager.IMPORTANCE_LOW,
-        )
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+            CHANNEL_ID, getString(R.string.record_channel), NotificationManager.IMPORTANCE_DEFAULT,
+        ).apply {
+            setSound(null, null)
+            enableVibration(false)
+            lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+        }
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(channel)
+        // Its importance can't be raised once created, so the channel of version 0.10 goes.
+        manager.deleteNotificationChannel(OLD_CHANNEL_ID)
     }
 
     companion object {
         private const val TAG = "TrackingService"
-        private const val CHANNEL_ID = "recording"
+        private const val CHANNEL_ID = "tracking"
+        private const val OLD_CHANNEL_ID = "recording"
         private const val NOTIFICATION_ID = 2
         private const val NOTIFICATION_INTERVAL_MS = 5_000L
+        private const val CLOCK_INTERVAL_MS = 60_000L
+        private const val CONFIRM_MS = 5_000L
+        private const val ACTION_TOGGLE = "app.sentrek.record.TOGGLE_PAUSE"
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, TrackingService::class.java))

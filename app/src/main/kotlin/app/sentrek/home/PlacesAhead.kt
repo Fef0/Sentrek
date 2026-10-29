@@ -38,6 +38,7 @@ import app.sentrek.geo.overlay.PoiKind
 import app.sentrek.geo.place.PlaceKind
 import app.sentrek.geo.route.RoutePlace
 import app.sentrek.geo.route.RoutePlaces
+import app.sentrek.record.routePlaceLabel
 import app.sentrek.geo.route.UpcomingPlace
 import app.sentrek.map.MapIcons
 import app.sentrek.record.PlaceIcon
@@ -137,35 +138,7 @@ internal fun PlaceBadge(kind: RoutePlace.Kind, size: Dp) {
 }
 
 @Composable
-internal fun kindLabel(kind: RoutePlace.Kind): String = when (kind) {
-    is RoutePlace.Kind.Saved -> placeKindLabel(kind.kind)
-    RoutePlace.Kind.Waypoint -> stringResource(R.string.ahead_waypoint)
-    is RoutePlace.Kind.Osm -> stringResource(
-        when (kind.kind) {
-            PoiKind.AlpineHut -> R.string.ahead_alpine_hut
-            PoiKind.WildernessHut -> R.string.ahead_wilderness_hut
-            PoiKind.Shelter -> R.string.ahead_shelter
-            PoiKind.Spring -> R.string.ahead_spring
-            PoiKind.DrinkingWater -> R.string.ahead_drinking_water
-            PoiKind.Cave -> R.string.ahead_cave
-            PoiKind.Viewpoint -> R.string.ahead_viewpoint
-            PoiKind.Waterfall -> R.string.ahead_waterfall
-            PoiKind.Camping -> R.string.ahead_camping
-            PoiKind.EmergencyPhone -> R.string.ahead_emergency_phone
-            PoiKind.Peak -> R.string.ahead_peak
-            PoiKind.Pass -> R.string.ahead_pass
-            // Not listed as places ahead (see PoiKind.landmark), but found by search.
-            PoiKind.Castle -> R.string.ahead_castle
-            PoiKind.Guidepost -> R.string.ahead_guidepost
-            PoiKind.Cross -> R.string.ahead_cross
-            PoiKind.Shrine -> R.string.ahead_shrine
-            PoiKind.Ruins -> R.string.ahead_ruins
-            PoiKind.Monument -> R.string.ahead_monument
-            PoiKind.Memorial -> R.string.ahead_memorial
-            PoiKind.Board -> R.string.ahead_board
-        },
-    )
-}
+internal fun kindLabel(kind: RoutePlace.Kind): String = stringResource(routePlaceLabel(kind))
 
 /** Less climb than this is noise on the way to a place, not worth a number. */
 private const val MIN_CLIMB_M = 10.0

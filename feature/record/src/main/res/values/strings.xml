@@ -53,6 +53,16 @@ Record a hike or import a GPX/KML file.</string>
     <string name="follow_notification_off_route">Off route · %s</string>
     <!-- Distance left, time left. -->
     <string name="follow_notification_left">%1$s left · %2$s</string>
+    <!-- Lock screen notification lines. -->
+    <string name="live_climb">↑ %s to climb</string>
+    <!-- Next place on the route, distance to it: "Rifugio Sapienza in 1.1 km". -->
+    <string name="live_next">%1$s in %2$s</string>
+    <string name="live_sunset_late">Sunset %1$s · arrival ≈ %2$s</string>
+    <string name="live_sunset_in">Sunset %1$s · in %2$s</string>
+    <string name="live_pause">Pause</string>
+    <string name="live_resume">Resume</string>
+    <string name="live_pause_confirm">Tap again to pause</string>
+    <string name="live_resume_confirm">Tap again to resume</string>
     <string name="tracks_delete_title">Delete this track?</string>
     <string name="tracks_saved">Track saved</string>
     <string name="tracks_save_failed">Save failed</string>
@@ -147,4 +157,27 @@ Long-press the map to add one.</string>
     <string name="weather_sky_snow">Snow</string>
     <string name="weather_sky_showers">Showers</string>
     <string name="weather_sky_storm">Storms</string>
+
+    <!-- Places along a route, when they have no name. -->
+    <string name="ahead_alpine_hut">Mountain hut</string>
+    <string name="ahead_wilderness_hut">Hut</string>
+    <string name="ahead_shelter">Shelter</string>
+    <string name="ahead_spring">Spring</string>
+    <string name="ahead_drinking_water">Drinking water</string>
+    <string name="ahead_cave">Cave</string>
+    <string name="ahead_viewpoint">Viewpoint</string>
+    <string name="ahead_waterfall">Waterfall</string>
+    <string name="ahead_camping">Campsite</string>
+    <string name="ahead_emergency_phone">Emergency phone</string>
+    <string name="ahead_peak">Peak</string>
+    <string name="ahead_pass">Pass</string>
+    <string name="ahead_waypoint">Waypoint</string>
+    <string name="ahead_castle">Castle</string>
+    <string name="ahead_guidepost">Guidepost</string>
+    <string name="ahead_cross">Cross</string>
+    <string name="ahead_shrine">Shrine</string>
+    <string name="ahead_ruins">Ruins</string>
+    <string name="ahead_monument">Monument</string>
+    <string name="ahead_memorial">Memorial</string>
+    <string name="ahead_board">Information board</string>
 </resources>

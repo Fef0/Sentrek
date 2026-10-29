@@ -1119,7 +1119,9 @@ fun MapScreen(
         style?.let { PlaceLayers.sync(context, it, places) }
     }
 
-    LaunchedEffect(style, recording?.segments, shownTracks) {
-        style?.let { TrackLayers.sync(it, recording?.segments.orEmpty(), shownTracks) }
+    // A route open in the planner is drawn by the planner: its saved line would show twice.
+    val editedId = plan.editing?.id?.takeIf { plan.active }
+    LaunchedEffect(style, recording?.segments, shownTracks, editedId) {
+        style?.let { TrackLayers.sync(it, recording?.segments.orEmpty(), shownTracks.filter { t -> t.id != editedId }) }
     }
 }

@@ -11,7 +11,11 @@
     <!-- Off-route and back-on-route alerts. -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Breadcrumbs: the position by SMS to the emergency contact while recording, if the user turns them on. -->
+    <uses-permission android:name="android.permission.SEND_SMS" />
+
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <application>
         <service

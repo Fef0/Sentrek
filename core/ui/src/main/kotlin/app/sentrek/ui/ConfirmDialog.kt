@@ -1,6 +1,10 @@
 package app.sentrek.ui
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -21,6 +25,8 @@ class Confirmation(
     val text: String?,
     val confirmLabel: String,
     val destructive: Boolean = false,
+    /** Below the text, in the error colour: what the user must not miss (e.g. a cost). */
+    val warning: String? = null,
     val onConfirm: () -> Unit,
 )
 
@@ -30,7 +36,14 @@ fun ConfirmDialog(confirmation: Confirmation, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(confirmation.title) },
-        text = confirmation.text?.let { { Text(it) } },
+        text = if (confirmation.text == null && confirmation.warning == null) null else {
+            {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    confirmation.text?.let { Text(it) }
+                    confirmation.warning?.let { Text(it, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }
+                }
+            }
+        },
         confirmButton = {
             Button(
                 onClick = {

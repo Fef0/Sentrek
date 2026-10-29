@@ -88,6 +88,10 @@ class EmergencyViewModel @Inject constructor(
     val smsTo: StateFlow<String> =
         settings.emergencySmsTo.stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
+    /** As in the phone's contacts; empty for a number typed in before contacts could be picked. */
+    val contactName: StateFlow<String> =
+        settings.emergencyContactName.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
     fun hasPermission() = location.hasPermission()
 
     fun onPermissionChanged() {
@@ -110,6 +114,7 @@ fun EmergencyScreen(onBack: () -> Unit, viewModel: EmergencyViewModel = hiltView
     val smsButton by viewModel.smsButton.collectAsStateWithLifecycle()
     val number by viewModel.number.collectAsStateWithLifecycle()
     val smsTo by viewModel.smsTo.collectAsStateWithLifecycle()
+    val contactName by viewModel.contactName.collectAsStateWithLifecycle()
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         viewModel.onPermissionChanged()
     }
@@ -160,7 +165,7 @@ fun EmergencyScreen(onBack: () -> Unit, viewModel: EmergencyViewModel = hiltView
                     val message = message(context, position, here)
                     if (smsButton) {
                         Button(onClick = { sms(context, smsTo, message) }, modifier = wide) {
-                            Text(if (smsTo.isEmpty()) stringResource(R.string.emergency_sms) else stringResource(R.string.emergency_sms_to, smsTo))
+                            Text(if (smsTo.isEmpty()) stringResource(R.string.emergency_sms) else stringResource(R.string.emergency_sms_to, contactName.ifBlank { smsTo }))
                         }
                     }
                     OutlinedButton(onClick = { share(context, message) }, modifier = wide) { Text(stringResource(R.string.emergency_share)) }

@@ -1,6 +1,9 @@
 package app.sentrek.home
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import android.location.Location
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -191,6 +194,13 @@ class HomeViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val following: StateFlow<Following?> = follower.state
+
+    /** Who gets the position by SMS while recording, and how often; null: nobody (see Breadcrumbs). */
+    val breadcrumbs: StateFlow<Pair<String, Int>?> =
+        combine(settings.sosEnabled, settings.breadcrumbMinutes, settings.emergencySmsTo, settings.emergencyContactName) { sos, minutes, to, name ->
+            val allowed = ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
+            if (sos && minutes > 0 && to.isNotBlank() && allowed) name.ifBlank { to } to minutes else null
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     val followPlaces: StateFlow<Boolean> =
         settings.followPlaces.stateIn(viewModelScope, SharingStarted.Eagerly, true)

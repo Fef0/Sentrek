@@ -70,6 +70,31 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { if (number.isBlank()) it.remove(EMERGENCY_SMS_TO) else it[EMERGENCY_SMS_TO] = number.trim() }
     }
 
+    /** The name of the contact the SMS goes to, as in the phone's contacts; empty: unknown. */
+    val emergencyContactName: Flow<String> =
+        context.settings.data.map { it[EMERGENCY_CONTACT_NAME].orEmpty() }
+
+    /** Picked from the phone's contacts; a blank [number] clears it. */
+    suspend fun setEmergencyContact(name: String, number: String) {
+        context.settings.edit {
+            if (number.isBlank()) {
+                it.remove(EMERGENCY_SMS_TO)
+                it.remove(EMERGENCY_CONTACT_NAME)
+            } else {
+                it[EMERGENCY_SMS_TO] = number.trim()
+                it[EMERGENCY_CONTACT_NAME] = name.trim()
+            }
+        }
+    }
+
+    /** While recording, the position goes by SMS to the emergency contact every so many minutes; 0: never. */
+    val breadcrumbMinutes: Flow<Int> =
+        context.settings.data.map { it[BREADCRUMB_MINUTES] ?: 0 }
+
+    suspend fun setBreadcrumbMinutes(minutes: Int) {
+        context.settings.edit { it[BREADCRUMB_MINUTES] = minutes }
+    }
+
     /** The user's own servers by name (see the map module's Server); missing: the default. */
     val servers: Flow<Map<String, String>> =
         context.settings.data.map { p ->
@@ -421,6 +446,8 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val SOS_ENABLED = booleanPreferencesKey("sos_enabled")
         val EMERGENCY_NUMBER = stringPreferencesKey("emergency_number")
         val EMERGENCY_SMS_TO = stringPreferencesKey("emergency_sms_to")
+        val EMERGENCY_CONTACT_NAME = stringPreferencesKey("emergency_contact_name")
+        val BREADCRUMB_MINUTES = intPreferencesKey("breadcrumb_minutes")
         private const val SERVER_PREFIX = "server_"
         val OFF_ROUTE_VIBRATION = booleanPreferencesKey("off_route_vibration")
         val FOLLOW_PROFILE = booleanPreferencesKey("follow_profile")

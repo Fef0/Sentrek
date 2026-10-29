@@ -73,6 +73,7 @@ fun TracksScreen(
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
     val shown by viewModel.shown.collectAsStateWithLifecycle()
     val following by viewModel.following.collectAsStateWithLifecycle()
+    val totalsAllTime by viewModel.totalsAllTime.collectAsStateWithLifecycle()
     var exporting by remember { mutableStateOf<SavedTrack?>(null) }
     var choosingFormat by remember { mutableStateOf<SavedTrack?>(null) }
     var confirm by remember { mutableStateOf<Confirmation?>(null) }
@@ -145,6 +146,9 @@ fun TracksScreen(
                 contentPadding = PaddingValues(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                item(key = "totals") {
+                    TripTotalsCard(tracks, allTime = totalsAllTime, onToggle = { viewModel.setTotalsAllTime(!totalsAllTime) })
+                }
                 items(tracks, key = { it.id }) { track ->
                     TrackCard(
                         track = track,

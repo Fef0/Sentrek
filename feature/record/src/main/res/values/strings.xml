@@ -7,6 +7,14 @@
     <string name="record_notification_text">%1$s · ↑ %2$s</string>
 
     <string name="tracks_title">Tracks</string>
+    <string name="totals_this_year">This year</string>
+    <string name="totals_all_time">All time</string>
+    <string name="totals_switch">Switch between this year and all time</string>
+    <string name="totals_none">No hikes recorded yet</string>
+    <plurals name="totals_hikes">
+        <item quantity="one">%d hike</item>
+        <item quantity="other">%d hikes</item>
+    </plurals>
     <string name="tracks_back">Back to map</string>
     <string name="tracks_empty">No tracks yet.
 Record a hike or import a GPX/KML file.</string>

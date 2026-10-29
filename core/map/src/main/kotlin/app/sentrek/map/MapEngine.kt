@@ -30,6 +30,7 @@ object MapEngine {
             .dispatcher(Dispatcher().apply { maxRequestsPerHost = MAX_REQUESTS_PER_HOST })
             .addInterceptor(ServerInterceptor)
             .addInterceptor(BundledAssetInterceptor(context.applicationContext))
+            .addInterceptor(MapSlopes.Tiles)
             .addNetworkInterceptor { chain ->
                 chain.proceed(chain.request().newBuilder().header("User-Agent", userAgent).build())
             }

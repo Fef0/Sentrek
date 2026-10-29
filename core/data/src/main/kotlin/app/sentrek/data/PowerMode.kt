@@ -33,8 +33,11 @@ enum class PowerMode {
     Saver,
     Stamina;
 
-    /** Black screens and the night map: on OLED screens black pixels use no power. */
-    val blackScreens: Boolean get() = this != Normal
+    /**
+     * Black screens and the night map, whatever the user chose: on OLED screens black pixels
+     * use no power. Stamina mode only; battery saver keeps the user's theme and map.
+     */
+    val blackScreens: Boolean get() = this == Stamina
 
     /** The most frames per second the maps may draw, given the one chosen (0: no cap). */
     fun mapFps(chosen: Int): Int = when (this) {

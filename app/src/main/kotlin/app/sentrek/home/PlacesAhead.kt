@@ -20,10 +20,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -49,12 +45,18 @@ import app.sentrek.ui.TouchTarget
 
 /**
  * The places still ahead on the followed route. One line for the next place (how far, how
- * much climb, how long); a tap opens the rest of the list, another closes it again.
+ * much climb, how long); a tap opens the rest of the list, another closes it again. Open or
+ * closed is remembered ([onExpand]), for the next route too.
  */
 @Composable
-fun PlacesAhead(upcoming: List<UpcomingPlace>, showClimb: Boolean, modifier: Modifier = Modifier) {
+fun PlacesAhead(
+    upcoming: List<UpcomingPlace>,
+    showClimb: Boolean,
+    expanded: Boolean,
+    onExpand: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     if (upcoming.isEmpty()) return
-    var expanded by rememberSaveable { mutableStateOf(false) }
     Column(modifier) {
         HorizontalDivider(color = LocalContentColor.current.copy(alpha = 0.2f))
         Row(
@@ -63,7 +65,7 @@ fun PlacesAhead(upcoming: List<UpcomingPlace>, showClimb: Boolean, modifier: Mod
                 .heightIn(min = TouchTarget)
                 .clickable(
                     onClickLabel = stringResource(if (expanded) R.string.follow_places_less else R.string.follow_places_more),
-                    onClick = { expanded = !expanded },
+                    onClick = { onExpand(!expanded) },
                 ),
             verticalAlignment = Alignment.CenterVertically,
         ) {

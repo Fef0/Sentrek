@@ -44,6 +44,9 @@ fun FollowPanel(
     /** The places ahead ([onTogglePlaces] hides them, as the profile). */
     showPlaces: Boolean,
     onTogglePlaces: () -> Unit,
+    /** The whole list of places ahead open, not just the next one. */
+    placesExpanded: Boolean,
+    onExpandPlaces: (Boolean) -> Unit,
     /** Opens the route's sheet (reverse direction and the rest). */
     onOpen: () -> Unit,
     /** Asks first (see FollowConfirmations): a stray tap mustn't end navigation. */
@@ -113,7 +116,15 @@ fun FollowPanel(
                 FollowStat(stringResource(R.string.follow_time_left), Format.duration(left.millis), Modifier.weight(1f))
             }
             SunsetLine(position, following.remaining.millis, Modifier.padding(bottom = 8.dp))
-            if (showPlaces) PlacesAhead(following.upcoming, showClimb = following.hasElevation, modifier = Modifier.padding(bottom = 4.dp))
+            if (showPlaces) {
+                PlacesAhead(
+                    following.upcoming,
+                    showClimb = following.hasElevation,
+                    expanded = placesExpanded,
+                    onExpand = onExpandPlaces,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+            }
             if (showProfile && following.profile.size >= 2) {
                 ElevationProfile(
                     profile = following.profile,

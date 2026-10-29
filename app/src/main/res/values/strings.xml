@@ -36,6 +36,8 @@
     <string name="record_confirm_title">Start recording?</string>
     <string name="record_confirm_text">Your way is recorded until you stop it, also with the screen off.</string>
     <string name="record_confirm">Start</string>
+    <!-- After record_confirm_text, when position texts are on. -->
+    <string name="record_confirm_breadcrumbs">Your position will also go by SMS to %1$s every %2$d min, from your SIM. You can turn this off in Settings › Emergency settings.</string>
     <string name="bar_plan">Plan</string>
     <string name="bar_settings">Settings</string>
     <string name="bar_tracks">Tracks</string>
@@ -169,9 +171,21 @@
     <string name="settings_emergency_number_hint">The number the SOS screen calls. 112 in Europe, 911 in North America, or mountain rescue, or a friend.</string>
     <string name="settings_emergency_sms">Emergency SMS</string>
     <string name="settings_emergency_sms_hint">Adds a button to the SOS screen that writes an SMS with your position.</string>
-    <string name="settings_emergency_sms_to">Send the SMS to</string>
-    <string name="settings_emergency_sms_to_none">Choose each time</string>
-    <string name="settings_emergency_sms_to_hint">A friend, or a rescue service that accepts text messages.</string>
+    <!-- The short line on the map while recording. -->
+    <string name="breadcrumb_chip">SMS every %1$d min · %2$s</string>
+    <string name="settings_emergency_contact">Emergency contact</string>
+    <string name="settings_emergency_contact_none">None: you choose each time</string>
+    <string name="settings_emergency_contact_hint">Who gets the SMS with your position. Pick someone from your contacts.</string>
+    <string name="settings_emergency_contact_remove">Remove</string>
+    <string name="settings_breadcrumbs">Text my position while recording</string>
+    <string name="settings_breadcrumbs_off">Off</string>
+    <string name="settings_breadcrumbs_every">Every %d min</string>
+    <string name="settings_breadcrumbs_hint">Sentrek texts your emergency contact when you start recording, then at this interval, and when you stop. No internet needed, just a phone signal; with none, it tries again until there is.</string>
+    <!-- Shown in red under the setting, and in the dialogs before texts are sent. -->
+    <string name="settings_breadcrumbs_cost_warning">Your carrier may charge for each SMS, abroad too.</string>
+    <string name="settings_breadcrumbs_cost_title">SMS can cost money</string>
+    <string name="settings_breadcrumbs_cost_text">Sentrek will send these texts by itself, from your SIM. Every %1$d minutes, an 8-hour hike is about %2$d texts.</string>
+    <string name="settings_breadcrumbs_cost_confirm">Turn on</string>
     <string name="settings_servers">Servers</string>
     <string name="settings_servers_hint">Where Sentrek gets its maps and data. If you run your own copy of one of these services, you can use it here. Areas downloaded from a different server may need to be downloaded again.</string>
     <string name="settings_server_tiles">Map tiles</string>

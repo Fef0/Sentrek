@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -192,6 +193,7 @@ class MainActivity : ComponentActivity() {
                     val shownCamera = camera ?: return@SentrekTheme
                     ExitConfirmation(enabled = confirmExit && screen == Screen.Map)
                     if (screen != Screen.Map) BackHandler(onBack = toMap)
+                    val pages = rememberSaveableStateHolder()
                     Box(Modifier.fillMaxSize()) {
                         // A theme or power mode change rebuilds the map in the right colours and
                         // frame rate. Only the map: a screen open on top (Settings) stays where it was.
@@ -221,6 +223,9 @@ class MainActivity : ComponentActivity() {
                         }
                         // Opaque and touch-tight: nothing reaches the map below.
                         if (screen != Screen.Map) Surface(Modifier.fillMaxSize()) {
+                            // Each screen keeps where it was scrolled to, and what it had
+                            // open, for when the user comes back to it.
+                            pages.SaveableStateProvider(screen.name) {
                             when (screen) {
                                 Screen.Map -> Unit
                                 Screen.Maps -> RegionsScreen(initialCamera = shownCamera, onBack = toMap)
@@ -252,6 +257,7 @@ class MainActivity : ComponentActivity() {
                                 )
                                 Screen.Emergency -> EmergencyScreen(onBack = toMap)
                                 Screen.Settings -> SettingsScreen(onBack = toMap)
+                            }
                             }
                         }
                     }

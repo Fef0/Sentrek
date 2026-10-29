@@ -193,6 +193,7 @@ fun MapScreen(
     val showDifficulty by viewModel.showDifficulty.collectAsStateWithLifecycle()
     val rasters by viewModel.rasters.collectAsStateWithLifecycle()
     val recording by viewModel.recording.collectAsStateWithLifecycle()
+    val breadcrumbs by viewModel.breadcrumbs.collectAsStateWithLifecycle()
     val oldMaps by viewModel.oldMaps.collectAsStateWithLifecycle()
     val failingMaps by viewModel.failingMaps.collectAsStateWithLifecycle()
     val shownTracks by viewModel.shownTracks.collectAsStateWithLifecycle()
@@ -692,7 +693,12 @@ fun MapScreen(
                             // A bumped button mustn't fill the phone with a track nobody meant to record.
                             confirm = Confirmation(
                                 title = context.getString(R.string.record_confirm_title),
-                                text = context.getString(R.string.record_confirm_text),
+                                // Texts cost money: said every time, before they start.
+                                text = listOfNotNull(
+                                    context.getString(R.string.record_confirm_text),
+                                    breadcrumbs?.let { (to, minutes) -> context.getString(R.string.record_confirm_breadcrumbs, to, minutes) },
+                                ).joinToString("\n\n"),
+                                warning = breadcrumbs?.let { context.getString(R.string.settings_breadcrumbs_cost_warning) },
                                 confirmLabel = context.getString(R.string.record_confirm),
                                 onConfirm = { withLocation(AfterPermission.Record) { startRecording() } },
                             )

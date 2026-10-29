@@ -1,6 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="record_channel">Track recording</string>
+    <!-- Breadcrumb texts to the emergency contact. Plain characters only, and short: one SMS each (160 characters with the position). -->
+    <string name="breadcrumb_started">Sentrek: I\'m starting a hike. My position every %1$d min: %2$s</string>
+    <string name="breadcrumb_position">Sentrek: my position at %1$s: %2$s</string>
+    <string name="breadcrumb_finished">Sentrek: hike finished. I\'m at %1$s</string>
+    <string name="breadcrumb_channel">Position texts</string>
+    <string name="breadcrumb_notification">Texting your position to %1$s every %2$d min</string>
+    <string name="breadcrumb_last">Last sent at %s</string>
+    <string name="breadcrumb_none_yet">First one on its way</string>
+    <string name="breadcrumb_no_signal">No signal, trying again</string>
     <string name="record_notification_title">Recording track</string>
     <string name="record_notification_paused">Recording paused</string>
     <!-- Distance, then ascent, e.g. "3.42 km · ↑ 420 m". -->

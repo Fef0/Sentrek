@@ -47,6 +47,13 @@ class TrackingService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val live by lazy { LiveNotification(this, CHANNEL_ID) }
+    private val breadcrumbs by lazy { Breadcrumbs(this) }
+
+    /** The last fix as it came, and the settings of [breadcrumbs]. */
+    private var fix: android.location.Location? = null
+    private var breadcrumbMinutes = 0
+    private var breadcrumbTo = ""
+    private var breadcrumbName = ""
 
     /** The last fix, for the time of sunset where the user is. */
     private var at: LatLon? = null
@@ -78,11 +85,23 @@ class TrackingService : Service() {
             interval.collectLatest { ms ->
                 location.locations(ms).collect {
                     at = runCatching { LatLon(it.latitude, it.longitude) }.getOrNull() ?: at
+                    fix = it
                     recording.onLocation(it)
                     following.onLocation(it)
+                    checkBreadcrumbs()
                 }
             }
         }
+        breadcrumbs.start()
+        // With the SOS screen off, its settings rest too (greyed out in Settings).
+        scope.launch {
+            combine(settings.sosEnabled, settings.breadcrumbMinutes) { sos, minutes -> if (sos) minutes else 0 }
+                .collect { breadcrumbMinutes = it; checkBreadcrumbs() }
+        }
+        scope.launch { settings.emergencySmsTo.collect { breadcrumbTo = it; checkBreadcrumbs() } }
+        scope.launch { settings.emergencyContactName.collect { breadcrumbName = it; checkBreadcrumbs() } }
+        // The last text as the recording ends, before the service may stop.
+        scope.launch { recording.state.collect { if (it == null) checkBreadcrumbs() } }
         val both = combine(recording.state, following.state) { r, f -> r to f }
         scope.launch {
             both.collect { (r, f) -> if (r == null && f == null) stopSelf() }
@@ -96,6 +115,8 @@ class TrackingService : Service() {
             while (true) {
                 delay(CLOCK_INTERVAL_MS)
                 update()
+                // Also when no fix comes (a gorge, a tunnel): the last one known is sent.
+                checkBreadcrumbs()
             }
         }
     }
@@ -140,7 +161,12 @@ class TrackingService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    private fun checkBreadcrumbs() =
+        breadcrumbs.check(recording.state.value, fix, breadcrumbMinutes, breadcrumbTo, breadcrumbName)
+
     override fun onDestroy() {
+        if (recording.state.value == null) checkBreadcrumbs()
+        breadcrumbs.stop()
         scope.cancel()
         super.onDestroy()
     }

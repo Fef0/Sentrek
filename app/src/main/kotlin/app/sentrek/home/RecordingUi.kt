@@ -1,5 +1,14 @@
 package app.sentrek.home
 
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,7 +34,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.sentrek.R
 import app.sentrek.geo.LatLon
+import app.sentrek.record.Breadcrumbs
 import app.sentrek.record.Recording
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sentrek.ui.Format
 import app.sentrek.ui.TouchTarget
 import kotlinx.coroutines.delay
@@ -58,9 +70,55 @@ fun RecordingStats(recording: Recording, modifier: Modifier = Modifier, position
             Stat(stringResource(R.string.record_ascent), "↑ " + Format.elevation(recording.ascent), Modifier.weight(1f))
         }
         SunsetLine(position, remainingMillis = null, Modifier.padding(top = 4.dp))
+        // Small and muted: it's there to be checked, not to be noticed.
+        val breadcrumbs by Breadcrumbs.status.collectAsStateWithLifecycle()
+        breadcrumbs?.let {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(top = 2.dp),
+            ) {
+                TrackedDot(it)
+                Text(
+                    stringResource(R.string.breadcrumb_chip, it.minutes, Breadcrumbs.statusLine(LocalContext.current, it)),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         }
     }
 }
+
+/**
+ * Red while the position goes out by SMS, grey without signal. Still, to spare the battery:
+ * it only pulses for a moment when a text has just gone.
+ */
+@Composable
+private fun TrackedDot(status: Breadcrumbs.Status) {
+    val alpha = remember { Animatable(1f) }
+    LaunchedEffect(status.lastSent) {
+        val sent = status.lastSent ?: return@LaunchedEffect
+        if (System.currentTimeMillis() - sent > PULSE_FRESH_MS) return@LaunchedEffect
+        repeat(PULSES) {
+            alpha.animateTo(0.2f, tween(PULSE_MS))
+            alpha.animateTo(1f, tween(PULSE_MS))
+        }
+    }
+    val color = if (status.noSignal) MaterialTheme.colorScheme.onSurfaceVariant else RecordRed
+    Box(
+        Modifier
+            .size(8.dp)
+            .graphicsLayer { this.alpha = alpha.value }
+            .background(color, CircleShape),
+    )
+}
+
+private val RecordRed = Color(0xFFE53935)
+private const val PULSES = 3
+private const val PULSE_MS = 350
+/** A text sent longer ago than this (the screen was off) isn't news any more. */
+private const val PULSE_FRESH_MS = 60_000L
 
 @Composable
 private fun Stat(label: String, value: String, modifier: Modifier, labelColor: Color = Color.Unspecified) {

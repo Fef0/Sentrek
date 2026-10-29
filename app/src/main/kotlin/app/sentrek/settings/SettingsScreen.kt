@@ -16,6 +16,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
 import android.widget.Toast
+import androidx.core.content.ContextCompat
+import android.provider.ContactsContract
+import android.content.pm.PackageManager
+import android.content.Intent
+import android.Manifest
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
@@ -58,6 +63,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -138,8 +144,18 @@ class SettingsViewModel @Inject constructor(
     val emergencySmsTo: StateFlow<String> =
         settings.emergencySmsTo.stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
-    fun setEmergencySmsTo(number: String) {
-        viewModelScope.launch { settings.setEmergencySmsTo(number) }
+    val emergencyContactName: StateFlow<String> =
+        settings.emergencyContactName.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
+    fun setEmergencyContact(name: String, number: String) {
+        viewModelScope.launch { settings.setEmergencyContact(name, number) }
+    }
+
+    val breadcrumbMinutes: StateFlow<Int> =
+        settings.breadcrumbMinutes.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    fun setBreadcrumbMinutes(minutes: Int) {
+        viewModelScope.launch { settings.setBreadcrumbMinutes(minutes) }
     }
 
     val servers: StateFlow<Map<String, String>> =
@@ -323,6 +339,8 @@ class SettingsViewModel @Inject constructor(
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
+    // Before the pages below: back from one, the list is where it was left.
+    val scroll = rememberScrollState()
     var advanced by rememberSaveable { mutableStateOf(false) }
     if (advanced) {
         BackHandler { advanced = false }
@@ -359,7 +377,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
         Column(
             modifier = Modifier
                 .safeDrawingPadding()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scroll)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
@@ -730,15 +748,14 @@ private fun EmergencySettings(viewModel: SettingsViewModel, onBack: () -> Unit) 
                 checked = emergencySms,
                 onChange = viewModel::setEmergencySms,
             )
-            TextSettingRow(
-                enabled = sos && emergencySms,
-                title = stringResource(R.string.settings_emergency_sms_to),
-                value = emergencySmsTo.ifEmpty { stringResource(R.string.settings_emergency_sms_to_none) },
-                editValue = emergencySmsTo,
-                hint = stringResource(R.string.settings_emergency_sms_to_hint),
-                phone = true,
-                onChange = viewModel::setEmergencySmsTo,
+            val contactName by viewModel.emergencyContactName.collectAsStateWithLifecycle()
+            ContactRow(
+                enabled = sos,
+                name = contactName,
+                number = emergencySmsTo,
+                onChange = viewModel::setEmergencyContact,
             )
+            BreadcrumbRow(enabled = sos && emergencySmsTo.isNotEmpty(), viewModel = viewModel)
             Spacer(Modifier.height(16.dp))
         }
     }
@@ -1059,4 +1076,120 @@ private fun SectionTitle(text: String) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(top = 12.dp, bottom = 2.dp),
     )
+}
+
+/**
+ * The emergency contact, picked from the phone's contacts. The picker hands over just the
+ * one number chosen: no permission to read the contacts is needed.
+ */
+@Composable
+private fun ContactRow(enabled: Boolean, name: String, number: String, onChange: (String, String) -> Unit) {
+    val context = LocalContext.current
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val uri = result.data?.data ?: return@rememberLauncherForActivityResult
+        val columns = arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME, ContactsContract.CommonDataKinds.Phone.NUMBER)
+        runCatching {
+            context.contentResolver.query(uri, columns, null, null, null)?.use { c ->
+                if (c.moveToFirst()) onChange(c.getString(0).orEmpty(), c.getString(1).orEmpty())
+            }
+        }.onFailure { Toast.makeText(context, R.string.emergency_no_app, Toast.LENGTH_LONG).show() }
+    }
+    val choose = {
+        runCatching {
+            pick.launch(Intent(Intent.ACTION_PICK).setType(ContactsContract.CommonDataKinds.Phone.CONTENT_TYPE))
+        }.onFailure { Toast.makeText(context, R.string.emergency_no_app, Toast.LENGTH_LONG).show() }
+        Unit
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = TouchTarget)
+            .clickable(enabled = enabled, role = Role.Button, onClick = choose)
+            .padding(vertical = 6.dp)
+            .alpha(if (enabled) 1f else DISABLED_ALPHA),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.settings_emergency_contact), style = MaterialTheme.typography.titleMedium)
+            val shown = when {
+                number.isEmpty() -> stringResource(R.string.settings_emergency_contact_none)
+                name.isEmpty() -> number
+                else -> "$name · $number"
+            }
+            Text(shown, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
+            Text(stringResource(R.string.settings_emergency_contact_hint), style = MaterialTheme.typography.bodyMedium)
+        }
+        if (number.isNotEmpty()) {
+            TextButton(onClick = { onChange("", "") }, enabled = enabled, modifier = Modifier.heightIn(min = TouchTarget)) {
+                Text(stringResource(R.string.settings_emergency_contact_remove))
+            }
+        }
+    }
+}
+
+/**
+ * Breadcrumbs: the position by SMS every 30 or 60 minutes while recording. Turning them on
+ * says first what they may cost, then asks Android for permission to send texts.
+ */
+@Composable
+private fun BreadcrumbRow(enabled: Boolean, viewModel: SettingsViewModel) {
+    val minutes by viewModel.breadcrumbMinutes.collectAsStateWithLifecycle()
+    var asking by remember { mutableStateOf<Int?>(null) }
+    val context = LocalContext.current
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val chosen = asking
+        asking = null
+        if (granted && chosen != null) viewModel.setBreadcrumbMinutes(chosen)
+    }
+    var warning by remember { mutableStateOf<Int?>(null) }
+    val canSend = {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
+    }
+    val choose = { choice: Int ->
+        when {
+            choice == 0 -> viewModel.setBreadcrumbMinutes(0)
+            minutes == 0 || !canSend() -> warning = choice
+            else -> viewModel.setBreadcrumbMinutes(choice)
+        }
+    }
+    ChoiceRow(
+        title = stringResource(R.string.settings_breadcrumbs),
+        options = listOf(
+            0 to stringResource(R.string.settings_breadcrumbs_off),
+            30 to stringResource(R.string.settings_breadcrumbs_every, 30),
+            60 to stringResource(R.string.settings_breadcrumbs_every, 60),
+        ),
+        // Without a contact nothing is sent, whatever was chosen.
+        selected = if (enabled) minutes else 0,
+        onChange = choose,
+        hint = stringResource(R.string.settings_breadcrumbs_hint),
+        enabled = enabled,
+    )
+    // The cost on a line of its own, where it can't be skimmed over.
+    Text(
+        stringResource(R.string.settings_breadcrumbs_cost_warning),
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.error,
+        modifier = Modifier.alpha(if (enabled) 1f else DISABLED_ALPHA),
+    )
+    warning?.let { choice ->
+        ConfirmDialog(
+            Confirmation(
+                title = stringResource(R.string.settings_breadcrumbs_cost_title),
+                // Start and end, plus one each period.
+                text = stringResource(R.string.settings_breadcrumbs_cost_text, choice, 8 * 60 / choice + 2),
+                warning = stringResource(R.string.settings_breadcrumbs_cost_warning),
+                confirmLabel = stringResource(R.string.settings_breadcrumbs_cost_confirm),
+                onConfirm = {
+                    if (canSend()) {
+                        viewModel.setBreadcrumbMinutes(choice)
+                    } else {
+                        asking = choice
+                        permission.launch(Manifest.permission.SEND_SMS)
+                    }
+                },
+            ),
+        ) { warning = null }
+    }
 }

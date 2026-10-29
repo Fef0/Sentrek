@@ -35,6 +35,8 @@ import app.sentrek.geo.overlay.TrailVisibility
 import app.sentrek.map.MapFeatureInfo
 import app.sentrek.map.MapRoute
 import app.sentrek.map.RouteMarks
+import app.sentrek.record.WeatherResult
+import app.sentrek.record.WeatherSection
 import app.sentrek.ui.Format
 import app.sentrek.ui.TouchTarget
 import java.util.Locale
@@ -42,7 +44,13 @@ import java.util.Locale
 /** Everything we know about a long-pressed map feature. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FeatureSheet(info: MapFeatureInfo, onSaveAsPlace: () -> Unit, onGoTo: () -> Unit, onDismiss: () -> Unit) {
+fun FeatureSheet(
+    info: MapFeatureInfo,
+    onSaveAsPlace: () -> Unit,
+    onGoTo: () -> Unit,
+    onDismiss: () -> Unit,
+    loadWeather: suspend () -> WeatherResult,
+) {
     val uriHandler = LocalUriHandler.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -89,6 +97,8 @@ fun FeatureSheet(info: MapFeatureInfo, onSaveAsPlace: () -> Unit, onGoTo: () -> 
                     )
                 }
             }
+
+            WeatherSection(loadWeather)
 
             if (info.routes.isNotEmpty()) {
                 HorizontalDivider()

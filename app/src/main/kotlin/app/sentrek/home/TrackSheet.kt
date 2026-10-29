@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +32,8 @@ import app.sentrek.geo.route.HikingTime
 import app.sentrek.record.ColorSwatch
 import app.sentrek.record.SavedTrack
 import app.sentrek.record.TrackColorDialog
+import app.sentrek.record.WeatherResult
+import app.sentrek.record.WeatherSection
 import app.sentrek.ui.ElevationProfile
 import app.sentrek.ui.Format
 import app.sentrek.ui.TouchTarget
@@ -51,13 +55,15 @@ fun TrackSheet(
     onDismiss: () -> Unit,
     /** Elevation profile of the track (see TrackRepository.profile). */
     loadProfile: suspend (SavedTrack) -> List<Pair<Double, Double>>,
+    /** The forecast at the track's highest point. */
+    loadWeather: suspend () -> WeatherResult,
 ) {
     var choosingColor by remember { mutableStateOf(false) }
     val profile by produceState(emptyList<Pair<Double, Double>>(), track.id) { value = loadProfile(track) }
     val wide = Modifier.fillMaxWidth().heightIn(min = TouchTarget)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(
-            modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp),
+            modifier = Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -74,6 +80,7 @@ fun TrackSheet(
                 style = MaterialTheme.typography.bodyLarge,
             )
             ElevationProfile(profile, Modifier.fillMaxWidth().height(72.dp))
+            WeatherSection(loadWeather, highest = true)
             if (isFollowed) {
                 Button(onClick = onStopFollowing, modifier = wide) { Text(stringResource(R.string.track_stop_following)) }
                 OutlinedButton(onClick = onReverse, modifier = wide) { Text(stringResource(R.string.track_reverse)) }

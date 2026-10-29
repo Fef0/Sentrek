@@ -14,6 +14,8 @@ import app.sentrek.geo.units.Units
 import app.sentrek.geo.Barometric
 import app.sentrek.record.BarometerRepository
 import app.sentrek.record.ElevationRepository
+import app.sentrek.record.WeatherRepository
+import app.sentrek.record.WeatherResult
 import app.sentrek.ui.Format
 import app.sentrek.map.RasterOverlay
 import app.sentrek.maps.ImportedMap
@@ -75,6 +77,7 @@ class HomeViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
     private val elevation: ElevationRepository,
     private val barometer: BarometerRepository,
+    private val weather: WeatherRepository,
 ) : ViewModel() {
     val powerMode: StateFlow<PowerMode> =
         settings.powerMode.stateIn(viewModelScope, SharingStarted.Eagerly, PowerMode.Normal)
@@ -239,6 +242,11 @@ class HomeViewModel @Inject constructor(
     fun track(id: String): SavedTrack? = tracks.find(id)
 
     suspend fun trackProfile(track: SavedTrack) = tracks.profile(track)
+
+    suspend fun weatherAt(at: LatLon): WeatherResult = weather.forecast(at)
+
+    suspend fun trackWeather(track: SavedTrack): WeatherResult =
+        tracks.highestPoint(track)?.let { weather.forecast(it) } ?: WeatherResult.Unavailable
 
     fun hideTrack(id: String) = tracks.hide(id)
 

@@ -3,6 +3,7 @@ package app.sentrek.record
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.sentrek.data.SettingsRepository
 import app.sentrek.geo.BoundingBox
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -16,8 +17,17 @@ import javax.inject.Inject
 class TracksViewModel @Inject constructor(
     private val repository: TrackRepository,
     private val follow: FollowRepository,
+    private val settings: SettingsRepository,
 ) : ViewModel() {
     val tracks: StateFlow<List<SavedTrack>> = repository.tracks
+
+    /** Whether the walking totals cover all time rather than this year; remembered. */
+    val totalsAllTime: StateFlow<Boolean> =
+        settings.tripTotalsAllTime.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setTotalsAllTime(allTime: Boolean) {
+        viewModelScope.launch { settings.setTripTotalsAllTime(allTime) }
+    }
 
     val shown: StateFlow<Set<String>> = repository.shown
         .map { it.keys }

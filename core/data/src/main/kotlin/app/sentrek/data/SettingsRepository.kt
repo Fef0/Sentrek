@@ -240,6 +240,14 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[FOLLOW_PLACES_EXPANDED] = expanded }
     }
 
+    /** The walking totals on the Tracks screen: all time, or this year (the default). */
+    val tripTotalsAllTime: Flow<Boolean> =
+        context.settings.data.map { it[TRIP_TOTALS_ALL_TIME] ?: false }
+
+    suspend fun setTripTotalsAllTime(allTime: Boolean) {
+        context.settings.edit { it[TRIP_TOTALS_ALL_TIME] = allTime }
+    }
+
     /** The elevation profile in the follow panel; hidden for more map. */
     val followProfile: Flow<Boolean> =
         context.settings.data.map { it[FOLLOW_PROFILE] ?: true }
@@ -418,6 +426,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val FOLLOW_PROFILE = booleanPreferencesKey("follow_profile")
         val FOLLOW_PLACES = booleanPreferencesKey("follow_places")
         val FOLLOW_PLACES_EXPANDED = booleanPreferencesKey("follow_places_expanded")
+        val TRIP_TOTALS_ALL_TIME = booleanPreferencesKey("trip_totals_all_time")
         val BATTERY_SAVER = booleanPreferencesKey("battery_saver")
         val STAMINA_MODE = booleanPreferencesKey("stamina_mode")
         val AUTO_POWER = booleanPreferencesKey("auto_power")

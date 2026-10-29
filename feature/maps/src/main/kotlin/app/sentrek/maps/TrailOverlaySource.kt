@@ -21,8 +21,8 @@ import javax.inject.Inject
 
 /** Where the hiking overlay (trail difficulty + points) comes from. Swapped for our own static files before public release. */
 interface TrailOverlaySource {
-    /** Writes the overlay GeoJSON for [box] to [out]. */
-    suspend fun fetch(box: BoundingBox, out: File)
+    /** Writes the overlay GeoJSON for [box] to [out]. [onBusy] says when it waits for a busy server, and when it asks again. */
+    suspend fun fetch(box: BoundingBox, out: File, onBusy: (Boolean) -> Unit = {})
 }
 
 /**
@@ -36,7 +36,7 @@ class OverpassTrailSource @Inject constructor() : TrailOverlaySource {
         MapEngine.httpClient.newBuilder().readTimeout(240, TimeUnit.SECONDS).build()
     }
 
-    override suspend fun fetch(box: BoundingBox, out: File) {
+    override suspend fun fetch(box: BoundingBox, out: File, onBusy: (Boolean) -> Unit) {
         var lastError: IOException? = null
         repeat(ROUNDS) { round ->
             for (endpoint in ENDPOINTS) {
@@ -47,7 +47,11 @@ class OverpassTrailSource @Inject constructor() : TrailOverlaySource {
                     lastError = e
                 }
             }
-            if (round < ROUNDS - 1) delay(BACKOFF_MS)
+            if (round < ROUNDS - 1) {
+                onBusy(true)
+                delay(BACKOFF_MS)
+                onBusy(false)
+            }
         }
         throw lastError ?: IOException("Overpass unavailable")
     }

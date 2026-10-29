@@ -135,10 +135,16 @@ fun RegionsScreen(
             }
         }
 
-        val trailsLabel = stringResource(R.string.regions_cell_trails)
+        val labels = CellLabels(
+            queued = stringResource(R.string.regions_cell_queued),
+            map = stringResource(R.string.regions_cell_map),
+            trailsWaiting = stringResource(R.string.regions_cell_trails_waiting),
+            trails = stringResource(R.string.regions_cell_trails),
+            busy = stringResource(R.string.regions_cell_busy),
+        )
         LaunchedEffect(style, view, regions, selection) {
             val s = style ?: return@LaunchedEffect
-            RegionGridLayer.update(s, view, cellLooks(regions, selection, trailsLabel))
+            RegionGridLayer.update(s, view, cellLooks(regions, selection, labels))
         }
 
         LaunchedEffect(style, imported) {
@@ -168,6 +174,7 @@ fun RegionsScreen(
             importing = importing,
             message = message,
             online = online,
+            estimate = viewModel::estimate,
             onDownload = download,
             onDelete = {
                 val count = selection.count { it in regions }
@@ -220,21 +227,26 @@ private fun MapLibreMap.visibleBox(): BoundingBox? {
     ).takeIf { it.west <= it.east }
 }
 
+/** What each area on the grid says while it downloads; [map] takes the percentage. */
+private class CellLabels(val queued: String, val map: String, val trailsWaiting: String, val trails: String, val busy: String)
+
 private fun cellLooks(
     regions: Map<RegionCell, RegionState>,
     selection: Set<RegionCell>,
-    trailsLabel: String,
+    labels: CellLabels,
 ): Map<RegionCell, Pair<CellLook, String?>> {
     val looks = HashMap<RegionCell, Pair<CellLook, String?>>()
     for ((cell, state) in regions) {
         looks[cell] = when (val m = state.map) {
-            MapDownload.Queued -> CellLook.Queued to null
-            is MapDownload.Downloading -> CellLook.Downloading to "${(m.fraction * 100).roundToInt()}%"
+            MapDownload.Queued -> CellLook.Queued to labels.queued
+            is MapDownload.Downloading -> CellLook.Downloading to String.format(labels.map, (m.fraction * 100).roundToInt())
             // Green only once the hiking details (trails, huts, springs…) are there too.
             is MapDownload.Ready -> when (state.trails) {
                 TrailsDownload.Ready -> CellLook.Ready to null
                 TrailsDownload.Failed -> CellLook.Failed to null
-                TrailsDownload.Missing, TrailsDownload.Downloading -> CellLook.Downloading to trailsLabel
+                TrailsDownload.Missing, TrailsDownload.Waiting -> CellLook.Downloading to labels.trailsWaiting
+                TrailsDownload.Downloading -> CellLook.Downloading to labels.trails
+                TrailsDownload.Retrying -> CellLook.Downloading to labels.busy
             }
         }
     }
@@ -251,6 +263,8 @@ private fun RegionsPanel(
     importing: Boolean,
     @StringRes message: Int?,
     online: Boolean,
+    /** About how many bytes downloading these areas takes, and the space left. */
+    estimate: (Collection<RegionCell>) -> Pair<Long, Long>,
     onDownload: () -> Unit,
     onDelete: () -> Unit,
     onClear: () -> Unit,
@@ -264,7 +278,7 @@ private fun RegionsPanel(
     val context = LocalContext.current
     val toDownload = selection.count { it !in regions }
     val toDelete = selection.count { it in regions }
-    val pending = regions.values.count { it.map !is MapDownload.Ready }
+    val pending = regions.values.count { it.isPending }
     val trailsFailed = regions.values.count { it.trails == TrailsDownload.Failed }
     val storedBytes = regions.values.sumOf { (it.map as? MapDownload.Ready)?.bytes ?: 0L }
     val now = System.currentTimeMillis()
@@ -284,7 +298,7 @@ private fun RegionsPanel(
                 selection.isNotEmpty() -> pluralStringResource(R.plurals.regions_selected, selection.size, selection.size)
                 importing -> stringResource(R.string.import_running)
                 !zoomedIn -> stringResource(R.string.regions_zoom_in)
-                pending > 0 -> pluralStringResource(R.plurals.regions_downloading, regions.size, regions.size - pending, regions.size)
+                pending > 0 -> pluralStringResource(R.plurals.regions_progress, regions.size, regions.size - pending, regions.size)
                 regions.isNotEmpty() ->
                     pluralStringResource(R.plurals.regions_stored, regions.size, regions.size, Formatter.formatShortFileSize(context, storedBytes))
                 else -> stringResource(R.string.regions_hint)
@@ -294,14 +308,32 @@ private fun RegionsPanel(
             message?.let {
                 Text(stringResource(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
             }
-            if (!online && (pending > 0 || regions.values.any { it.trails == TrailsDownload.Downloading }) && message == null) {
+            if (pending > 0 && selection.isEmpty()) DownloadProgress(regions.values)
+            if (!online && pending > 0 && message == null) {
                 Text(stringResource(R.string.regions_waiting_network), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
             }
 
             if (selection.isNotEmpty()) {
+                val new = selection.filter { it !in regions }
+                if (new.isNotEmpty()) {
+                    val (needed, free) = remember(new) { estimate(new) }
+                    val size = Formatter.formatShortFileSize(context, needed)
+                    val left = Formatter.formatShortFileSize(context, free)
+                    if (needed > free) {
+                        Text(
+                            stringResource(R.string.regions_no_space, size, left),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    } else {
+                        Text(stringResource(R.string.regions_size, size, left), style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
                 selectedDate?.let { date ->
                     val day = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(date))
-                    Text(stringResource(R.string.regions_downloaded_on, day), style = MaterialTheme.typography.bodyLarge)
+                    val bytes = selection.sumOf { (regions[it]?.map as? MapDownload.Ready)?.bytes ?: 0L }
+                    val size = Formatter.formatShortFileSize(context, bytes)
+                    Text(stringResource(R.string.regions_downloaded_on, size, day), style = MaterialTheme.typography.bodyLarge)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     // Three buttons at most, wide enough for gloves: new areas first.
@@ -429,5 +461,47 @@ private fun PanelButton(text: String, onClick: () -> Unit, modifier: Modifier = 
         },
     ) {
         Text(text, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+/**
+ * What the download is doing now: the map of one area, then its trail details, which come
+ * from another server, one area at a time, and can take minutes.
+ */
+@Composable
+private fun DownloadProgress(states: Collection<RegionState>) {
+    val context = LocalContext.current
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        val active = states.firstNotNullOfOrNull { it.map as? MapDownload.Downloading }
+        val mapsWaiting = states.count { it.map == MapDownload.Queued }
+        if (active != null) {
+            val line = stringResource(
+                R.string.regions_map_progress,
+                (active.fraction * 100).roundToInt(),
+                Formatter.formatShortFileSize(context, active.bytes),
+            )
+            val more = if (mapsWaiting > 0) " · " + pluralStringResource(R.plurals.regions_more_waiting, mapsWaiting, mapsWaiting) else ""
+            Text(line + more, style = MaterialTheme.typography.bodyLarge)
+        } else if (mapsWaiting > 0) {
+            Text(pluralStringResource(R.plurals.regions_maps_waiting, mapsWaiting, mapsWaiting), style = MaterialTheme.typography.bodyLarge)
+        }
+
+        val trails = states.map { it.trails }
+        val fetching = TrailsDownload.Downloading in trails || TrailsDownload.Retrying in trails
+        val trailsWaiting = states.count {
+            it.trails == TrailsDownload.Waiting || (it.trails == TrailsDownload.Missing && it.map !is MapDownload.Ready)
+        }
+        val trailsLine = when {
+            TrailsDownload.Retrying in trails -> stringResource(R.string.regions_trails_busy)
+            TrailsDownload.Downloading in trails -> stringResource(R.string.regions_trails_progress)
+            trailsWaiting > 0 -> stringResource(R.string.regions_trails_next)
+            else -> null
+        }
+        trailsLine?.let {
+            val more = if (trailsWaiting > 0 && fetching) " · " + pluralStringResource(R.plurals.regions_more_waiting, trailsWaiting, trailsWaiting) else ""
+            Text(it + more, style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(R.string.regions_trails_explain), style = MaterialTheme.typography.bodyMedium, color = muted)
+        }
     }
 }

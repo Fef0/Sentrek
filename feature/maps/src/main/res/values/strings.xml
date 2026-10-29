@@ -15,19 +15,40 @@
     <string name="regions_delete">Delete (%d)</string>
     <string name="regions_clear">Clear</string>
     <string name="regions_update">Update (%d)</string>
-    <!-- The oldest download date among the selected areas. -->
-    <string name="regions_downloaded_on">Downloaded on %1$s</string>
+    <!-- Space taken by the selected areas already on the phone, and the oldest download date among them. -->
+    <string name="regions_downloaded_on">%1$s on the phone · downloaded on %2$s</string>
     <plurals name="regions_old">
         <item quantity="one">%d area is over 6 months old</item>
         <item quantity="other">%d areas are over 6 months old</item>
     </plurals>
     <string name="regions_update_old">Update</string>
-    <!-- On a grid cell whose map is ready but whose hiking details are still downloading. -->
-    <string name="regions_cell_trails">Trails…</string>
-    <plurals name="regions_downloading">
-        <item quantity="one">Downloading %1$d of %2$d area…</item>
-        <item quantity="other">Downloading %1$d of %2$d areas…</item>
+    <!-- Short labels on the grid squares while they download. -->
+    <string name="regions_cell_queued">Queued</string>
+    <string name="regions_cell_map">Map %d%%</string>
+    <string name="regions_cell_trails_waiting">Trails next</string>
+    <string name="regions_cell_trails">Getting trails</string>
+    <string name="regions_cell_busy">Server busy</string>
+    <plurals name="regions_progress">
+        <item quantity="one">%1$d of %2$d area ready</item>
+        <item quantity="other">%1$d of %2$d areas ready</item>
     </plurals>
+    <!-- Percentage of the map of the area downloading now, and how much it has downloaded. -->
+    <string name="regions_map_progress">Map: %1$d%% · %2$s</string>
+    <plurals name="regions_more_waiting">
+        <item quantity="one">%d more waiting</item>
+        <item quantity="other">%d more waiting</item>
+    </plurals>
+    <plurals name="regions_maps_waiting">
+        <item quantity="one">%d map waiting to download</item>
+        <item quantity="other">%d maps waiting to download</item>
+    </plurals>
+    <string name="regions_trails_progress">Trails: getting difficulty, huts and springs</string>
+    <string name="regions_trails_next">Trails: they come after the map</string>
+    <string name="regions_trails_busy">Trails: the server is busy, trying again in half a minute</string>
+    <string name="regions_trails_explain">Trail details come from OpenStreetMap, one area at a time. A big or busy area can take a few minutes. The map works without them.</string>
+    <!-- Size of the selected areas, and free space on the phone. -->
+    <string name="regions_size">About %1$s to download · %2$s free</string>
+    <string name="regions_no_space">Not enough space: about %1$s needed, only %2$s free.</string>
     <plurals name="regions_trails_failed">
         <item quantity="one">Trail details failed for %d area</item>
         <item quantity="other">Trail details failed for %d areas</item>
@@ -55,10 +76,12 @@
     <string name="import_vector">Vector map files are not supported yet. Use a raster MBTiles or PMTiles file.</string>
     <string name="import_unknown">Unsupported file. Use .mbtiles or .pmtiles.</string>
     <string name="import_failed">Import failed</string>
+    <string name="regions_up_to_date">Already up to date, nothing to download.</string>
     <string name="regions_offline">No network. Connect to the internet to download maps.</string>
     <string name="regions_waiting_network">No network: downloads continue once you’re back online.</string>
     <string name="download_channel">Map downloads</string>
     <string name="download_notification_title">Downloading maps</string>
-    <string name="download_notification_area">%1$d left, current %2$d%%</string>
-    <string name="download_notification_trails">Downloading trail data…</string>
+    <string name="download_notification_area">%1$d left · map %2$d%%</string>
+    <string name="download_notification_trails">Getting trail details: difficulty, huts and springs</string>
+    <string name="download_notification_trails_busy">Trail server busy, trying again shortly</string>
 </resources>

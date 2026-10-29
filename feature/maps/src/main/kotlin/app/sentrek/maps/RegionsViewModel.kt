@@ -45,6 +45,9 @@ class RegionsViewModel @Inject constructor(
     private val _flyTo = MutableStateFlow<BoundingBox?>(null)
     val flyTo: StateFlow<BoundingBox?> = _flyTo.asStateFlow()
 
+    /** About how many bytes downloading [cells] takes, and the space left on the phone. */
+    fun estimate(cells: Collection<RegionCell>): Pair<Long, Long> = repository.estimatedBytes(cells) to repository.freeBytes()
+
     fun toggle(cell: RegionCell) {
         _message.value = null
         _selection.value = _selection.value.let { if (cell in it) it - cell else it + cell }
@@ -71,7 +74,7 @@ class RegionsViewModel @Inject constructor(
     fun updateSelected() {
         if (!isOnline(context)) return show(R.string.regions_offline)
         _message.value = null
-        repository.update(_selection.value.filter { regions.value[it]?.map is MapDownload.Ready })
+        repository.update(_selection.value.filter { regions.value[it]?.map is MapDownload.Ready }) { show(R.string.regions_up_to_date) }
         clearSelection()
     }
 
@@ -79,7 +82,7 @@ class RegionsViewModel @Inject constructor(
         if (!isOnline(context)) return show(R.string.regions_offline)
         _message.value = null
         val now = System.currentTimeMillis()
-        repository.update(regions.value.values.filter { it.isOld(now) }.map(RegionState::cell))
+        repository.update(regions.value.values.filter { it.isOld(now) }.map(RegionState::cell)) { show(R.string.regions_up_to_date) }
     }
 
     fun retryTrails() {

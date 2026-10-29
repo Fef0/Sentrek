@@ -3,16 +3,19 @@ package app.sentrek.maps
 import android.content.Context
 import android.util.Log
 import app.sentrek.geo.BoundingBox
+import app.sentrek.geo.DownloadSize
 import app.sentrek.geo.RegionCell
 import app.sentrek.geo.RegionGrid
 import app.sentrek.geo.overlay.OverlayPoi
 import app.sentrek.geo.overlay.OverlayPoiSource
 import app.sentrek.geo.overlay.OverlayPois
+import app.sentrek.map.MapEngine
 import app.sentrek.map.MapStyle
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,17 +30,28 @@ import org.maplibre.android.offline.OfflineRegion
 import org.maplibre.android.offline.OfflineRegionError
 import org.maplibre.android.offline.OfflineRegionStatus
 import org.maplibre.android.offline.OfflineTilePyramidRegionDefinition
+import okhttp3.Request
+import org.json.JSONObject
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
 sealed interface MapDownload {
     data object Queued : MapDownload
-    data class Downloading(val fraction: Float) : MapDownload
+    /** [bytes] downloaded so far. */
+    data class Downloading(val fraction: Float, val bytes: Long = 0) : MapDownload
     data class Ready(val bytes: Long) : MapDownload
 }
 
-enum class TrailsDownload { Missing, Downloading, Ready, Failed }
+/**
+ * The trail details of an area (difficulty, huts, springs…), fetched one area at a time:
+ * [Waiting] for another area's turn, [Downloading] now, [Retrying] after a busy server.
+ */
+enum class TrailsDownload {
+    Missing, Waiting, Downloading, Retrying, Ready, Failed;
+
+    val inProgress: Boolean get() = this == Waiting || this == Downloading || this == Retrying
+}
 
 /**
  * [updatedAt]: when the map was last downloaded (epoch ms), once it's there.
@@ -160,26 +174,48 @@ class RegionRepository @Inject constructor(
      * tiles are only marked stale, then fetched again one by one (the old one stays usable
      * until its replacement is in, and an unchanged tile costs a "not modified"); the trails
      * in use stay until the new ones are in.
+     *
+     * What is already current isn't downloaded again: one small request tells which version
+     * of the map OpenFreeMap serves, and trails less than a week old are kept. [onUpToDate]
+     * when that's every area.
      */
-    fun update(cells: Collection<RegionCell>) {
-        for (cell in cells) {
-            if (_state.value[cell]?.map !is MapDownload.Ready) continue
-            val region = regions[cell] ?: continue
-            updating += cell
-            region.invalidate(object : OfflineRegion.OfflineRegionInvalidateCallback {
-                override fun onInvalidate() {
-                    queue.addLast(cell)
-                    pump()
+    fun update(cells: Collection<RegionCell>, onUpToDate: () -> Unit = {}) {
+        val ready = cells.filter { _state.value[it]?.map is MapDownload.Ready && it in regions }
+        if (ready.isEmpty()) return
+        scope.launch {
+            val current = tileVersion()
+            val now = System.currentTimeMillis()
+            var upToDate = 0
+            for (cell in ready) {
+                val state = _state.value[cell] ?: continue
+                val region = regions[cell] ?: continue
+                val mapCurrent = current != null && current == savedVersion(cell)
+                val trailsCurrent = state.trails == TrailsDownload.Ready && now - trailFile(cell).lastModified() < TRAILS_FRESH_MS
+                if (mapCurrent && trailsCurrent) {
+                    // Checked today: counts as updated, for the reminders and automatic updates.
+                    updateMap(cell, state.map, stamp(cell))
+                    if (state.failedUpdates > 0) forgetFailedUpdates(listOf(cell))
+                    upToDate++
+                    continue
                 }
+                updating += cell
+                if (!mapCurrent) {
+                    region.invalidate(object : OfflineRegion.OfflineRegionInvalidateCallback {
+                        override fun onInvalidate() {
+                            queue.addLast(cell)
+                            pump()
+                        }
 
-                override fun onError(error: String) {
-                    Log.e(TAG, "Cannot update region ${cell.id}: $error")
-                    failUpdate(cell)
+                        override fun onError(error: String) {
+                            Log.e(TAG, "Cannot update region ${cell.id}: $error")
+                            failUpdate(cell)
+                        }
+                    })
                 }
-            })
-            fetchTrails(cell)
+                if (!trailsCurrent) fetchTrails(cell)
+            }
+            if (upToDate == ready.size) onUpToDate() else ensureService()
         }
-        ensureService()
     }
 
     fun delete(cells: Collection<RegionCell>) {
@@ -188,6 +224,7 @@ class RegionRepository @Inject constructor(
             trailFile(cell).delete()
             dateFile(cell).delete()
             failuresFile(cell).delete()
+            versionFile(cell).delete()
             updating -= cell
             val region = regions.remove(cell)
             if (active == cell) {
@@ -214,6 +251,23 @@ class RegionRepository @Inject constructor(
             _state.update { all -> all[cell]?.let { all + (cell to it.copy(failedUpdates = 0)) } ?: all }
         }
     }
+
+    /**
+     * About how many bytes downloading [cells] takes, map and trail details, learning the
+     * size of a tile from the areas already downloaded.
+     */
+    fun estimatedBytes(cells: Collection<RegionCell>): Long {
+        val known = _state.value.values.mapNotNull { s -> (s.map as? MapDownload.Ready)?.bytes?.takeIf { it > 0 }?.let { it to s.cell.tileCount() } }
+        return DownloadSize.estimate(
+            newTiles = cells.sumOf { it.tileCount() },
+            areas = cells.size,
+            knownBytes = known.sumOf { it.first },
+            knownTiles = known.sumOf { it.second },
+        )
+    }
+
+    /** Space left for downloads. */
+    fun freeBytes(): Long = context.filesDir.usableSpace
 
     fun retryTrails(cells: Collection<RegionCell>) {
         cells.filter { _state.value[it]?.trails == TrailsDownload.Failed }.forEach(::fetchTrails)
@@ -262,19 +316,22 @@ class RegionRepository @Inject constructor(
         val cell = queue.removeFirstOrNull() ?: return
         val region = regions[cell] ?: return pump()
         active = cell
+        // The version MapLibre is about to download, for the next update to compare with.
+        val version = scope.async { tileVersion() }
         region.setObserver(object : OfflineRegion.OfflineRegionObserver {
             override fun onStatusChanged(status: OfflineRegionStatus) {
                 if (active != cell) return
                 if (status.isComplete) {
                     region.setDownloadState(OfflineRegion.STATE_INACTIVE)
                     region.setObserver(null)
+                    scope.launch { version.await()?.let { saveVersion(cell, it) } }
                     updateMap(cell, MapDownload.Ready(status.completedResourceSize), stamp(cell))
                     settleUpdate(cell)
                     active = null
                     pump()
                 } else {
                     val required = status.requiredResourceCount.coerceAtLeast(1)
-                    updateMap(cell, MapDownload.Downloading(status.completedResourceCount.toFloat() / required))
+                    updateMap(cell, MapDownload.Downloading(status.completedResourceCount.toFloat() / required, status.completedResourceSize))
                 }
             }
 
@@ -292,11 +349,16 @@ class RegionRepository @Inject constructor(
     }
 
     private fun fetchTrails(cell: RegionCell) {
-        updateTrails(cell, TrailsDownload.Downloading)
+        updateTrails(cell, TrailsDownload.Waiting)
         scope.launch {
             trailsLock.withLock {
                 if (cell !in _state.value) return@withLock
-                val result = runCatching { trailSource.fetch(cell.bbox, trailFile(cell)) }
+                updateTrails(cell, TrailsDownload.Downloading)
+                val result = runCatching {
+                    trailSource.fetch(cell.bbox, trailFile(cell)) { busy ->
+                        updateTrails(cell, if (busy) TrailsDownload.Retrying else TrailsDownload.Downloading)
+                    }
+                }
                 result.exceptionOrNull()?.let { Log.w(TAG, "Trails for ${cell.id} failed", it) }
                 if (cell !in _state.value) {
                     trailFile(cell).delete() // Area deleted while downloading.
@@ -339,6 +401,29 @@ class RegionRepository @Inject constructor(
         return now
     }
 
+    /** The map version [cell] was downloaded at: OpenFreeMap's tile address, which names it. */
+    private fun versionFile(cell: RegionCell) = File(datesDir, cell.id + ".tiles")
+
+    private fun savedVersion(cell: RegionCell): String? =
+        runCatching { versionFile(cell).readText().trim() }.getOrNull()?.takeIf { it.isNotEmpty() }
+
+    private fun saveVersion(cell: RegionCell, version: String) {
+        runCatching { versionFile(cell).writeText(version) }.onFailure { Log.w(TAG, "Cannot save version of ${cell.id}", it) }
+    }
+
+    /**
+     * The map version served now, from the map's TileJSON (about 20 KB): its tile address
+     * changes with each new build of the map. Null when it can't be told (no network).
+     */
+    private suspend fun tileVersion(): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            MapEngine.httpClient.newCall(Request.Builder().url(TILEJSON_URL).build()).execute().use { response ->
+                if (!response.isSuccessful) return@use null
+                JSONObject(response.body!!.string()).getJSONArray("tiles").getString(0)
+            }
+        }.onFailure { Log.w(TAG, "Cannot tell the map version", it) }.getOrNull()
+    }
+
     private fun failuresFile(cell: RegionCell) = File(datesDir, cell.id + ".failed")
 
     private fun failures(cell: RegionCell): Int =
@@ -368,5 +453,11 @@ class RegionRepository @Inject constructor(
 
         /** Bump when the overlay file format changes (v2: points, v3: huts, v4: all hiking points, v5: all tags, v6: all paths and tracks, v9: waymarked routes, v10: route details). */
         const val OVERLAY_SUFFIX = ".v10.geojson"
+
+        /** The vector source of the hiking style (assets/styles/hiking.json). */
+        const val TILEJSON_URL = "https://tiles.openfreemap.org/planet"
+
+        /** Trail details younger than this aren't fetched again: Overpass is shared. */
+        const val TRAILS_FRESH_MS = 7L * 24 * 60 * 60 * 1000
     }
 }

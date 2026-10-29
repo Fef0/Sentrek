@@ -223,6 +223,8 @@ fun PlaceSheet(
     onDismiss: () -> Unit,
     /** Null where there is no map to point the way on. */
     onGoTo: (() -> Unit)? = null,
+    /** The forecast at the place; null where it isn't offered. */
+    loadWeather: (suspend () -> WeatherResult)? = null,
 ) {
     val wide = Modifier.fillMaxWidth().heightIn(min = TouchTarget)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
@@ -246,6 +248,7 @@ fun PlaceSheet(
                     distance?.let { Fact(stringResource(R.string.places_distance), Format.distance(it)) }
                 }
             }
+            loadWeather?.let { WeatherSection(it) }
             if (onGoTo != null) Button(onClick = onGoTo, modifier = wide) { Text(stringResource(R.string.places_go_to)) }
             if (onGoTo != null) {
                 OutlinedButton(onClick = onEdit, modifier = wide) { Text(stringResource(R.string.places_edit)) }

@@ -411,6 +411,12 @@ class TrackRepository @Inject constructor(
         return segments.map { segment -> segment.map { TrackPoint(heights[i++], it.time) } }
     }
 
+    /** Where the weather matters most on [track]: its highest point, or its start without heights. */
+    suspend fun highestPoint(track: SavedTrack): LatLon? = withContext(Dispatchers.IO) {
+        val points = runCatching { read(track) }.getOrNull()?.tracks?.flatMap { it.segments }?.flatten() ?: return@withContext null
+        points.maxByOrNull { it.position.ele ?: Double.NEGATIVE_INFINITY }?.position
+    }
+
     fun find(id: String): SavedTrack? = _tracks.value.firstOrNull { it.id == id }
 
     /**

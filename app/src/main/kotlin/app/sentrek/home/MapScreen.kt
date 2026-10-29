@@ -834,6 +834,7 @@ fun MapScreen(
                 onDelete = { pressed = null; deletingPlace = place },
                 onDismiss = { pressed = null },
                 onGoTo = { pressed = null; startGoTo(GoTo(place.name, place.position)) },
+                loadWeather = { viewModel.weatherAt(place.position) },
             )
         } else if (track == null) {
             FeatureSheet(
@@ -855,6 +856,10 @@ fun MapScreen(
                     startGoTo(GoTo(name, LatLon(p.latitude, p.longitude, info.tags["ele"]?.toDoubleOrNull())))
                 },
                 onDismiss = { pressed = null },
+                loadWeather = {
+                    val p = info.position
+                    viewModel.weatherAt(LatLon(p.latitude, p.longitude, info.tags["ele"]?.toDoubleOrNull()))
+                },
             )
         } else {
             TrackSheet(
@@ -899,6 +904,7 @@ fun MapScreen(
                 },
                 onDismiss = { pressed = null },
                 loadProfile = viewModel::trackProfile,
+                loadWeather = { viewModel.trackWeather(track) },
             )
         }
     }

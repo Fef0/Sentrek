@@ -51,6 +51,8 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.sentrek.feature.record.R
+import app.sentrek.geo.route.RoutePlace
+import app.sentrek.geo.overlay.PoiKind
 import app.sentrek.geo.LatLon
 import app.sentrek.geo.place.Place
 import app.sentrek.geo.place.PlaceKind
@@ -60,19 +62,48 @@ import app.sentrek.ui.TouchTarget
 import java.util.Locale
 
 @Composable
-fun placeKindLabel(kind: PlaceKind): String = stringResource(
-    when (kind) {
-        PlaceKind.Star -> R.string.place_kind_star
-        PlaceKind.Camp -> R.string.place_kind_camp
-        PlaceKind.Water -> R.string.place_kind_water
-        PlaceKind.Shelter -> R.string.place_kind_shelter
-        PlaceKind.View -> R.string.place_kind_viewpoint
-        PlaceKind.Peak -> R.string.place_kind_peak
-        PlaceKind.Parking -> R.string.place_kind_parking
-        PlaceKind.Food -> R.string.place_kind_food
-        PlaceKind.Danger -> R.string.place_kind_danger
-    },
-)
+fun placeKindLabel(kind: PlaceKind): String = stringResource(placeKindLabelRes(kind))
+
+fun placeKindLabelRes(kind: PlaceKind): Int = when (kind) {
+    PlaceKind.Star -> R.string.place_kind_star
+    PlaceKind.Camp -> R.string.place_kind_camp
+    PlaceKind.Water -> R.string.place_kind_water
+    PlaceKind.Shelter -> R.string.place_kind_shelter
+    PlaceKind.View -> R.string.place_kind_viewpoint
+    PlaceKind.Peak -> R.string.place_kind_peak
+    PlaceKind.Parking -> R.string.place_kind_parking
+    PlaceKind.Food -> R.string.place_kind_food
+    PlaceKind.Danger -> R.string.place_kind_danger
+}
+
+/** What a place along a route is, for one without a name: "Mountain hut", "Spring"… */
+fun routePlaceLabel(kind: RoutePlace.Kind): Int = when (kind) {
+    is RoutePlace.Kind.Saved -> placeKindLabelRes(kind.kind)
+    RoutePlace.Kind.Waypoint -> R.string.ahead_waypoint
+    is RoutePlace.Kind.Osm -> when (kind.kind) {
+        PoiKind.AlpineHut -> R.string.ahead_alpine_hut
+        PoiKind.WildernessHut -> R.string.ahead_wilderness_hut
+        PoiKind.Shelter -> R.string.ahead_shelter
+        PoiKind.Spring -> R.string.ahead_spring
+        PoiKind.DrinkingWater -> R.string.ahead_drinking_water
+        PoiKind.Cave -> R.string.ahead_cave
+        PoiKind.Viewpoint -> R.string.ahead_viewpoint
+        PoiKind.Waterfall -> R.string.ahead_waterfall
+        PoiKind.Camping -> R.string.ahead_camping
+        PoiKind.EmergencyPhone -> R.string.ahead_emergency_phone
+        PoiKind.Peak -> R.string.ahead_peak
+        PoiKind.Pass -> R.string.ahead_pass
+        // Not listed as places ahead (see PoiKind.landmark), but found by search.
+        PoiKind.Castle -> R.string.ahead_castle
+        PoiKind.Guidepost -> R.string.ahead_guidepost
+        PoiKind.Cross -> R.string.ahead_cross
+        PoiKind.Shrine -> R.string.ahead_shrine
+        PoiKind.Ruins -> R.string.ahead_ruins
+        PoiKind.Monument -> R.string.ahead_monument
+        PoiKind.Memorial -> R.string.ahead_memorial
+        PoiKind.Board -> R.string.ahead_board
+    }
+}
 
 /** The category symbol in white on a disc of the place colour, as on the map. */
 @Composable

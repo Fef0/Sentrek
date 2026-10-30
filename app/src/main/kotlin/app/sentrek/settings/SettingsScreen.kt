@@ -898,15 +898,16 @@ private fun appearanceSummary(viewModel: SettingsViewModel): String {
 private fun unitsSummary(viewModel: SettingsViewModel): String {
     val units by viewModel.units.collectAsStateWithLifecycle()
     val system = when (unitSystem(units)) {
-        Units.Metric -> stringResource(R.string.settings_units_metric)
-        Units.Imperial -> stringResource(R.string.settings_units_imperial)
+        Units.Metric -> stringResource(R.string.settings_sum_units_metric)
+        Units.Imperial -> stringResource(R.string.settings_sum_units_imperial)
         else -> stringResource(R.string.settings_sum_units_mixed)
     }
-    return "$system · " + when (units.coordinates) {
+    val format = when (units.coordinates) {
         CoordinateFormat.Decimal -> "DD.ddd"
         CoordinateFormat.DegreesMinutes -> "DD MM.mmm"
         CoordinateFormat.DegreesMinutesSeconds -> "DD MM SS"
     }
+    return stringResource(R.string.settings_sum_units, system, format)
 }
 
 @Composable

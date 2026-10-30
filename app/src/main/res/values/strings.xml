@@ -189,7 +189,10 @@
     <string name="settings_sum_lock">lock button</string>
     <string name="settings_sum_auto_hide">auto-hide</string>
     <string name="settings_sum_appearance">%1$s theme · %2$s map · %3$s text</string>
-    <string name="settings_sum_units_mixed">Mixed</string>
+    <string name="settings_sum_units_metric">Metric system</string>
+    <string name="settings_sum_units_imperial">Imperial system</string>
+    <string name="settings_sum_units_mixed">Mixed units</string>
+    <string name="settings_sum_units">%1$s · coordinates in %2$s</string>
     <string name="settings_sum_sos_off">SOS off</string>
     <string name="settings_sum_sos_on">SOS on</string>
     <string name="settings_sum_texts">texts every %d min</string>

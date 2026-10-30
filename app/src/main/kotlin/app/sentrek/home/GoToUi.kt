@@ -1,5 +1,7 @@
 package app.sentrek.home
 
+import app.sentrek.map.GoToLayer
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -62,7 +64,8 @@ fun GoToPanel(target: GoTo, here: LatLon?, heading: Float?, mapBearing: Double, 
                 Icon(
                     SentrekIcons.Heading,
                     contentDescription = Format.bearing(bearing),
-                    tint = MaterialTheme.colorScheme.primary,
+                    // As the line on the map.
+                    tint = Color(GoToLayer.COLOR),
                     modifier = Modifier.size(LocalTouch.current.icon * 1.6f).rotate(turn.toFloat()),
                 )
             }

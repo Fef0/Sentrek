@@ -28,7 +28,8 @@ import org.maplibre.geojson.Point
 object GoToLayer {
     private const val LINE = "goto-line"
     private const val TARGET = "goto-target"
-    private const val COLOR = 0xFFE85D04.toInt()
+    /** Bright cyan: not the orange of the track being recorded, nor a colour a track can have. */
+    const val COLOR = 0xFF00B8D4.toInt()
     private const val MIN_MOVE_M = 5.0
 
     /** What the map has now, so that an unchanged line isn't sent again. */

@@ -302,6 +302,13 @@
     <string name="settings_trail_difficulty_hint">In downloaded areas. Yellow is T1, red T2–T3 and blue T4–T6 on the SAC scale. Dotted lines are faint trails.</string>
     <string name="settings_off_route_vibration">Vibrate when off route</string>
     <string name="settings_off_route_vibration_hint">3 long buzzes when you leave the route, 2 short ones when you’re back on it.</string>
+    <!-- The last place with a phone signal, while there's none. -->
+    <string name="signal_note">No signal · last %1$s away</string>
+    <string name="signal_note_time">No signal · last at %s</string>
+    <string name="signal_goto">Take me there</string>
+    <string name="signal_goto_name">Last signal</string>
+    <string name="emergency_last_signal">No phone signal here. The last was %1$s away (%2$s), at %3$s.</string>
+    <string name="emergency_last_signal_time">No phone signal here. The last was at %s.</string>
     <string name="settings_turnaround">Turnaround alarm</string>
     <string name="settings_turnaround_off">Off</string>
     <string name="settings_turnaround_dark">Before dark</string>

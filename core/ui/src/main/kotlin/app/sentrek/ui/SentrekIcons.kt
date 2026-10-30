@@ -158,6 +158,26 @@ object SentrekIcons {
         )
     }
 
+    /** Phone signal bars. */
+    val Signal: ImageVector by lazy { icon("Sentrek.Signal", "M17,4h3v16h-3zM5,14h3v6H5zM11,9h3v11h-3z") }
+
+    /** A drop of water. */
+    val Water: ImageVector by lazy {
+        icon("Sentrek.Water", "M12,2c-5.33,4.55 -8,8.48 -8,11.8c0,4.98 3.8,8.2 8,8.2s8,-3.22 8,-8.2C20,10.48 17.33,6.55 12,2z")
+    }
+
+    /** A cloud with rain. */
+    val Rain: ImageVector by lazy {
+        icon(
+            "Sentrek.Rain",
+            "M19.35,8.04C18.67,4.59 15.64,2 12,2C9.11,2 6.6,3.64 5.35,6.04C2.34,6.36 0,8.91 0,12c0,3.31 2.69,6 6,6h13c2.76,0 5,-2.24 5,-5c0,-2.64 -2.05,-4.78 -4.65,-4.96z" +
+                "M8,19l-1.5,3h1.6l1.5,-3zM12,19l-1.5,3h1.6l1.5,-3zM16,19l-1.5,3h1.6l1.5,-3z",
+        )
+    }
+
+    /** A lightning bolt. */
+    val Storm: ImageVector by lazy { icon("Sentrek.Storm", "M7,2v11h3v9l7,-12h-4l4,-8z") }
+
     val ExpandMore: ImageVector by lazy { icon("Sentrek.ExpandMore", "M16.59,8.59L12,13.17 7.41,8.59 6,10l6,6 6,-6z") }
 
     val ExpandLess: ImageVector by lazy { icon("Sentrek.ExpandLess", "M12,8l-6,6 1.41,1.41L12,10.83l4.59,4.58L18,14z") }

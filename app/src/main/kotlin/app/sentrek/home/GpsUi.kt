@@ -1,5 +1,9 @@
 package app.sentrek.home
 
+import app.sentrek.ui.SentrekIcons
+import app.sentrek.record.SignalWatch
+import app.sentrek.geo.Geo
+import androidx.compose.foundation.clickable
 import kotlinx.coroutines.flow.Flow
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -283,4 +287,22 @@ fun MapNote(text: String, icon: ImageVector, modifier: Modifier = Modifier) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
         Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
     }
+}
+
+/**
+ * No signal here: how far back the last one was, and when. A tap shows the way there. Quiet
+ * like the other notes, it's there when it's needed and gone when the signal is back.
+ */
+@Composable
+fun SignalNote(spot: SignalWatch.Spot, here: LatLon?, onClick: () -> Unit) {
+    val time = android.text.format.DateFormat.getTimeFormat(LocalContext.current).format(java.util.Date(spot.time))
+    val text = here?.let { stringResource(R.string.signal_note, Format.distance(Geo.distance(it, spot.position))) }
+        ?: stringResource(R.string.signal_note_time, time)
+    MapNote(
+        text,
+        SentrekIcons.Signal,
+        Modifier
+            .heightIn(min = TouchTarget)
+            .clickable(onClickLabel = stringResource(R.string.signal_goto), onClick = onClick),
+    )
 }

@@ -1,5 +1,6 @@
 package app.sentrek.home
 
+import app.sentrek.map.SignalLayer
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.animation.fadeOut
@@ -274,6 +275,7 @@ fun MapScreen(
     var locked by rememberSaveable { mutableStateOf(false) }
     val sharing = rememberSharing()
     val goTo by viewModel.goTo.collectAsStateWithLifecycle()
+    val lastSignal by viewModel.lastSignal.collectAsStateWithLifecycle()
     // The phone's compass while pointing the way: the arrow then points the real way.
     var heading by remember { mutableStateOf<Float?>(null) }
     val showLockButton by viewModel.showLockButton.collectAsStateWithLifecycle()
@@ -528,6 +530,15 @@ fun MapScreen(
                 // nothing to draw here until the area is downloaded or the network is back.
                 if (!online && centreCell?.let { it !in downloadedCells } == true) {
                     MapNote(stringResource(R.string.offline_area), SentrekIcons.CloudOff)
+                }
+                // No signal: where the last one was, a tap away from "take me there".
+                lastSignal?.let { spot ->
+                    val signalName = stringResource(R.string.signal_goto_name)
+                    if (goTo?.position != spot.position) {
+                        SignalNote(spot, lastFixForSun?.let { LatLon(it.latitude, it.longitude) }) {
+                            viewModel.goTo(GoTo(signalName, spot.position))
+                        }
+                    }
                 }
                 // Never forgotten: they change how the whole app behaves.
                 when (powerMode) {
@@ -1151,6 +1162,10 @@ fun MapScreen(
         )
     }
 
+    LaunchedEffect(style, lastSignal) {
+        val s = style ?: return@LaunchedEffect
+        SignalLayer.sync(context, s, lastSignal?.position)
+    }
     LaunchedEffect(style, goTo, lastFixForSun) {
         val s = style ?: return@LaunchedEffect
         GoToLayer.sync(s, lastFixForSun?.takeIf { goTo != null }?.let { LatLon(it.latitude, it.longitude) }, goTo?.position)

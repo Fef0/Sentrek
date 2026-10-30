@@ -55,6 +55,7 @@ class TrackingService : Service() {
     @Inject lateinit var following: FollowRepository
     @Inject lateinit var location: LocationRepository
     @Inject lateinit var settings: SettingsRepository
+    @Inject lateinit var signal: SignalWatch
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val live by lazy { LiveNotification(this, CHANNEL_ID) }
@@ -130,6 +131,7 @@ class TrackingService : Service() {
                     at = runCatching { LatLon(it.latitude, it.longitude) }.getOrNull() ?: at
                     fix = it
                     onRestCheck(it)
+                    signal.onLocation(it)
                     recording.onLocation(it)
                     following.onLocation(it)
                     checkBreadcrumbs()
@@ -137,6 +139,7 @@ class TrackingService : Service() {
             }
         }
         breadcrumbs.start()
+        signal.start()
         ContextCompat.registerReceiver(this, screenOn, IntentFilter(Intent.ACTION_SCREEN_ON), ContextCompat.RECEIVER_NOT_EXPORTED)
         // With the SOS screen off, its settings rest too (greyed out in Settings).
         scope.launch {
@@ -235,6 +238,7 @@ class TrackingService : Service() {
         motionSensor?.let { sensors?.cancelTriggerSensor(motion, it) }
         if (recording.state.value == null) checkBreadcrumbs()
         breadcrumbs.stop()
+        signal.stop()
         scope.cancel()
         super.onDestroy()
     }

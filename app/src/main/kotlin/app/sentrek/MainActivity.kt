@@ -1,5 +1,7 @@
 package app.sentrek
 
+import app.sentrek.home.GoTo
+import app.sentrek.home.HomeViewModel
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
@@ -194,6 +196,8 @@ class MainActivity : ComponentActivity() {
                     ExitConfirmation(enabled = confirmExit && screen == Screen.Map)
                     if (screen != Screen.Map) BackHandler(onBack = toMap)
                     val pages = rememberSaveableStateHolder()
+                    // The map's own, shared: the SOS screen hands it a place to go to.
+                    val home: HomeViewModel = hiltViewModel()
                     Box(Modifier.fillMaxSize()) {
                         // A theme or power mode change rebuilds the map in the right colours and
                         // frame rate. Only the map: a screen open on top (Settings) stays where it was.
@@ -255,7 +259,13 @@ class MainActivity : ComponentActivity() {
                                     onBack = toMap,
                                     onShowOnMap = { box -> focus = box; screen = Screen.Map },
                                 )
-                                Screen.Emergency -> EmergencyScreen(onBack = toMap)
+                                Screen.Emergency -> EmergencyScreen(
+                                    onBack = toMap,
+                                    onGoTo = { name, position ->
+                                        home.goTo(GoTo(name, position))
+                                        screen = Screen.Map
+                                    },
+                                )
                                 Screen.Settings -> SettingsScreen(onBack = toMap)
                             }
                             }

@@ -1,5 +1,6 @@
 package app.sentrek
 
+import app.sentrek.search.PeaksScreen
 import app.sentrek.home.GoTo
 import app.sentrek.home.HomeViewModel
 import android.content.Intent
@@ -75,7 +76,7 @@ import org.maplibre.android.geometry.LatLng
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-private enum class Screen { Map, Maps, Tracks, Places, Search, Emergency, Settings }
+private enum class Screen { Map, Maps, Tracks, Places, Search, Peaks, Emergency, Settings }
 
 private const val CAMERA_SAVE_MS = 5_000L
 
@@ -194,7 +195,8 @@ class MainActivity : ComponentActivity() {
 
                     val shownCamera = camera ?: return@SentrekTheme
                     ExitConfirmation(enabled = confirmExit && screen == Screen.Map)
-                    if (screen != Screen.Map) BackHandler(onBack = toMap)
+                    // The peak finder opens from Search: back goes there.
+                    if (screen != Screen.Map) BackHandler(onBack = if (screen == Screen.Peaks) ({ screen = Screen.Search }) else toMap)
                     val pages = rememberSaveableStateHolder()
                     // The map's own, shared: the SOS screen hands it a place to go to.
                     val home: HomeViewModel = hiltViewModel()
@@ -258,7 +260,9 @@ class MainActivity : ComponentActivity() {
                                     near = shownCamera.target?.let { LatLon(it.latitude, it.longitude) },
                                     onBack = toMap,
                                     onShowOnMap = { box -> focus = box; screen = Screen.Map },
+                                    onPeaks = { screen = Screen.Peaks },
                                 )
+                                Screen.Peaks -> PeaksScreen(onBack = { screen = Screen.Search })
                                 Screen.Emergency -> EmergencyScreen(
                                     onBack = toMap,
                                     onGoTo = { name, position ->

@@ -1,5 +1,6 @@
 package app.sentrek.record
 
+import app.sentrek.geo.track.JumpFilter
 import android.content.Context
 import android.location.Location
 import android.util.Log
@@ -63,6 +64,9 @@ class RecordingRepository @Inject constructor(
     /** The next point starts a new segment: at start, after a pause, after an app restart. */
     private var newSegment = true
 
+    /** GPS jumps stay out of the track (see JumpFilter). */
+    private val jumps = JumpFilter()
+
     private val _state = MutableStateFlow<Recording?>(null)
     val state: StateFlow<Recording?> = _state.asStateFlow()
 
@@ -110,7 +114,10 @@ class RecordingRepository @Inject constructor(
         val position = runCatching { LatLon(location.latitude, location.longitude, LocationRepository.altitude(location)) }
             .getOrNull() ?: return
         val point = TrackPoint(position, location.time)
-        val startSegment = newSegment || segments.isEmpty()
+        // A new segment starts from wherever the user is: nothing to jump from.
+        val verdict = if (newSegment || segments.isEmpty()) JumpFilter.Verdict.Keep else jumps.check(point)
+        if (verdict == JumpFilter.Verdict.Drop) return
+        val startSegment = newSegment || segments.isEmpty() || verdict == JumpFilter.Verdict.NewSegment
         val last = segments.lastOrNull()?.lastOrNull()
         // Standing still, GPS wanders a few metres: don't record that as walking.
         if (!startSegment && last != null && Geo.distance(last.position, position) < MIN_STEP_M) return
@@ -125,6 +132,7 @@ class RecordingRepository @Inject constructor(
         }
         segments.last() += point
         lines.last() += position
+        jumps.kept(point)
         stats.add(point, startSegment)
         newSegment = false
         publish()

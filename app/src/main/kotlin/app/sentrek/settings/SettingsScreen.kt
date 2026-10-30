@@ -167,6 +167,20 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setLowBatterySms(on) }
     }
 
+    val waterAdvice: StateFlow<Boolean> =
+        settings.waterAdvice.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setWaterAdvice(on: Boolean) {
+        viewModelScope.launch { settings.setWaterAdvice(on) }
+    }
+
+    val rainAdvice: StateFlow<Boolean> =
+        settings.rainAdvice.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setRainAdvice(on: Boolean) {
+        viewModelScope.launch { settings.setRainAdvice(on) }
+    }
+
     val turnaround: StateFlow<TurnaroundMode> =
         settings.turnaround.stateIn(viewModelScope, SharingStarted.Eagerly, TurnaroundMode.Off)
 
@@ -522,6 +536,20 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 hint = stringResource(R.string.settings_off_route_vibration_hint),
                 checked = offRouteVibration,
                 onChange = viewModel::setOffRouteVibration,
+            )
+            val waterAdvice by viewModel.waterAdvice.collectAsStateWithLifecycle()
+            ToggleRow(
+                title = stringResource(R.string.settings_water_advice),
+                hint = stringResource(R.string.settings_water_advice_hint),
+                checked = waterAdvice,
+                onChange = viewModel::setWaterAdvice,
+            )
+            val rainAdvice by viewModel.rainAdvice.collectAsStateWithLifecycle()
+            ToggleRow(
+                title = stringResource(R.string.settings_rain_advice),
+                hint = stringResource(R.string.settings_rain_advice_hint),
+                checked = rainAdvice,
+                onChange = viewModel::setRainAdvice,
             )
             TurnaroundRows(viewModel)
             ToggleRow(

@@ -103,6 +103,22 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[LOW_BATTERY_SMS] = on }
     }
 
+    /** While following a route: the last water before a long dry stretch, on screen and with a buzz. */
+    val waterAdvice: Flow<Boolean> =
+        context.settings.data.map { it[WATER_ADVICE] ?: true }
+
+    suspend fun setWaterAdvice(on: Boolean) {
+        context.settings.edit { it[WATER_ADVICE] = on }
+    }
+
+    /** While walking: rain, snow and storms on the way, from an hourly forecast (needs data). */
+    val rainAdvice: Flow<Boolean> =
+        context.settings.data.map { it[RAIN_ADVICE] ?: true }
+
+    suspend fun setRainAdvice(on: Boolean) {
+        context.settings.edit { it[RAIN_ADVICE] = on }
+    }
+
     /** The turnaround alarm: off, before dark, or at a set time. */
     val turnaround: Flow<TurnaroundMode> =
         context.settings.data.map { p -> TurnaroundMode.entries.firstOrNull { it.name == p[TURNAROUND] } ?: TurnaroundMode.Off }
@@ -485,6 +501,8 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val BREADCRUMB_MINUTES = intPreferencesKey("breadcrumb_minutes")
         val LOW_BATTERY_SMS = booleanPreferencesKey("low_battery_sms")
         val TURNAROUND = stringPreferencesKey("turnaround")
+        val WATER_ADVICE = booleanPreferencesKey("water_advice")
+        val RAIN_ADVICE = booleanPreferencesKey("rain_advice")
         val TURNAROUND_MARGIN = intPreferencesKey("turnaround_margin")
         val TURNAROUND_TIME = intPreferencesKey("turnaround_time")
         private const val SERVER_PREFIX = "server_"

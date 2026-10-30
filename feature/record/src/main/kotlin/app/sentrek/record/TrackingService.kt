@@ -81,6 +81,9 @@ class TrackingService : Service() {
     private var powerMode = PowerMode.Normal
     private var batteryWarned = false
 
+    /** Rain and storms on the way: off, no forecast is asked for at all. */
+    private var rainAdvice = true
+
     /** The last fix, for the time of sunset where the user is. */
     private var at: LatLon? = null
     private var shown: String? = null
@@ -158,6 +161,7 @@ class TrackingService : Service() {
         scope.launch { settings.lowBatterySms.collect { lowBatterySms = it; checkBreadcrumbs() } }
         scope.launch { settings.turnaround.collect { turnaroundMode = it } }
         scope.launch { settings.powerMode.collect { powerMode = it } }
+        scope.launch { settings.rainAdvice.collect { rainAdvice = it; if (!it) wet.stop() } }
         scope.launch { settings.turnaroundMarginMinutes.collect { turnaroundMargin = it } }
         scope.launch { settings.turnaroundTime.collect { turnaroundTime = it } }
         // The last text as the recording ends, before the service may stop.
@@ -179,7 +183,7 @@ class TrackingService : Service() {
                 checkBreadcrumbs()
                 turnaround.check(turnaroundMode, turnaroundMargin, turnaroundTime, at, following.state.value)
                 checkBattery()
-                wet.check(at, following.state.value)
+                if (rainAdvice) wet.check(at, following.state.value)
             }
         }
     }

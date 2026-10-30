@@ -333,6 +333,10 @@
     <string name="signal_goto_name">Last signal</string>
     <string name="emergency_last_signal">No phone signal here. The last was %1$s away (%2$s), at %3$s.</string>
     <string name="emergency_last_signal_time">No phone signal here. The last was at %s.</string>
+    <string name="settings_water_advice">Water along the route</string>
+    <string name="settings_water_advice_hint">Before a long stretch without springs or fountains, says which is the last one, and buzzes there to fill up.</string>
+    <string name="settings_rain_advice">Rain and storms on the way</string>
+    <string name="settings_rain_advice_hint">While you record or follow a route, says when rain or snow is likely where you will be, and buzzes for storms. Checks the forecast once an hour when there is a connection.</string>
     <string name="settings_turnaround">Turnaround alarm</string>
     <string name="settings_turnaround_off">Off</string>
     <string name="settings_turnaround_dark">Before dark</string>

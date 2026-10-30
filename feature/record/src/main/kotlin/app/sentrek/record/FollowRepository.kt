@@ -88,6 +88,9 @@ class FollowRepository @Inject constructor(
     /** The off-route alert still shows on screen and in the notification when this is off. */
     private val vibrationOn = settings.offRouteVibration.stateIn(scope, SharingStarted.Eagerly, true)
 
+    /** Off: no word about water, on screen or in the pocket. */
+    private val waterOn = settings.waterAdvice.stateIn(scope, SharingStarted.Eagerly, true)
+
     private var route: Route? = null
     private var along: Double? = null
     private var routePlaces: List<RoutePlace> = emptyList()
@@ -222,7 +225,7 @@ class FollowRepository @Inject constructor(
     }
 
     private fun water(r: Route, found: List<RoutePlace>, at: Double): WaterAhead? =
-        WaterAhead.of(r, found, at)?.let { w -> w.copy(next = w.next?.let { it.copy(millis = atPace(it.millis)) }, dryMillis = atPace(w.dryMillis)) }
+        if (!waterOn.value) null else WaterAhead.of(r, found, at)?.let { w -> w.copy(next = w.next?.let { it.copy(millis = atPace(it.millis)) }, dryMillis = atPace(w.dryMillis)) }
 
     /** Close to the last water before a long dry stretch: a word, once, before walking past it. */
     private fun fillUpAlert(water: WaterAhead) {

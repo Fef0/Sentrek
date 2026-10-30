@@ -1,5 +1,6 @@
 package app.sentrek.home
 
+import app.sentrek.geo.route.Shade
 import app.sentrek.geo.weather.Hourly
 import app.sentrek.geo.weather.WetAhead
 import app.sentrek.ui.Format
@@ -50,13 +51,16 @@ fun TrailNotes(
     water: WaterAhead? = null,
     /** The first wet spot on the way, null while dry or unknown. */
     wet: WetAhead.Found? = null,
+    /** The next long stretch in the sun on the route, or the one the user is in. */
+    sunny: Shade.Stretch? = null,
 ) {
     val now = rememberNow()
     val empty = battery?.emptyAt?.takeIf { BatteryWatch.tooSoon(it, arrival, now) }
     val dry = water?.takeIf { it.long }
-    if (empty == null && dry == null && wet == null) return
+    if (empty == null && dry == null && wet == null && sunny == null) return
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (wet != null) WetNote(wet, onRoute = arrival != null, now = now)
+        if (sunny != null) SunNote(sunny, now)
         if (dry != null) WaterNote(dry)
         if (empty != null) TrailNote(
             icon = SentrekIcons.BatteryAlert,
@@ -95,6 +99,17 @@ private fun WetNote(wet: WetAhead.Found, onRoute: Boolean, now: Long) {
         text,
         warning = wet.wet == Hourly.Wet.Storm,
     )
+}
+
+/** In the sun now and for how long, or from when, how far on and for how long. */
+@Composable
+private fun SunNote(stretch: Shade.Stretch, now: Long) {
+    val text = if (stretch.start <= now + NOW_MS) {
+        stringResource(R.string.note_sun_now, Format.hoursMinutes(stretch.end - now))
+    } else {
+        stringResource(R.string.note_sun_from, time(stretch.start), Format.distance(stretch.from), Format.hoursMinutes(stretch.millis))
+    }
+    TrailNote(SentrekIcons.Sun, text, warning = false)
 }
 
 /** The last water before a long dry stretch, or none left at all. */

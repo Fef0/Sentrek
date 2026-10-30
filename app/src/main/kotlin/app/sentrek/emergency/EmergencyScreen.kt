@@ -1,5 +1,8 @@
 package app.sentrek.emergency
 
+import app.sentrek.geo.Geo
+import kotlinx.coroutines.flow.map
+import app.sentrek.record.SignalWatch
 import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.ClipData
@@ -70,6 +73,7 @@ import javax.inject.Inject
 class EmergencyViewModel @Inject constructor(
     private val location: LocationRepository,
     settings: SettingsRepository,
+    signal: SignalWatch,
 ) : ViewModel() {
     private val permissionChecks = MutableStateFlow(0)
 
@@ -92,6 +96,11 @@ class EmergencyViewModel @Inject constructor(
     val contactName: StateFlow<String> =
         settings.emergencyContactName.stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
+    /** The last place with a phone signal, while there is none here. */
+    val lastSignal: StateFlow<SignalWatch.Spot?> = signal.state
+        .map { s -> s?.last?.takeIf { !s.hasSignal } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     fun hasPermission() = location.hasPermission()
 
     fun onPermissionChanged() {
@@ -108,13 +117,19 @@ class EmergencyViewModel @Inject constructor(
  * and ways to pass them on that need no data connection (a call, an SMS).
  */
 @Composable
-fun EmergencyScreen(onBack: () -> Unit, viewModel: EmergencyViewModel = hiltViewModel()) {
+fun EmergencyScreen(
+    onBack: () -> Unit,
+    /** Shows the way to a place on the map: the last one with signal. */
+    onGoTo: (name: String, position: LatLon) -> Unit,
+    viewModel: EmergencyViewModel = hiltViewModel(),
+) {
     val context = LocalContext.current
     val fix by viewModel.fix.collectAsStateWithLifecycle()
     val smsButton by viewModel.smsButton.collectAsStateWithLifecycle()
     val number by viewModel.number.collectAsStateWithLifecycle()
     val smsTo by viewModel.smsTo.collectAsStateWithLifecycle()
     val contactName by viewModel.contactName.collectAsStateWithLifecycle()
+    val lastSignal by viewModel.lastSignal.collectAsStateWithLifecycle()
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         viewModel.onPermissionChanged()
     }
@@ -136,6 +151,30 @@ fun EmergencyScreen(onBack: () -> Unit, viewModel: EmergencyViewModel = hiltView
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 modifier = wide,
             ) { Text(stringResource(R.string.emergency_call, number), style = MaterialTheme.typography.titleLarge) }
+
+            // No signal: the call above may not get out. Where it last did.
+            lastSignal?.let { spot ->
+                val here = fix?.let { LatLon(it.latitude, it.longitude) }
+                val time = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(spot.time))
+                Text(
+                    if (here != null) {
+                        stringResource(
+                            R.string.emergency_last_signal,
+                            Format.distance(Geo.distance(here, spot.position)),
+                            Format.bearing(Geo.bearing(here, spot.position)),
+                            time,
+                        )
+                    } else {
+                        stringResource(R.string.emergency_last_signal_time, time)
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                val name = stringResource(R.string.signal_goto_name)
+                OutlinedButton(onClick = { onGoTo(name, spot.position) }, modifier = wide) {
+                    Text(stringResource(R.string.signal_goto))
+                }
+            }
 
             val here = fix
             when {

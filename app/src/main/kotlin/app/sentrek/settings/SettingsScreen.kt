@@ -1,5 +1,6 @@
 package app.sentrek.settings
 
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
@@ -165,6 +166,20 @@ class SettingsViewModel @Inject constructor(
 
     fun setLowBatterySms(on: Boolean) {
         viewModelScope.launch { settings.setLowBatterySms(on) }
+    }
+
+    val waterAdvice: StateFlow<Boolean> =
+        settings.waterAdvice.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setWaterAdvice(on: Boolean) {
+        viewModelScope.launch { settings.setWaterAdvice(on) }
+    }
+
+    val rainAdvice: StateFlow<Boolean> =
+        settings.rainAdvice.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setRainAdvice(on: Boolean) {
+        viewModelScope.launch { settings.setRainAdvice(on) }
     }
 
     val turnaround: StateFlow<TurnaroundMode> =
@@ -367,41 +382,32 @@ class SettingsViewModel @Inject constructor(
     }
 }
 
+/** The pages of Settings, each opened from a row of the main one. */
+private enum class SettingsPageId { Map, MapUpdates, Controls, Appearance, Units, Alerts, Emergency, Advanced, Data, About }
+
 @Composable
 fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
     // Before the pages below: back from one, the list is where it was left.
     val scroll = rememberScrollState()
-    var advanced by rememberSaveable { mutableStateOf(false) }
-    if (advanced) {
-        BackHandler { advanced = false }
-        return AdvancedSettings(viewModel, onBack = { advanced = false })
+    var page by rememberSaveable { mutableStateOf<SettingsPageId?>(null) }
+    page?.let { open ->
+        val close = { page = null }
+        BackHandler(onBack = close)
+        return when (open) {
+            SettingsPageId.Map -> MapSettings(viewModel, close)
+            SettingsPageId.MapUpdates -> MapUpdateSettings(viewModel, close)
+            SettingsPageId.Controls -> ControlSettings(viewModel, close)
+            SettingsPageId.Appearance -> AppearanceSettings(viewModel, close)
+            SettingsPageId.Units -> UnitSettings(viewModel, close)
+            SettingsPageId.Alerts -> AlertsSettings(viewModel, close)
+            SettingsPageId.Emergency -> EmergencySettings(viewModel, close)
+            SettingsPageId.Advanced -> AdvancedSettings(viewModel, close)
+            SettingsPageId.Data -> DataSettings(viewModel, close)
+            SettingsPageId.About -> AboutSettings(close)
+        }
     }
-    var emergencyPage by rememberSaveable { mutableStateOf(false) }
-    if (emergencyPage) {
-        BackHandler { emergencyPage = false }
-        return EmergencySettings(viewModel, onBack = { emergencyPage = false })
-    }
-    val showTrailDifficulty by viewModel.showTrailDifficulty.collectAsStateWithLifecycle()
-    val textSize by viewModel.textSize.collectAsStateWithLifecycle()
-    val buttonSize by viewModel.buttonSize.collectAsStateWithLifecycle()
-    val gloveMode by viewModel.gloveMode.collectAsStateWithLifecycle()
-    val volumeKeysZoom by viewModel.volumeKeysZoom.collectAsStateWithLifecycle()
-    val offRouteVibration by viewModel.offRouteVibration.collectAsStateWithLifecycle()
-    val theme by viewModel.theme.collectAsStateWithLifecycle()
-    val mapTheme by viewModel.mapTheme.collectAsStateWithLifecycle()
-    val fullScreen by viewModel.fullScreen.collectAsStateWithLifecycle()
-    val autoHideControls by viewModel.autoHideControls.collectAsStateWithLifecycle()
-    val confirmExit by viewModel.confirmExit.collectAsStateWithLifecycle()
-    val showScaleBar by viewModel.showScaleBar.collectAsStateWithLifecycle()
-    val showLockButton by viewModel.showLockButton.collectAsStateWithLifecycle()
-    val showContours by viewModel.showContours.collectAsStateWithLifecycle()
-    val showSlopes by viewModel.showSlopes.collectAsStateWithLifecycle()
     val batterySaver by viewModel.batterySaver.collectAsStateWithLifecycle()
     val staminaMode by viewModel.staminaMode.collectAsStateWithLifecycle()
-    val rotationLocked by viewModel.rotationLocked.collectAsStateWithLifecycle()
-    val mapUpdateReminders by viewModel.mapUpdateReminders.collectAsStateWithLifecycle()
-    val autoUpdateMaps by viewModel.autoUpdateMaps.collectAsStateWithLifecycle()
-    val units by viewModel.units.collectAsStateWithLifecycle()
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
@@ -416,9 +422,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 Text(stringResource(R.string.bar_settings), style = MaterialTheme.typography.headlineMedium)
             }
 
-            // First: on a long trip, the one switch that matters most.
-            // What the power modes override is greyed out: it waits until they're off.
-            val saving = batterySaver || staminaMode
+            // First, and right here: on a long trip, the one switch that matters most.
             ToggleRow(
                 icon = SentrekIcons.BatterySaver,
                 title = stringResource(R.string.settings_battery_saver),
@@ -429,283 +433,364 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 enabled = !staminaMode,
             )
 
+            // The rest a page each, a line under each saying what's in it: everything at a glance.
             // By how often they're changed: the map and the controls first, units are set once.
-            SectionTitle(stringResource(R.string.settings_map))
-            ToggleRow(
-                enabled = !saving,
-                title = stringResource(R.string.settings_contours),
-                checked = showContours,
-                onChange = viewModel::setShowContours,
-            )
-            ToggleRow(
-                enabled = !saving,
-                title = stringResource(R.string.settings_slopes),
-                hint = stringResource(R.string.settings_slopes_hint),
-                checked = showSlopes,
-                onChange = viewModel::setShowSlopes,
-            )
-            ToggleRow(
-                title = stringResource(R.string.settings_trail_difficulty),
-                hint = stringResource(R.string.settings_trail_difficulty_hint),
-                checked = showTrailDifficulty,
-                onChange = viewModel::setShowTrailDifficulty,
-            )
-            ToggleRow(
-                title = stringResource(R.string.settings_scale_bar),
-                checked = showScaleBar,
-                onChange = viewModel::setShowScaleBar,
-            )
-            ToggleRow(
-                title = stringResource(R.string.settings_lock_north),
-                hint = stringResource(R.string.settings_lock_north_hint),
-                checked = rotationLocked,
-                onChange = viewModel::setRotationLocked,
-            )
+            NavRow(stringResource(R.string.settings_map), stringResource(R.string.settings_map_about)) { page = SettingsPageId.Map }
+            NavRow(stringResource(R.string.settings_map_updates), stringResource(R.string.settings_map_updates_about)) { page = SettingsPageId.MapUpdates }
+            NavRow(stringResource(R.string.settings_controls), stringResource(R.string.settings_controls_about)) { page = SettingsPageId.Controls }
+            NavRow(stringResource(R.string.settings_appearance), stringResource(R.string.settings_appearance_about)) { page = SettingsPageId.Appearance }
+            NavRow(stringResource(R.string.settings_units), stringResource(R.string.settings_units_about)) { page = SettingsPageId.Units }
+            NavRow(stringResource(R.string.settings_alerts_page), stringResource(R.string.settings_alerts_about)) { page = SettingsPageId.Alerts }
+            NavRow(stringResource(R.string.settings_emergency_page), stringResource(R.string.settings_emergency_about)) { page = SettingsPageId.Emergency }
+            NavRow(stringResource(R.string.settings_advanced), stringResource(R.string.settings_advanced_hint)) { page = SettingsPageId.Advanced }
+            NavRow(stringResource(R.string.settings_data), stringResource(R.string.settings_data_about)) { page = SettingsPageId.Data }
+            NavRow(stringResource(R.string.settings_about), stringResource(R.string.settings_about_about)) { page = SettingsPageId.About }
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
 
-            SectionTitle(stringResource(R.string.settings_map_updates))
-            ToggleRow(
-                title = stringResource(R.string.settings_auto_update_maps),
-                hint = stringResource(R.string.settings_auto_update_maps_hint),
-                checked = autoUpdateMaps,
-                onChange = viewModel::setAutoUpdateMaps,
-            )
-            ToggleRow(
-                // Maps that update themselves need no reminder.
-                enabled = !autoUpdateMaps,
-                title = stringResource(R.string.settings_map_reminders),
-                hint = stringResource(R.string.settings_map_reminders_hint),
-                checked = mapUpdateReminders,
-                onChange = viewModel::setMapUpdateReminders,
-            )
-
-            SectionTitle(stringResource(R.string.settings_controls))
-            ToggleRow(
-                title = stringResource(R.string.settings_glove_mode),
-                hint = stringResource(R.string.settings_glove_mode_hint),
-                checked = gloveMode,
-                onChange = viewModel::setGloveMode,
-            )
-            // Glove mode decides these two: greyed out until it's off.
-            ChoiceRow(
-                enabled = !gloveMode,
-                title = stringResource(R.string.settings_button_size),
-                hint = stringResource(if (gloveMode) R.string.settings_button_size_gloves else R.string.settings_button_size_hint),
-                options = listOf(
-                    ButtonSize.Standard to stringResource(R.string.settings_size_standard),
-                    ButtonSize.Large to stringResource(R.string.settings_size_large),
-                    ButtonSize.Largest to stringResource(R.string.settings_size_largest),
-                ),
-                selected = buttonSize,
-                onChange = viewModel::setButtonSize,
-            )
-            ToggleRow(
-                enabled = !gloveMode,
-                title = stringResource(R.string.settings_volume_zoom),
-                hint = if (gloveMode) stringResource(R.string.settings_volume_zoom_gloves) else null,
-                checked = gloveMode || volumeKeysZoom,
-                onChange = viewModel::setVolumeKeysZoom,
-            )
-            ToggleRow(
-                title = stringResource(R.string.settings_lock_button),
-                hint = stringResource(R.string.settings_lock_button_hint),
-                checked = showLockButton,
-                onChange = viewModel::setShowLockButton,
-            )
-            ToggleRow(
-                title = stringResource(R.string.settings_auto_hide),
-                hint = stringResource(R.string.settings_auto_hide_hint),
-                checked = autoHideControls,
-                onChange = viewModel::setAutoHideControls,
-            )
-            ToggleRow(
-                title = stringResource(R.string.settings_off_route_vibration),
-                hint = stringResource(R.string.settings_off_route_vibration_hint),
-                checked = offRouteVibration,
-                onChange = viewModel::setOffRouteVibration,
-            )
-            TurnaroundRows(viewModel)
-            ToggleRow(
-                title = stringResource(R.string.settings_confirm_exit),
-                checked = confirmExit,
-                onChange = viewModel::setConfirmExit,
-            )
-
-            SectionTitle(stringResource(R.string.settings_appearance))
-            ChoiceRow(
-                title = stringResource(R.string.settings_text_size),
-                hint = stringResource(R.string.settings_text_size_hint),
-                options = listOf(
-                    TextSize.Small to stringResource(R.string.settings_size_small),
-                    TextSize.Default to stringResource(R.string.settings_size_default),
-                    TextSize.Large to stringResource(R.string.settings_size_large),
-                    TextSize.Largest to stringResource(R.string.settings_size_largest),
-                ),
-                selected = textSize,
-                onChange = viewModel::setTextSize,
-            )
-            ChoiceRow(
-                enabled = !saving,
-                title = stringResource(R.string.settings_app_theme),
-                options = listOf(
-                    AppTheme.System to stringResource(R.string.settings_theme_system),
-                    AppTheme.Light to stringResource(R.string.settings_theme_light),
-                    AppTheme.Dark to stringResource(R.string.settings_theme_dark),
-                    AppTheme.Black to stringResource(R.string.settings_theme_black),
-                ),
-                selected = theme,
-                onChange = viewModel::setTheme,
-            )
-            ChoiceRow(
-                enabled = !saving,
-                title = stringResource(R.string.settings_map_theme),
-                hint = stringResource(R.string.settings_map_theme_hint),
-                options = listOf(
-                    MapTheme.Auto to stringResource(R.string.settings_map_theme_auto),
-                    MapTheme.Day to stringResource(R.string.settings_map_theme_day),
-                    MapTheme.Night to stringResource(R.string.settings_map_theme_night),
-                ),
-                selected = mapTheme,
-                onChange = viewModel::setMapTheme,
-            )
-            ToggleRow(
-                title = stringResource(R.string.settings_full_screen),
-                hint = stringResource(R.string.settings_full_screen_hint),
-                checked = fullScreen,
-                onChange = viewModel::setFullScreen,
-            )
-
-            SectionTitle(stringResource(R.string.settings_units))
-            // Metric or imperial sets distance, height and speed; the rest stays as chosen.
-            val system = listOf(Units.Metric, Units.Imperial).firstOrNull {
-                it.distance == units.distance && it.elevation == units.elevation && it.speed == units.speed
+/** A page of Settings: a back button, the [title], and its rows. */
+@Composable
+private fun SettingsPage(title: String, onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(
+            modifier = Modifier
+                .safeDrawingPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                MapButton(SentrekIcons.Back, stringResource(R.string.settings_back), onBack, Modifier.padding(vertical = 12.dp))
+                Text(title, style = MaterialTheme.typography.headlineMedium)
             }
+            content()
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun MapSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
+    val showContours by viewModel.showContours.collectAsStateWithLifecycle()
+    val showSlopes by viewModel.showSlopes.collectAsStateWithLifecycle()
+    val showTrailDifficulty by viewModel.showTrailDifficulty.collectAsStateWithLifecycle()
+    val showScaleBar by viewModel.showScaleBar.collectAsStateWithLifecycle()
+    val rotationLocked by viewModel.rotationLocked.collectAsStateWithLifecycle()
+    // What the power modes override is greyed out: it waits until they're off.
+    val saving = rememberSaving(viewModel)
+    SettingsPage(stringResource(R.string.settings_map), onBack) {
+        if (saving) PowerNote()
+        ToggleRow(
+            enabled = !saving,
+            title = stringResource(R.string.settings_contours),
+            hint = stringResource(R.string.settings_contours_hint),
+            checked = showContours,
+            onChange = viewModel::setShowContours,
+        )
+        ToggleRow(
+            enabled = !saving,
+            title = stringResource(R.string.settings_slopes),
+            hint = stringResource(R.string.settings_slopes_hint),
+            checked = showSlopes,
+            onChange = viewModel::setShowSlopes,
+        )
+        ToggleRow(
+            title = stringResource(R.string.settings_trail_difficulty),
+            hint = stringResource(R.string.settings_trail_difficulty_hint),
+            checked = showTrailDifficulty,
+            onChange = viewModel::setShowTrailDifficulty,
+        )
+        ToggleRow(
+            title = stringResource(R.string.settings_scale_bar),
+            hint = stringResource(R.string.settings_scale_bar_hint),
+            checked = showScaleBar,
+            onChange = viewModel::setShowScaleBar,
+        )
+        ToggleRow(
+            title = stringResource(R.string.settings_lock_north),
+            hint = stringResource(R.string.settings_lock_north_hint),
+            checked = rotationLocked,
+            onChange = viewModel::setRotationLocked,
+        )
+    }
+}
+
+@Composable
+private fun MapUpdateSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
+    val autoUpdateMaps by viewModel.autoUpdateMaps.collectAsStateWithLifecycle()
+    val mapUpdateReminders by viewModel.mapUpdateReminders.collectAsStateWithLifecycle()
+    SettingsPage(stringResource(R.string.settings_map_updates), onBack) {
+        ToggleRow(
+            title = stringResource(R.string.settings_auto_update_maps),
+            hint = stringResource(R.string.settings_auto_update_maps_hint),
+            checked = autoUpdateMaps,
+            onChange = viewModel::setAutoUpdateMaps,
+        )
+        ToggleRow(
+            // Maps that update themselves need no reminder.
+            enabled = !autoUpdateMaps,
+            title = stringResource(R.string.settings_map_reminders),
+            hint = stringResource(R.string.settings_map_reminders_hint),
+            checked = mapUpdateReminders,
+            onChange = viewModel::setMapUpdateReminders,
+        )
+    }
+}
+
+@Composable
+private fun ControlSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
+    val gloveMode by viewModel.gloveMode.collectAsStateWithLifecycle()
+    val buttonSize by viewModel.buttonSize.collectAsStateWithLifecycle()
+    val volumeKeysZoom by viewModel.volumeKeysZoom.collectAsStateWithLifecycle()
+    val showLockButton by viewModel.showLockButton.collectAsStateWithLifecycle()
+    val autoHideControls by viewModel.autoHideControls.collectAsStateWithLifecycle()
+    val confirmExit by viewModel.confirmExit.collectAsStateWithLifecycle()
+    SettingsPage(stringResource(R.string.settings_controls), onBack) {
+        ToggleRow(
+            title = stringResource(R.string.settings_glove_mode),
+            hint = stringResource(R.string.settings_glove_mode_hint),
+            checked = gloveMode,
+            onChange = viewModel::setGloveMode,
+        )
+        // Glove mode decides these two: greyed out until it's off.
+        ChoiceRow(
+            enabled = !gloveMode,
+            title = stringResource(R.string.settings_button_size),
+            hint = stringResource(if (gloveMode) R.string.settings_button_size_gloves else R.string.settings_button_size_hint),
+            options = listOf(
+                ButtonSize.Standard to stringResource(R.string.settings_size_standard),
+                ButtonSize.Large to stringResource(R.string.settings_size_large),
+                ButtonSize.Largest to stringResource(R.string.settings_size_largest),
+            ),
+            selected = buttonSize,
+            onChange = viewModel::setButtonSize,
+        )
+        ToggleRow(
+            enabled = !gloveMode,
+            title = stringResource(R.string.settings_volume_zoom),
+            hint = stringResource(if (gloveMode) R.string.settings_volume_zoom_gloves else R.string.settings_volume_zoom_hint),
+            checked = gloveMode || volumeKeysZoom,
+            onChange = viewModel::setVolumeKeysZoom,
+        )
+        ToggleRow(
+            title = stringResource(R.string.settings_lock_button),
+            hint = stringResource(R.string.settings_lock_button_hint),
+            checked = showLockButton,
+            onChange = viewModel::setShowLockButton,
+        )
+        ToggleRow(
+            title = stringResource(R.string.settings_auto_hide),
+            hint = stringResource(R.string.settings_auto_hide_hint),
+            checked = autoHideControls,
+            onChange = viewModel::setAutoHideControls,
+        )
+        ToggleRow(
+            title = stringResource(R.string.settings_confirm_exit),
+            hint = stringResource(R.string.settings_confirm_exit_hint),
+            checked = confirmExit,
+            onChange = viewModel::setConfirmExit,
+        )
+    }
+}
+
+@Composable
+private fun AppearanceSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
+    val textSize by viewModel.textSize.collectAsStateWithLifecycle()
+    val theme by viewModel.theme.collectAsStateWithLifecycle()
+    val mapTheme by viewModel.mapTheme.collectAsStateWithLifecycle()
+    val fullScreen by viewModel.fullScreen.collectAsStateWithLifecycle()
+    val saving = rememberSaving(viewModel)
+    SettingsPage(stringResource(R.string.settings_appearance), onBack) {
+        if (saving) PowerNote()
+        ChoiceRow(
+            title = stringResource(R.string.settings_text_size),
+            hint = stringResource(R.string.settings_text_size_hint),
+            options = listOf(
+                TextSize.Small to stringResource(R.string.settings_size_small),
+                TextSize.Default to stringResource(R.string.settings_size_default),
+                TextSize.Large to stringResource(R.string.settings_size_large),
+                TextSize.Largest to stringResource(R.string.settings_size_largest),
+            ),
+            selected = textSize,
+            onChange = viewModel::setTextSize,
+        )
+        ChoiceRow(
+            enabled = !saving,
+            title = stringResource(R.string.settings_app_theme),
+            hint = stringResource(R.string.settings_app_theme_hint),
+            options = listOf(
+                AppTheme.System to stringResource(R.string.settings_theme_system),
+                AppTheme.Light to stringResource(R.string.settings_theme_light),
+                AppTheme.Dark to stringResource(R.string.settings_theme_dark),
+                AppTheme.Black to stringResource(R.string.settings_theme_black),
+            ),
+            selected = theme,
+            onChange = viewModel::setTheme,
+        )
+        ChoiceRow(
+            enabled = !saving,
+            title = stringResource(R.string.settings_map_theme),
+            hint = stringResource(R.string.settings_map_theme_hint),
+            options = listOf(
+                MapTheme.Auto to stringResource(R.string.settings_map_theme_auto),
+                MapTheme.Day to stringResource(R.string.settings_map_theme_day),
+                MapTheme.Night to stringResource(R.string.settings_map_theme_night),
+            ),
+            selected = mapTheme,
+            onChange = viewModel::setMapTheme,
+        )
+        ToggleRow(
+            title = stringResource(R.string.settings_full_screen),
+            hint = stringResource(R.string.settings_full_screen_hint),
+            checked = fullScreen,
+            onChange = viewModel::setFullScreen,
+        )
+    }
+}
+
+@Composable
+private fun UnitSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
+    val units by viewModel.units.collectAsStateWithLifecycle()
+    SettingsPage(stringResource(R.string.settings_units), onBack) {
+        // Metric or imperial sets distance, height and speed; the rest stays as chosen.
+        val system = unitSystem(units)
+        ChoiceRow(
+            title = stringResource(R.string.settings_units_system),
+            hint = stringResource(R.string.settings_units_system_hint),
+            options = listOf(
+                Units.Metric to stringResource(R.string.settings_units_metric),
+                Units.Imperial to stringResource(R.string.settings_units_imperial),
+            ),
+            selected = system,
+            onChange = { preset ->
+                viewModel.setUnits { it.copy(distance = preset.distance, elevation = preset.elevation, speed = preset.speed) }
+            },
+        )
+        ChoiceRow(
+            title = stringResource(R.string.settings_units_coordinates),
+            // Mont Blanc, as an example of the chosen format.
+            hint = UnitFormat.coordinates(45.83265, 6.86517, units.coordinates),
+            options = listOf(
+                CoordinateFormat.Decimal to "DD.ddd",
+                CoordinateFormat.DegreesMinutes to "DD MM.mmm",
+                CoordinateFormat.DegreesMinutesSeconds to "DD MM SS",
+            ),
+            selected = units.coordinates,
+            onChange = { format -> viewModel.setUnits { it.copy(coordinates = format) } },
+        )
+        // A mix of units (say km with feet) opens the details straight away.
+        var moreUnits by rememberSaveable { mutableStateOf(system == null) }
+        ExpandRow(
+            title = stringResource(R.string.settings_more_units),
+            hint = stringResource(R.string.settings_more_units_hint),
+            expanded = moreUnits,
+            onToggle = { moreUnits = !moreUnits },
+        )
+        if (moreUnits) {
             ChoiceRow(
-                title = stringResource(R.string.settings_units_system),
-                options = listOf(
-                    Units.Metric to stringResource(R.string.settings_units_metric),
-                    Units.Imperial to stringResource(R.string.settings_units_imperial),
-                ),
-                selected = system,
-                onChange = { preset ->
-                    viewModel.setUnits { it.copy(distance = preset.distance, elevation = preset.elevation, speed = preset.speed) }
-                },
+                title = stringResource(R.string.settings_units_distance),
+                options = listOf(DistanceUnit.Kilometers to "km", DistanceUnit.Miles to "mi", DistanceUnit.NauticalMiles to "nmi"),
+                selected = units.distance,
+                onChange = { unit -> viewModel.setUnits { it.copy(distance = unit) } },
             )
             ChoiceRow(
-                title = stringResource(R.string.settings_units_coordinates),
-                // Mont Blanc, as an example of the chosen format.
-                hint = UnitFormat.coordinates(45.83265, 6.86517, units.coordinates),
-                options = listOf(
-                    CoordinateFormat.Decimal to "DD.ddd",
-                    CoordinateFormat.DegreesMinutes to "DD MM.mmm",
-                    CoordinateFormat.DegreesMinutesSeconds to "DD MM SS",
-                ),
-                selected = units.coordinates,
-                onChange = { format -> viewModel.setUnits { it.copy(coordinates = format) } },
+                title = stringResource(R.string.settings_units_elevation),
+                options = listOf(ElevationUnit.Meters to "m", ElevationUnit.Feet to "ft"),
+                selected = units.elevation,
+                onChange = { unit -> viewModel.setUnits { it.copy(elevation = unit) } },
             )
-            // A mix of units (say km with feet) opens the details straight away.
-            var moreUnits by rememberSaveable { mutableStateOf(system == null) }
-            ExpandRow(
-                title = stringResource(R.string.settings_more_units),
-                hint = stringResource(R.string.settings_more_units_hint),
-                expanded = moreUnits,
-                onToggle = { moreUnits = !moreUnits },
+            ChoiceRow(
+                title = stringResource(R.string.settings_units_speed),
+                options = listOf(SpeedUnit.KilometersPerHour to "km/h", SpeedUnit.MilesPerHour to "mph", SpeedUnit.Knots to "kn"),
+                selected = units.speed,
+                onChange = { unit -> viewModel.setUnits { it.copy(speed = unit) } },
             )
-            if (moreUnits) {
-                ChoiceRow(
-                    title = stringResource(R.string.settings_units_distance),
-                    options = listOf(DistanceUnit.Kilometers to "km", DistanceUnit.Miles to "mi", DistanceUnit.NauticalMiles to "nmi"),
-                    selected = units.distance,
-                    onChange = { unit -> viewModel.setUnits { it.copy(distance = unit) } },
-                    )
-                ChoiceRow(
-                    title = stringResource(R.string.settings_units_elevation),
-                    options = listOf(ElevationUnit.Meters to "m", ElevationUnit.Feet to "ft"),
-                    selected = units.elevation,
-                    onChange = { unit -> viewModel.setUnits { it.copy(elevation = unit) } },
-                    )
-                ChoiceRow(
-                    title = stringResource(R.string.settings_units_speed),
-                    options = listOf(SpeedUnit.KilometersPerHour to "km/h", SpeedUnit.MilesPerHour to "mph", SpeedUnit.Knots to "kn"),
-                    selected = units.speed,
-                    onChange = { unit -> viewModel.setUnits { it.copy(speed = unit) } },
-                    )
-                ChoiceRow(
-                    title = stringResource(R.string.settings_units_slope),
-                    options = listOf(SlopeUnit.Degrees to "12°", SlopeUnit.Percent to "21%"),
-                    selected = units.slope,
-                    onChange = { unit -> viewModel.setUnits { it.copy(slope = unit) } },
-                    )
-                ChoiceRow(
-                    title = stringResource(R.string.settings_units_bearing),
-                    options = listOf(BearingUnit.Degrees to "245°", BearingUnit.Mils to "4356 mil"),
-                    selected = units.bearing,
-                    onChange = { unit -> viewModel.setUnits { it.copy(bearing = unit) } },
-                    )
-            }
+            ChoiceRow(
+                title = stringResource(R.string.settings_units_slope),
+                options = listOf(SlopeUnit.Degrees to "12°", SlopeUnit.Percent to "21%"),
+                selected = units.slope,
+                onChange = { unit -> viewModel.setUnits { it.copy(slope = unit) } },
+            )
+            ChoiceRow(
+                title = stringResource(R.string.settings_units_bearing),
+                options = listOf(BearingUnit.Degrees to "245°", BearingUnit.Mils to "4356 mil"),
+                selected = units.bearing,
+                onChange = { unit -> viewModel.setUnits { it.copy(bearing = unit) } },
+            )
+        }
+    }
+}
 
-            SectionTitle(stringResource(R.string.settings_emergency))
-            NavRow(
-                title = stringResource(R.string.settings_emergency_page),
-                hint = stringResource(R.string.settings_emergency_page_hint),
-                onClick = { emergencyPage = true },
-            )
-
-            SectionTitle(stringResource(R.string.settings_advanced_section))
-            NavRow(
-                title = stringResource(R.string.settings_advanced),
-                hint = stringResource(R.string.settings_advanced_hint),
-                onClick = { advanced = true },
-            )
-
-            SectionTitle(stringResource(R.string.settings_data))
-            val context = LocalContext.current
-            val saveTo = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
-                if (uri != null) {
-                    viewModel.backUp(uri) { ok ->
-                        Toast.makeText(context, if (ok) R.string.settings_backup_done else R.string.settings_backup_failed, Toast.LENGTH_LONG).show()
-                    }
-                }
-            }
-            val openFrom = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-                if (uri != null) {
-                    viewModel.restore(uri) { restored ->
-                        val text = restored?.let { context.getString(R.string.settings_restore_done, it.tracks.size, it.places.size) }
-                            ?: context.getString(R.string.settings_restore_failed)
-                        Toast.makeText(context, text, Toast.LENGTH_LONG).show()
-                    }
-                }
-            }
-            Text(stringResource(R.string.settings_data_hint), style = MaterialTheme.typography.bodyMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = { saveTo.launch(BackupRepository.fileName()) },
-                    modifier = Modifier.weight(1f).heightIn(min = TouchTarget),
-                ) { FitText(stringResource(R.string.settings_backup)) }
-                OutlinedButton(
-                    onClick = { openFrom.launch(arrayOf("application/zip", "application/octet-stream")) },
-                    modifier = Modifier.weight(1f).heightIn(min = TouchTarget),
-                ) { FitText(stringResource(R.string.settings_restore)) }
-            }
-
-            SectionTitle(stringResource(R.string.settings_about))
-            Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodyLarge)
-            Text(stringResource(R.string.settings_osm_credit), style = MaterialTheme.typography.bodyMedium)
-            var allCredits by rememberSaveable { mutableStateOf(false) }
-            ExpandRow(
-                title = stringResource(R.string.settings_all_credits),
-                hint = null,
-                expanded = allCredits,
-                onToggle = { allCredits = !allCredits },
-            )
-            if (allCredits) {
-                Text(
-                    stringResource(R.string.settings_credits),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(bottom = 16.dp),
-                )
+@Composable
+private fun DataSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val saveTo = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        if (uri != null) {
+            viewModel.backUp(uri) { ok ->
+                Toast.makeText(context, if (ok) R.string.settings_backup_done else R.string.settings_backup_failed, Toast.LENGTH_LONG).show()
             }
         }
     }
+    val openFrom = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            viewModel.restore(uri) { restored ->
+                val text = restored?.let { context.getString(R.string.settings_restore_done, it.tracks.size, it.places.size) }
+                    ?: context.getString(R.string.settings_restore_failed)
+                Toast.makeText(context, text, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+    SettingsPage(stringResource(R.string.settings_data), onBack) {
+        Text(stringResource(R.string.settings_data_hint), style = MaterialTheme.typography.bodyMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+            OutlinedButton(
+                onClick = { saveTo.launch(BackupRepository.fileName()) },
+                modifier = Modifier.weight(1f).heightIn(min = TouchTarget),
+            ) { FitText(stringResource(R.string.settings_backup)) }
+            OutlinedButton(
+                onClick = { openFrom.launch(arrayOf("application/zip", "application/octet-stream")) },
+                modifier = Modifier.weight(1f).heightIn(min = TouchTarget),
+            ) { FitText(stringResource(R.string.settings_restore)) }
+        }
+    }
+}
+
+@Composable
+private fun AboutSettings(onBack: () -> Unit) {
+    SettingsPage(stringResource(R.string.settings_about), onBack) {
+        Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodyLarge)
+        Text(
+            stringResource(R.string.settings_credits),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+}
+
+/** Battery saver or stamina mode on: what they override waits, greyed out. */
+@Composable
+private fun rememberSaving(viewModel: SettingsViewModel): Boolean {
+    val batterySaver by viewModel.batterySaver.collectAsStateWithLifecycle()
+    val staminaMode by viewModel.staminaMode.collectAsStateWithLifecycle()
+    return batterySaver || staminaMode
+}
+
+/** Why some rows are greyed out on this page. */
+@Composable
+private fun PowerNote() {
+    Text(
+        stringResource(R.string.settings_power_note),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(vertical = 4.dp),
+    )
+}
+
+/** Metric or imperial when distance, height and speed all match one; null for a mix. */
+private fun unitSystem(units: Units): Units? = listOf(Units.Metric, Units.Imperial).firstOrNull {
+    it.distance == units.distance && it.elevation == units.elevation && it.speed == units.speed
 }
 
 @Composable
@@ -734,6 +819,51 @@ private fun ToggleRow(
         }
         // The whole row toggles; the switch only shows the state.
         Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+    }
+}
+
+/**
+ * What the app warns about on the way: leaving the route, the last water, rain and storms,
+ * time to turn back. On a page of their own, with a summary on the main one.
+ */
+@Composable
+private fun AlertsSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
+    val offRouteVibration by viewModel.offRouteVibration.collectAsStateWithLifecycle()
+    val waterAdvice by viewModel.waterAdvice.collectAsStateWithLifecycle()
+    val rainAdvice by viewModel.rainAdvice.collectAsStateWithLifecycle()
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(
+            modifier = Modifier
+                .safeDrawingPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                MapButton(SentrekIcons.Back, stringResource(R.string.settings_back), onBack, Modifier.padding(vertical = 12.dp))
+                Text(stringResource(R.string.settings_alerts_page), style = MaterialTheme.typography.headlineMedium)
+            }
+            ToggleRow(
+                title = stringResource(R.string.settings_off_route_vibration),
+                hint = stringResource(R.string.settings_off_route_vibration_hint),
+                checked = offRouteVibration,
+                onChange = viewModel::setOffRouteVibration,
+            )
+            ToggleRow(
+                title = stringResource(R.string.settings_water_advice),
+                hint = stringResource(R.string.settings_water_advice_hint),
+                checked = waterAdvice,
+                onChange = viewModel::setWaterAdvice,
+            )
+            ToggleRow(
+                title = stringResource(R.string.settings_rain_advice),
+                hint = stringResource(R.string.settings_rain_advice_hint),
+                checked = rainAdvice,
+                onChange = viewModel::setRainAdvice,
+            )
+            TurnaroundRows(viewModel)
+            Spacer(Modifier.height(16.dp))
+        }
     }
 }
 

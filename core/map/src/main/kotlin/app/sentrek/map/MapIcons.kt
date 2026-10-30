@@ -71,7 +71,7 @@ object MapIcons {
         }
     }
 
-    private fun badge(context: Context, @DrawableRes res: Int, color: Int, density: Float): Bitmap {
+    internal fun badge(context: Context, @DrawableRes res: Int, color: Int, density: Float): Bitmap {
         val size = (BADGE_DP * density).toInt()
         val stroke = 1.5f * density
         val bitmap = createBitmap(size, size)

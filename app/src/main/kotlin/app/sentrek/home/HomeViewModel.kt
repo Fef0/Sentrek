@@ -1,5 +1,9 @@
 package app.sentrek.home
 
+import app.sentrek.geo.weather.WetAhead
+import app.sentrek.record.WetWatch
+import app.sentrek.record.BatteryWatch
+import app.sentrek.record.SignalWatch
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -81,6 +85,9 @@ class HomeViewModel @Inject constructor(
     private val elevation: ElevationRepository,
     private val barometer: BarometerRepository,
     private val weather: WeatherRepository,
+    private val signal: SignalWatch,
+    private val batteryWatch: BatteryWatch,
+    private val wetWatch: WetWatch,
 ) : ViewModel() {
     val powerMode: StateFlow<PowerMode> =
         settings.powerMode.stateIn(viewModelScope, SharingStarted.Eagerly, PowerMode.Normal)
@@ -194,6 +201,21 @@ class HomeViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val following: StateFlow<Following?> = follower.state
+
+    /** The first wet spot on the way, while recording or following. */
+    val wet: StateFlow<WetAhead.Found?> = wetWatch.state
+
+    /** How long the battery lasts at this rate, while recording or following. */
+    val battery: StateFlow<BatteryWatch.State?> = batteryWatch.state
+
+    fun setStaminaMode() {
+        viewModelScope.launch { settings.setStaminaMode(true) }
+    }
+
+    /** The last place with a phone signal, while there is none here; null otherwise. */
+    val lastSignal: StateFlow<SignalWatch.Spot?> = signal.state
+        .map { s -> s?.last?.takeIf { !s.hasSignal } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Who gets the position by SMS while recording, and how often; null: nobody (see Breadcrumbs). */
     val breadcrumbs: StateFlow<Pair<String, Int>?> =

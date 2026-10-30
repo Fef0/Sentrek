@@ -11,7 +11,26 @@ data class Forecast(
     val days: List<Day>,
     /** The height the forecast is for, in metres: the place's own when we knew it. */
     val elevation: Double?,
+    /** Hour by hour, local time; empty in forecasts saved before there were hours. */
+    val hours: List<Hour> = emptyList(),
 ) {
+    /** One hour of a day: [date] as in [Day.date], [hour] 0–23 at the place. */
+    data class Hour(
+        val date: String,
+        val hour: Int,
+        val sky: Sky,
+        val temp: Double?,
+        val precipitation: Double?,
+        val precipitationChance: Int?,
+        val wind: Double?,
+        val gusts: Double?,
+        /** False at night, null when unknown. */
+        val day: Boolean? = null,
+    )
+
+    /** The hours of [date]. */
+    fun hoursOf(date: String): List<Hour> = hours.filter { it.date == date }
+
     data class Day(
         /** Local date at the place, "2026-10-29". */
         val date: String,
@@ -55,6 +74,9 @@ data class Forecast(
         /** About 60 km/h: hard to walk upright on an exposed ridge. */
         const val STRONG_GUSTS_MS = 16.7
         const val DAYS = 7
+        private val HOURLY = listOf(
+            "weather_code", "temperature_2m", "precipitation", "precipitation_probability", "wind_speed_10m", "wind_gusts_10m", "is_day",
+        )
         private val DAILY = listOf(
             "weather_code", "temperature_2m_max", "temperature_2m_min", "precipitation_sum",
             "precipitation_probability_max", "wind_speed_10m_max", "wind_gusts_10m_max",
@@ -70,6 +92,7 @@ data class Forecast(
             append(String.format(Locale.ROOT, "?latitude=%.2f&longitude=%.2f", lat, lon))
             elevation?.let { append(String.format(Locale.ROOT, "&elevation=%.0f", Math.round(it / 10.0) * 10.0)) }
             append("&daily=").append(DAILY.joinToString(","))
+            append("&hourly=").append(HOURLY.joinToString(","))
             append("&timezone=auto&wind_speed_unit=ms&forecast_days=$DAYS")
         }
 
@@ -94,7 +117,30 @@ data class Forecast(
             }
             if (days.isEmpty()) return null
             val elevation = root.get("elevation")?.takeUnless { it.isJsonNull }?.asDouble
-            return Forecast(days, elevation)
+            return Forecast(days, elevation, hours(root))
+        }
+
+        /** "2026-10-30T14:00" each, local to the place. */
+        private fun hours(root: JsonObject): List<Hour> {
+            val hourly = root.getAsJsonObject("hourly") ?: return emptyList()
+            val times = hourly.array("time") ?: return emptyList()
+            fun number(key: String, i: Int) = hourly.array(key)?.takeIf { i < it.size() }?.get(i)
+                ?.takeUnless { it.isJsonNull }?.asDouble
+            return (0 until times.size()).mapNotNull { i ->
+                val time = times[i].asString
+                val hour = time.substringAfter('T').substringBefore(':').toIntOrNull() ?: return@mapNotNull null
+                Hour(
+                    date = time.substringBefore('T'),
+                    hour = hour,
+                    sky = Sky.of(number("weather_code", i)?.toInt() ?: -1),
+                    temp = number("temperature_2m", i),
+                    precipitation = number("precipitation", i),
+                    precipitationChance = number("precipitation_probability", i)?.toInt(),
+                    wind = number("wind_speed_10m", i),
+                    gusts = number("wind_gusts_10m", i),
+                    day = number("is_day", i)?.let { it > 0.5 },
+                )
+            }
         }
 
         private fun JsonObject.array(key: String): JsonArray? = get(key)?.takeIf { it.isJsonArray }?.asJsonArray

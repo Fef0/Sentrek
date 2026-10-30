@@ -51,6 +51,16 @@ object Geo {
         return (Math.toDegrees(atan2(y, x)) + 360) % 360
     }
 
+    /** The point [distance] metres from [from] towards compass [bearing] (degrees), on the sphere. */
+    fun destination(from: LatLon, bearing: Double, distance: Double): LatLon {
+        val d = distance / EARTH_RADIUS_M
+        val b = Math.toRadians(bearing)
+        val phi1 = Math.toRadians(from.lat)
+        val phi2 = asin(sin(phi1) * cos(d) + cos(phi1) * sin(d) * cos(b))
+        val lambda = Math.toRadians(from.lon) + atan2(sin(b) * sin(d) * cos(phi1), cos(d) - sin(phi1) * sin(phi2))
+        return LatLon(Math.toDegrees(phi2), (Math.toDegrees(lambda) + 540) % 360 - 180)
+    }
+
     /** Total length of a polyline in metres. */
     fun length(points: List<LatLon>): Double =
         points.zipWithNext().sumOf { (a, b) -> distance(a, b) }

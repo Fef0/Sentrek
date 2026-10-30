@@ -1,5 +1,16 @@
 package app.sentrek.record
 
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.ui.window.Dialog
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -101,7 +112,16 @@ private fun ForecastDays(weather: Weather, highest: Boolean, onRetry: () -> Unit
         val today = remember { ISO.format(Date()) }
         // A forecast saved days ago starts in the past: those days are over.
         val days = forecast.days.filterIndexed { i, day -> day.date >= today || (i == 0 && !weather.offline) }
-        for ((i, day) in days.withIndex()) DayRow(day, label = dayLabel(day.date, today, i))
+        var open by remember { mutableStateOf<Pair<Forecast.Day, String>?>(null) }
+        for ((i, day) in days.withIndex()) {
+            val label = dayLabel(day.date, today, i)
+            // Hour by hour, for forecasts that have the hours (not those saved before).
+            val hours = forecast.hoursOf(day.date).isNotEmpty()
+            DayRow(day, label, onClick = if (hours) ({ open = day to label }) else null)
+        }
+        open?.let { (day, label) ->
+            HoursDialog(label, forecast.hoursOf(day.date), today = day.date == today && !weather.offline) { open = null }
+        }
         if (weather.offline) {
             OutlinedButton(onClick = onRetry, modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget)) {
                 Text(stringResource(R.string.weather_retry))
@@ -116,8 +136,16 @@ private fun ForecastDays(weather: Weather, highest: Boolean, onRetry: () -> Unit
 }
 
 @Composable
-private fun DayRow(day: Forecast.Day, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+private fun DayRow(day: Forecast.Day, label: String, onClick: (() -> Unit)?) {
+    Row(
+        modifier = if (onClick != null) {
+            Modifier.fillMaxWidth().heightIn(min = TouchTarget).clickable(onClickLabel = stringResource(R.string.weather_hours), onClick = onClick)
+        } else {
+            Modifier.fillMaxWidth()
+        },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.width(76.dp))
         Text(SKY_SYMBOL.getValue(day.sky), fontSize = 28.sp)
         Column(Modifier.weight(1f)) {
@@ -143,6 +171,75 @@ private fun DayRow(day: Forecast.Day, label: String) {
             if (warnings.isNotEmpty()) {
                 Text(
                     "⚠ " + warnings.joinToString(" · "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+        // "There's more": the hours of the day.
+        if (onClick != null) Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+    }
+}
+
+/** The [hours] of one day; [today] starts from the hour now, the past ones are no use. */
+@Composable
+private fun HoursDialog(label: String, hours: List<Forecast.Hour>, today: Boolean, onDismiss: () -> Unit) {
+    val now = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+    val shown = if (today) hours.filter { it.hour >= now } else hours
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface) {
+            Column(Modifier.padding(vertical = 16.dp)) {
+                Text(
+                    stringResource(R.string.weather_hours_title, label),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                )
+                LazyColumn(Modifier.weight(1f, fill = false), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)) {
+                    items(shown) { HourRow(it) }
+                }
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.End).padding(end = 12.dp).heightIn(min = TouchTarget),
+                ) { Text(stringResource(R.string.weather_hours_close)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HourRow(hour: Forecast.Hour) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(String.format(Locale.ROOT, "%02d", hour.hour), style = MaterialTheme.typography.titleMedium, modifier = Modifier.width(28.dp))
+        // No sun at night.
+        val symbol = when {
+            hour.day != false -> SKY_SYMBOL.getValue(hour.sky)
+            hour.sky == Forecast.Sky.Clear -> "🌙"
+            hour.sky == Forecast.Sky.PartlyCloudy -> "☁️"
+            else -> SKY_SYMBOL.getValue(hour.sky)
+        }
+        Text(symbol, fontSize = 24.sp)
+        Text(
+            hour.temp?.let(::temperature).orEmpty(),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.width(44.dp),
+        )
+        Column(Modifier.weight(1f)) {
+            val wet = (hour.precipitation ?: 0.0) >= 0.1 || (hour.precipitationChance ?: 0) >= 20
+            val rain = listOfNotNull(hour.precipitation?.takeIf { it >= 0.05 }?.let(::precipitation), hour.precipitationChance?.let { "$it%" })
+                .takeIf { wet && it.isNotEmpty() }?.joinToString(" ")?.let { "💧 $it" }
+            val wind = hour.wind?.let { w ->
+                "💨 " + Format.speed(w) + (hour.gusts?.takeIf { it >= Forecast.STRONG_GUSTS_MS }?.let { " (" + Format.speed(it) + ")" } ?: "")
+            }
+            Text(listOfNotNull(rain, wind).joinToString("   "), style = MaterialTheme.typography.bodyMedium)
+            if (hour.sky == Forecast.Sky.Storm || (hour.gusts ?: 0.0) >= Forecast.STRONG_GUSTS_MS) {
+                Text(
+                    "⚠ " + stringResource(if (hour.sky == Forecast.Sky.Storm) R.string.weather_storm else R.string.weather_windy),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.error,

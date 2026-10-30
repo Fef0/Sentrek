@@ -37,6 +37,7 @@ import kotlinx.coroutines.delay
 import app.sentrek.geo.LatLon
 import app.sentrek.data.SettingsRepository
 import app.sentrek.data.TurnaroundMode
+import app.sentrek.data.PowerMode
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -55,6 +56,9 @@ class TrackingService : Service() {
     @Inject lateinit var following: FollowRepository
     @Inject lateinit var location: LocationRepository
     @Inject lateinit var settings: SettingsRepository
+    @Inject lateinit var signal: SignalWatch
+    @Inject lateinit var battery: BatteryWatch
+    @Inject lateinit var wet: WetWatch
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val live by lazy { LiveNotification(this, CHANNEL_ID) }
@@ -72,6 +76,13 @@ class TrackingService : Service() {
     private var turnaroundMode = TurnaroundMode.Off
     private var turnaroundMargin = 30
     private var turnaroundTime = 14 * 60
+
+    /** What the battery drain depends on, and whether its warning was given on this walk. */
+    private var powerMode = PowerMode.Normal
+    private var batteryWarned = false
+
+    /** Rain and storms on the way: off, no forecast is asked for at all. */
+    private var rainAdvice = true
 
     /** The last fix, for the time of sunset where the user is. */
     private var at: LatLon? = null
@@ -130,6 +141,7 @@ class TrackingService : Service() {
                     at = runCatching { LatLon(it.latitude, it.longitude) }.getOrNull() ?: at
                     fix = it
                     onRestCheck(it)
+                    signal.onLocation(it)
                     recording.onLocation(it)
                     following.onLocation(it)
                     checkBreadcrumbs()
@@ -137,6 +149,7 @@ class TrackingService : Service() {
             }
         }
         breadcrumbs.start()
+        signal.start()
         ContextCompat.registerReceiver(this, screenOn, IntentFilter(Intent.ACTION_SCREEN_ON), ContextCompat.RECEIVER_NOT_EXPORTED)
         // With the SOS screen off, its settings rest too (greyed out in Settings).
         scope.launch {
@@ -147,6 +160,8 @@ class TrackingService : Service() {
         scope.launch { settings.emergencyContactName.collect { breadcrumbName = it; checkBreadcrumbs() } }
         scope.launch { settings.lowBatterySms.collect { lowBatterySms = it; checkBreadcrumbs() } }
         scope.launch { settings.turnaround.collect { turnaroundMode = it } }
+        scope.launch { settings.powerMode.collect { powerMode = it } }
+        scope.launch { settings.rainAdvice.collect { rainAdvice = it; if (!it) wet.stop() } }
         scope.launch { settings.turnaroundMarginMinutes.collect { turnaroundMargin = it } }
         scope.launch { settings.turnaroundTime.collect { turnaroundTime = it } }
         // The last text as the recording ends, before the service may stop.
@@ -167,6 +182,8 @@ class TrackingService : Service() {
                 // Also when no fix comes (a gorge, a tunnel): the last one known is sent.
                 checkBreadcrumbs()
                 turnaround.check(turnaroundMode, turnaroundMargin, turnaroundTime, at, following.state.value)
+                checkBattery()
+                if (rainAdvice) wet.check(at, following.state.value)
             }
         }
     }
@@ -227,6 +244,23 @@ class TrackingService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    /** A battery reading, and once a walk, a word when at this rate it won't last. */
+    private fun checkBattery() {
+        battery.sample(powerMode)
+        val empty = battery.state.value?.emptyAt ?: return
+        val now = System.currentTimeMillis()
+        val arrival = following.state.value?.let { now + it.remaining.millis }
+        if (batteryWarned || !BatteryWatch.tooSoon(empty, arrival, now)) return
+        batteryWarned = true
+        val time = { millis: Long -> android.text.format.DateFormat.getTimeFormat(this).format(java.util.Date(millis)) }
+        val text = if (arrival != null) {
+            getString(R.string.battery_alert_route, time(empty), time(arrival))
+        } else {
+            getString(R.string.battery_alert_left, time(empty))
+        }
+        TrailAlerts.ring(this, BATTERY_NOTIFICATION_ID, getString(R.string.battery_alert_title), text, BATTERY_PATTERN)
+    }
+
     private fun checkBreadcrumbs() =
         breadcrumbs.check(recording.state.value, fix, breadcrumbMinutes, breadcrumbTo, breadcrumbName, lowBatterySms)
 
@@ -235,6 +269,9 @@ class TrackingService : Service() {
         motionSensor?.let { sensors?.cancelTriggerSensor(motion, it) }
         if (recording.state.value == null) checkBreadcrumbs()
         breadcrumbs.stop()
+        signal.stop()
+        battery.stop()
+        wet.stop()
         scope.cancel()
         super.onDestroy()
     }
@@ -272,6 +309,10 @@ class TrackingService : Service() {
         private const val CHANNEL_ID = "tracking"
         private const val OLD_CHANNEL_ID = "recording"
         private const val NOTIFICATION_ID = 2
+        private const val BATTERY_NOTIFICATION_ID = 6
+
+        /** Two long buzzes: worth a look, not an alarm. */
+        private val BATTERY_PATTERN = longArrayOf(0, 600, 300, 600)
         private const val NOTIFICATION_INTERVAL_MS = 5_000L
         private const val CLOCK_INTERVAL_MS = 60_000L
 

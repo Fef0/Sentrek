@@ -1,5 +1,6 @@
 package app.sentrek.search
 
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -73,6 +74,8 @@ fun SearchScreen(
     near: LatLon?,
     onBack: () -> Unit,
     onShowOnMap: (BoundingBox) -> Unit,
+    /** Opens the peak finder. */
+    onPeaks: () -> Unit,
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
     val query by viewModel.query.collectAsStateWithLifecycle()
@@ -115,6 +118,16 @@ fun SearchScreen(
         }
 
         val blank = query.isBlank()
+        // Finding a place by name, or naming a place in sight: one screen for both.
+        if (blank) {
+            OutlinedButton(
+                onClick = onPeaks,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp).heightIn(min = TouchTarget),
+            ) {
+                Icon(SentrekIcons.Peak, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                Text(stringResource(R.string.peaks_open), style = MaterialTheme.typography.titleMedium)
+            }
+        }
         if (blank || results.isEmpty) {
             Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(

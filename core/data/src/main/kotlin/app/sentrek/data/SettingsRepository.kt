@@ -119,6 +119,14 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[RAIN_ADVICE] = on }
     }
 
+    /** While following a route: the long stretches in the sun ahead, from the terrain. */
+    val shadeAdvice: Flow<Boolean> =
+        context.settings.data.map { it[SHADE_ADVICE] ?: true }
+
+    suspend fun setShadeAdvice(on: Boolean) {
+        context.settings.edit { it[SHADE_ADVICE] = on }
+    }
+
     /** The turnaround alarm: off, before dark, or at a set time. */
     val turnaround: Flow<TurnaroundMode> =
         context.settings.data.map { p -> TurnaroundMode.entries.firstOrNull { it.name == p[TURNAROUND] } ?: TurnaroundMode.Off }
@@ -503,6 +511,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val TURNAROUND = stringPreferencesKey("turnaround")
         val WATER_ADVICE = booleanPreferencesKey("water_advice")
         val RAIN_ADVICE = booleanPreferencesKey("rain_advice")
+        val SHADE_ADVICE = booleanPreferencesKey("shade_advice")
         val TURNAROUND_MARGIN = intPreferencesKey("turnaround_margin")
         val TURNAROUND_TIME = intPreferencesKey("turnaround_time")
         private const val SERVER_PREFIX = "server_"

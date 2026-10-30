@@ -182,6 +182,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setRainAdvice(on) }
     }
 
+    val shadeAdvice: StateFlow<Boolean> =
+        settings.shadeAdvice.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setShadeAdvice(on: Boolean) {
+        viewModelScope.launch { settings.setShadeAdvice(on) }
+    }
+
     val turnaround: StateFlow<TurnaroundMode> =
         settings.turnaround.stateIn(viewModelScope, SharingStarted.Eagerly, TurnaroundMode.Off)
 
@@ -860,6 +867,13 @@ private fun AlertsSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
                 hint = stringResource(R.string.settings_rain_advice_hint),
                 checked = rainAdvice,
                 onChange = viewModel::setRainAdvice,
+            )
+            val shadeAdvice by viewModel.shadeAdvice.collectAsStateWithLifecycle()
+            ToggleRow(
+                title = stringResource(R.string.settings_shade_advice),
+                hint = stringResource(R.string.settings_shade_advice_hint),
+                checked = shadeAdvice,
+                onChange = viewModel::setShadeAdvice,
             )
             TurnaroundRows(viewModel)
             Spacer(Modifier.height(16.dp))

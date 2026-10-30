@@ -56,6 +56,15 @@ class Panorama(private val tiles: TerrainTiles) {
         }.sortedBy { it.azimuth }
     }
 
+    /**
+     * How high the ground rises towards [azimuth], in degrees above the level of an eye
+     * [eyeHeight] metres over [from]: the sun lower than that is behind it.
+     */
+    fun horizon(from: LatLon, eyeHeight: Double, azimuth: Double, maxDistance: Double = MAX_DISTANCE_M): Double {
+        val eye = (from.ele ?: height(from) ?: 0.0) + eyeHeight
+        return maxAngle(from, eye, azimuth, maxDistance)
+    }
+
     /** The highest ground angle along [azimuth] out to [maxDistance]. */
     private fun maxAngle(from: LatLon, eye: Double, azimuth: Double, maxDistance: Double): Double {
         var best = -90.0

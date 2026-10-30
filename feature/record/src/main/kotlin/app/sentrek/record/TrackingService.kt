@@ -59,6 +59,7 @@ class TrackingService : Service() {
     @Inject lateinit var signal: SignalWatch
     @Inject lateinit var battery: BatteryWatch
     @Inject lateinit var wet: WetWatch
+    @Inject lateinit var shade: ShadeWatch
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val live by lazy { LiveNotification(this, CHANNEL_ID) }
@@ -83,6 +84,7 @@ class TrackingService : Service() {
 
     /** Rain and storms on the way: off, no forecast is asked for at all. */
     private var rainAdvice = true
+    private var shadeAdvice = true
 
     /** The last fix, for the time of sunset where the user is. */
     private var at: LatLon? = null
@@ -162,6 +164,7 @@ class TrackingService : Service() {
         scope.launch { settings.turnaround.collect { turnaroundMode = it } }
         scope.launch { settings.powerMode.collect { powerMode = it } }
         scope.launch { settings.rainAdvice.collect { rainAdvice = it; if (!it) wet.stop() } }
+        scope.launch { settings.shadeAdvice.collect { shadeAdvice = it; if (it) shade.check(following.state.value) else shade.stop() } }
         scope.launch { settings.turnaroundMarginMinutes.collect { turnaroundMargin = it } }
         scope.launch { settings.turnaroundTime.collect { turnaroundTime = it } }
         // The last text as the recording ends, before the service may stop.
@@ -184,6 +187,7 @@ class TrackingService : Service() {
                 turnaround.check(turnaroundMode, turnaroundMargin, turnaroundTime, at, following.state.value)
                 checkBattery()
                 if (rainAdvice) wet.check(at, following.state.value)
+                if (shadeAdvice) shade.check(following.state.value)
             }
         }
     }
@@ -272,6 +276,7 @@ class TrackingService : Service() {
         signal.stop()
         battery.stop()
         wet.stop()
+        shade.stop()
         scope.cancel()
         super.onDestroy()
     }

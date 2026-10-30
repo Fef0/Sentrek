@@ -278,6 +278,7 @@ fun MapScreen(
     val lastSignal by viewModel.lastSignal.collectAsStateWithLifecycle()
     val battery by viewModel.battery.collectAsStateWithLifecycle()
     val wet by viewModel.wet.collectAsStateWithLifecycle()
+    val sunny by viewModel.sunny.collectAsStateWithLifecycle()
     // The phone's compass while pointing the way: the arrow then points the real way.
     var heading by remember { mutableStateOf<Float?>(null) }
     val showLockButton by viewModel.showLockButton.collectAsStateWithLifecycle()
@@ -533,6 +534,7 @@ fun MapScreen(
                         onStamina = viewModel::setStaminaMode,
                         water = followedRoute?.water,
                         wet = wet,
+                        sunny = sunny,
                     )
                 }
                 // Top left, under any panel. It stays when the other controls fade out.

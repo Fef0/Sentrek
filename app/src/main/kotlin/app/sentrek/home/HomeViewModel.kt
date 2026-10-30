@@ -1,5 +1,7 @@
 package app.sentrek.home
 
+import app.sentrek.geo.route.Shade
+import app.sentrek.record.ShadeWatch
 import app.sentrek.geo.weather.WetAhead
 import app.sentrek.record.WetWatch
 import app.sentrek.record.BatteryWatch
@@ -88,6 +90,7 @@ class HomeViewModel @Inject constructor(
     private val signal: SignalWatch,
     private val batteryWatch: BatteryWatch,
     private val wetWatch: WetWatch,
+    private val shadeWatch: ShadeWatch,
 ) : ViewModel() {
     val powerMode: StateFlow<PowerMode> =
         settings.powerMode.stateIn(viewModelScope, SharingStarted.Eagerly, PowerMode.Normal)
@@ -201,6 +204,9 @@ class HomeViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val following: StateFlow<Following?> = follower.state
+
+    /** The next long stretch in the sun on the followed route. */
+    val sunny: StateFlow<Shade.Stretch?> = shadeWatch.state
 
     /** The first wet spot on the way, while recording or following. */
     val wet: StateFlow<WetAhead.Found?> = wetWatch.state

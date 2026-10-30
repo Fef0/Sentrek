@@ -2,6 +2,8 @@ package app.sentrek.geo
 
 import kotlin.math.acos
 import kotlin.math.asin
+import kotlin.math.atan2
+import kotlin.math.tan
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.roundToLong
@@ -34,6 +36,26 @@ object Sun {
         if (cosHourAngle !in -1.0..1.0) return null
         val half = Math.toDegrees(acos(cosHourAngle)) / 360
         return Day(toMillis(transit - half), toMillis(transit + half))
+    }
+
+    /** Where the sun is in the sky: compass [azimuth] and [altitude] above the horizon, in degrees. */
+    data class Position(val azimuth: Double, val altitude: Double)
+
+    /** The sun seen from [lat], [lon] at [time] (the low-precision solar ephemeris: a few hundredths of a degree). */
+    fun position(time: Long, lat: Double, lon: Double): Position {
+        val d = time / MILLIS_PER_DAY.toDouble() + UNIX_EPOCH_JD - J2000
+        val anomaly = Math.toRadians((357.529 + 0.98560028 * d).mod(360.0))
+        val mean = 280.459 + 0.98564736 * d
+        val longitude = Math.toRadians((mean + 1.915 * sin(anomaly) + 0.020 * sin(2 * anomaly)).mod(360.0))
+        val obliquity = Math.toRadians(23.439 - 0.00000036 * d)
+        val rightAscension = atan2(cos(obliquity) * sin(longitude), cos(longitude))
+        val declination = asin(sin(obliquity) * sin(longitude))
+        val siderealDeg = (280.46061837 + 360.98564736629 * d + lon).mod(360.0)
+        val hourAngle = Math.toRadians(siderealDeg) - rightAscension
+        val phi = Math.toRadians(lat)
+        val altitude = asin(sin(phi) * sin(declination) + cos(phi) * cos(declination) * cos(hourAngle))
+        val azimuth = atan2(-sin(hourAngle), tan(declination) * cos(phi) - sin(phi) * cos(hourAngle))
+        return Position((Math.toDegrees(azimuth) + 360) % 360, Math.toDegrees(altitude))
     }
 
     private fun toMillis(julian: Double): Long = ((julian - UNIX_EPOCH_JD) * MILLIS_PER_DAY).roundToLong()

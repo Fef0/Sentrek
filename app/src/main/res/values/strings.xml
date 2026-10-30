@@ -178,7 +178,7 @@
     <string name="settings_controls_about">Glove mode, button size, volume keys, lock button</string>
     <string name="settings_appearance_about">Text size, app and map themes, full screen</string>
     <string name="settings_units_about">Metric or imperial, coordinates, each unit on its own</string>
-    <string name="settings_alerts_about">Off route, water, rain and storms, turnaround alarm</string>
+    <string name="settings_alerts_about">Off route, water, rain and storms, sun, turnaround alarm</string>
     <string name="settings_emergency_about">SOS screen, emergency contact, position texts</string>
     <string name="settings_data_about">Back up and restore your tracks, places and photos</string>
     <string name="settings_about_about">Version and credits</string>
@@ -339,6 +339,8 @@
     <string name="note_wet_from">%1$s likely from %2$s</string>
     <string name="note_wet_route">%1$s likely from %2$s, %3$s on%4$s</string>
     <string name="note_wet_height">, at %s</string>
+    <string name="note_sun_now">In the sun for the next %s</string>
+    <string name="note_sun_from">Full sun from %1$s, %2$s on, for %3$s</string>
     <string name="note_water_last">Last water for %1$s: %2$s in %3$s</string>
     <string name="note_water_unnamed">a spring</string>
     <string name="note_water_none">No water for the rest of the route (%s)</string>
@@ -353,6 +355,8 @@
     <string name="settings_water_advice_hint">Before a long stretch without springs or fountains, says which is the last one, and buzzes there to fill up.</string>
     <string name="settings_rain_advice">Rain and storms on the way</string>
     <string name="settings_rain_advice_hint">While you record or follow a route, says when rain or snow is likely where you will be, and buzzes for storms. Checks the forecast once an hour when there is a connection.</string>
+    <string name="settings_shade_advice">Sun on the way</string>
+    <string name="settings_shade_advice_hint">While you follow a route: when you\'ll be walking in full sun for a while, worked out from the terrain at your pace.</string>
     <string name="settings_turnaround">Turnaround alarm</string>
     <string name="settings_turnaround_off">Off</string>
     <string name="settings_turnaround_dark">Before dark</string>

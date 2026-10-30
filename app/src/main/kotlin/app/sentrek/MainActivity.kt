@@ -123,7 +123,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             val textSize by settings.textSize.collectAsStateWithLifecycle(initialValue = TextSize.Default)
             val buttonSize by settings.buttonSize.collectAsStateWithLifecycle(initialValue = ButtonSize.Standard)
-            val gloves by settings.gloveMode.collectAsStateWithLifecycle(initialValue = false)
             val volumeZoom by settings.volumeKeysZoom.collectAsStateWithLifecycle(initialValue = false)
             val theme by settings.theme.collectAsStateWithLifecycle(initialValue = AppTheme.System)
             val fullScreen by settings.fullScreen.collectAsStateWithLifecycle(initialValue = false)
@@ -163,11 +162,10 @@ class MainActivity : ComponentActivity() {
                 SentrekTheme(
                     darkTheme = dark,
                     black = power.blackScreens || theme == AppTheme.Black,
-                    touch = when {
-                        gloves -> Touch.Gloves
-                        buttonSize == ButtonSize.Large -> Touch.Large
-                        buttonSize == ButtonSize.Largest -> Touch.Largest
-                        else -> Touch.Standard
+                    touch = when (buttonSize) {
+                        ButtonSize.Standard -> Touch.Standard
+                        ButtonSize.Large -> Touch.Large
+                        ButtonSize.Gloves -> Touch.Gloves
                     },
                     textScale = textSize.scale,
                 ) {
@@ -183,7 +181,7 @@ class MainActivity : ComponentActivity() {
                     val planner: PlannerViewModel = hiltViewModel()
                     val scope = rememberCoroutineScope()
                     val toMap = { screen = Screen.Map }
-                    SideEffect { volumeKeysZoom = (gloves || volumeZoom) && screen == Screen.Map }
+                    SideEffect { volumeKeysZoom = volumeZoom && screen == Screen.Map }
 
                     val importedBounds by imported.collectAsStateWithLifecycle()
                     LaunchedEffect(importedBounds) {

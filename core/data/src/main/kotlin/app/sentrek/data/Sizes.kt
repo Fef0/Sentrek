@@ -8,9 +8,9 @@ enum class TextSize(val scale: Float) {
     Largest(1.3f),
 }
 
-/** How big buttons are without gloves; glove mode makes them the biggest whatever this says. */
+/** How big buttons are; [Gloves] is the biggest, with long presses on the map that reach further too. */
 enum class ButtonSize {
     Standard,
     Large,
-    Largest,
+    Gloves,
 }

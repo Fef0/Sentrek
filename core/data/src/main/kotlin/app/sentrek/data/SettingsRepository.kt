@@ -30,17 +30,9 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[SHOW_TRAIL_DIFFICULTY] = show }
     }
 
-    /** Biggest buttons, wider long-press area, and the volume keys zoom whatever [volumeKeysZoom] says. */
-    val gloveMode: Flow<Boolean> =
-        context.settings.data.map { it[GLOVE_MODE] ?: false }
-
-    suspend fun setGloveMode(on: Boolean) {
-        context.settings.edit { it[GLOVE_MODE] = on }
-    }
-
-    /** Volume keys zoom the map, without glove mode too. */
+    /** Volume keys zoom the map. On for those who had the old glove mode on, which forced it. */
     val volumeKeysZoom: Flow<Boolean> =
-        context.settings.data.map { it[VOLUME_KEYS_ZOOM] ?: false }
+        context.settings.data.map { it[VOLUME_KEYS_ZOOM] ?: (it[GLOVE_MODE] ?: false) }
 
     suspend fun setVolumeKeysZoom(on: Boolean) {
         context.settings.edit { it[VOLUME_KEYS_ZOOM] = on }
@@ -180,13 +172,24 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[TEXT_SIZE] = size.name }
     }
 
+    /** The old glove mode (a switch of its own until 0.14) and "Largest" read as [ButtonSize.Gloves]. */
     val buttonSize: Flow<ButtonSize> =
         context.settings.data.map { p ->
-            p[BUTTON_SIZE]?.let { runCatching { ButtonSize.valueOf(it) }.getOrNull() } ?: ButtonSize.Standard
+            val stored = p[BUTTON_SIZE]
+            when {
+                p[GLOVE_MODE] == true || stored == "Largest" -> ButtonSize.Gloves
+                stored == null -> ButtonSize.Standard
+                else -> runCatching { ButtonSize.valueOf(stored) }.getOrDefault(ButtonSize.Standard)
+            }
         }
 
     suspend fun setButtonSize(size: ButtonSize) {
-        context.settings.edit { it[BUTTON_SIZE] = size.name }
+        context.settings.edit {
+            // Its volume keys stay as they were: written out before the old switch goes.
+            if (it[GLOVE_MODE] == true && it[VOLUME_KEYS_ZOOM] == null) it[VOLUME_KEYS_ZOOM] = true
+            it.remove(GLOVE_MODE)
+            it[BUTTON_SIZE] = size.name
+        }
     }
 
     /** Vibrate when leaving the followed route and when back on it. */
@@ -257,6 +260,14 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         }
     }
 
+    /** Normal, battery saver or stamina mode, as chosen in Settings. */
+    suspend fun setPowerMode(mode: PowerMode) {
+        context.settings.edit {
+            it[STAMINA_MODE] = mode == PowerMode.Stamina
+            it[BATTERY_SAVER] = mode == PowerMode.Saver
+        }
+    }
+
     /** Which of normal, battery saver and stamina mode is on. */
     val powerMode: Flow<PowerMode> =
         context.settings.data.map {
@@ -308,12 +319,12 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         }
     }
 
-    /** The places ahead in the followed route's panel. */
-    val followPlaces: Flow<Boolean> =
-        context.settings.data.map { it[FOLLOW_PLACES] ?: true }
+    /** The trail card open: every note, the places ahead and the profile, not just the numbers. */
+    val trailCardExpanded: Flow<Boolean> =
+        context.settings.data.map { it[TRAIL_CARD_EXPANDED] ?: false }
 
-    suspend fun setFollowPlaces(show: Boolean) {
-        context.settings.edit { it[FOLLOW_PLACES] = show }
+    suspend fun setTrailCardExpanded(expanded: Boolean) {
+        context.settings.edit { it[TRAIL_CARD_EXPANDED] = expanded }
     }
 
     /** The whole list of places ahead open, rather than just the next one. */
@@ -330,14 +341,6 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     suspend fun setTripTotalsAllTime(allTime: Boolean) {
         context.settings.edit { it[TRIP_TOTALS_ALL_TIME] = allTime }
-    }
-
-    /** The elevation profile in the follow panel; hidden for more map. */
-    val followProfile: Flow<Boolean> =
-        context.settings.data.map { it[FOLLOW_PROFILE] ?: true }
-
-    suspend fun setFollowProfile(show: Boolean) {
-        context.settings.edit { it[FOLLOW_PROFILE] = show }
     }
 
     /** Light (the default), dark, OLED black, or the phone's own choice. */
@@ -516,8 +519,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val TURNAROUND_TIME = intPreferencesKey("turnaround_time")
         private const val SERVER_PREFIX = "server_"
         val OFF_ROUTE_VIBRATION = booleanPreferencesKey("off_route_vibration")
-        val FOLLOW_PROFILE = booleanPreferencesKey("follow_profile")
-        val FOLLOW_PLACES = booleanPreferencesKey("follow_places")
+        val TRAIL_CARD_EXPANDED = booleanPreferencesKey("trail_card_expanded")
         val FOLLOW_PLACES_EXPANDED = booleanPreferencesKey("follow_places_expanded")
         val TRIP_TOTALS_ALL_TIME = booleanPreferencesKey("trip_totals_all_time")
         val BATTERY_SAVER = booleanPreferencesKey("battery_saver")

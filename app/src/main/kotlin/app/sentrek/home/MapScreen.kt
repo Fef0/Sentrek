@@ -212,8 +212,7 @@ fun MapScreen(
     val recording by viewModel.recording.collectAsStateWithLifecycle()
     val breadcrumbs by viewModel.breadcrumbs.collectAsStateWithLifecycle()
     val followedRoute by viewModel.following.collectAsStateWithLifecycle()
-    val followProfile by viewModel.followProfile.collectAsStateWithLifecycle()
-    val followPlaces by viewModel.followPlaces.collectAsStateWithLifecycle()
+    val trailCardExpanded by viewModel.trailCardExpanded.collectAsStateWithLifecycle()
     val followPlacesExpanded by viewModel.followPlacesExpanded.collectAsStateWithLifecycle()
     val plan by planner.state.collectAsStateWithLifecycle()
     val planBlock by planner.blockedBy.collectAsStateWithLifecycle()
@@ -489,10 +488,6 @@ fun MapScreen(
                 // Where the sun sets for the user: their position, or the map's before a fix.
                 val sunPosition = lastFixForSun?.let { LatLon(it.latitude, it.longitude) }
                     ?: map?.cameraPosition?.target?.let { LatLon(it.latitude, it.longitude) }
-                recording?.let {
-                    // While following, the route's panel says it, against the time left.
-                    RecordingStats(recording = it, modifier = Modifier.fillMaxWidth(), position = sunPosition.takeIf { followedRoute == null })
-                }
                 goTo?.let { target ->
                     GoToPanel(
                         target = target,
@@ -503,32 +498,31 @@ fun MapScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                followedRoute?.let {
-                    FollowPanel(
-                        following = it,
-                        showProfile = followProfile,
-                        onToggleProfile = { viewModel.setFollowProfile(!followProfile) },
-                        showPlaces = followPlaces,
-                        onTogglePlaces = { viewModel.setFollowPlaces(!followPlaces) },
+                if (recording != null || followedRoute != null) {
+                    TrailCard(
+                        recording = recording,
+                        following = followedRoute,
+                        notes = rememberTrailNotes(
+                            battery = battery,
+                            arrival = followedRoute?.let { System.currentTimeMillis() + it.remaining.millis },
+                            powerMode = powerMode,
+                            onStamina = viewModel::setStaminaMode,
+                            position = sunPosition,
+                            water = followedRoute?.water,
+                            wet = wet,
+                            sunny = sunny,
+                        ),
+                        expanded = trailCardExpanded,
+                        onExpand = viewModel::setTrailCardExpanded,
                         placesExpanded = followPlacesExpanded,
                         onExpandPlaces = viewModel::setFollowPlacesExpanded,
-                        onOpen = {
-                            pressed = MapFeatureInfo(name = null, kind = "track", position = LatLng(0.0, 0.0), osmId = null, trackId = it.trackId)
+                        onOpenRoute = {
+                            followedRoute?.let {
+                                pressed = MapFeatureInfo(name = null, kind = "track", position = LatLng(0.0, 0.0), osmId = null, trackId = it.trackId)
+                            }
                         },
                         onStop = { confirm = FollowConfirmations.stop(context, it.name, viewModel::stopFollowing) },
                         modifier = Modifier.fillMaxWidth(),
-                        position = sunPosition,
-                    )
-                }
-                if (recording != null || followedRoute != null) {
-                    TrailNotes(
-                        battery = battery,
-                        arrival = followedRoute?.let { System.currentTimeMillis() + it.remaining.millis },
-                        powerMode = powerMode,
-                        onStamina = viewModel::setStaminaMode,
-                        water = followedRoute?.water,
-                        wet = wet,
-                        sunny = sunny,
                     )
                 }
                 // Top left, under any panel. It stays when the other controls fade out.
@@ -548,38 +542,38 @@ fun MapScreen(
                         }
                     }
                 }
-                // Never forgotten: they change how the whole app behaves.
-                when (powerMode) {
-                    PowerMode.Stamina -> MapNote(stringResource(R.string.stamina_on_map), SentrekIcons.BatteryAlert)
-                    PowerMode.Saver -> MapNote(stringResource(R.string.saver_on_map), SentrekIcons.BatterySaver)
-                    PowerMode.Normal -> Unit
-                }
             }
 
-            MapCompass(
-                bearing = bearing,
-                locked = rotationLocked,
-                onClick = {
-                    // Out of heading up too: the map would turn away again at the next fix.
-                    if (followMode != FollowMode.Off) {
-                        followRequest = FollowMode.North
-                    } else {
-                        map?.animateCamera(CameraUpdateFactory.bearingTo(0.0), NORTH_ANIMATION_MS)
-                    }
-                },
-                onLongClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    val locked = !rotationLocked
-                    viewModel.setRotationLocked(locked)
-                    Toast.makeText(context, if (locked) R.string.rotation_locked else R.string.rotation_unlocked, Toast.LENGTH_SHORT).show()
-                },
-                contentDescription = stringResource(R.string.compass_north),
-                longClickLabel = stringResource(if (rotationLocked) R.string.compass_unlock else R.string.compass_lock),
-                modifier = Modifier
+            Column(
+                Modifier
                     .align(Alignment.TopEnd)
                     .safeTopPadding()
                     .padding(horizontal = 12.dp, vertical = 8.dp),
-            )
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                MapCompass(
+                    bearing = bearing,
+                    locked = rotationLocked,
+                    onClick = {
+                        // Out of heading up too: the map would turn away again at the next fix.
+                        if (followMode != FollowMode.Off) {
+                            followRequest = FollowMode.North
+                        } else {
+                            map?.animateCamera(CameraUpdateFactory.bearingTo(0.0), NORTH_ANIMATION_MS)
+                        }
+                    },
+                    onLongClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        val locked = !rotationLocked
+                        viewModel.setRotationLocked(locked)
+                        Toast.makeText(context, if (locked) R.string.rotation_locked else R.string.rotation_unlocked, Toast.LENGTH_SHORT).show()
+                    },
+                    contentDescription = stringResource(R.string.compass_north),
+                    longClickLabel = stringResource(if (rotationLocked) R.string.compass_unlock else R.string.compass_lock),
+                )
+                    // Never forgotten, but small: they change how the whole app behaves. A tap to Settings.
+                PowerBadge(powerMode, onOpenSettings)
+            }
 
             // With the controls hidden, GPS trouble must still show.
             if (controlsHidden) {

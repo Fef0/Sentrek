@@ -97,7 +97,6 @@
     <string name="follow_time_left">Time left</string>
     <!-- Once the time left follows the user's own pace, learnt on this walk. -->
     <string name="follow_time_left_own">At your pace</string>
-    <string name="follow_profile">Elevation profile</string>
     <string name="follow_you_are_here">You are here</string>
     <string name="record_back_to_start">Back to start</string>
     <string name="offline_area">Offline · area not downloaded</string>
@@ -107,7 +106,6 @@
     <string name="record_way_back">Way back: %s</string>
     <string name="record_back_started">Following your way back. Still recording.</string>
     <string name="record_back_nothing">Nothing recorded yet to go back along</string>
-    <string name="follow_places">Places ahead</string>
     <string name="follow_places_more">All places ahead</string>
     <string name="follow_places_less">Next place only</string>
     <string name="follow_place_here">Here</string>
@@ -161,8 +159,6 @@
     <string name="settings_units_coordinates">Coordinates</string>
     <string name="settings_controls">Controls</string>
     <string name="settings_confirm_exit">Confirm exit</string>
-    <string name="settings_glove_mode">Glove mode</string>
-    <string name="settings_glove_mode_hint">The biggest buttons, easier long presses on the map, and zoom with the volume keys.</string>
     <string name="settings_volume_zoom">Volume keys zoom</string>
     <!-- Settings: hints for rows that had none. -->
     <string name="settings_contours_hint">Lines of equal height, drawn from the terrain.</string>
@@ -173,9 +169,8 @@
     <string name="settings_units_system_hint">Sets distance, height and speed together.</string>
     <string name="settings_power_note">Some of these wait, greyed out, while battery saver or stamina mode is on.</string>
     <!-- Settings: what each page holds, under its name on the main page. -->
-    <string name="settings_map_about">Contour lines, steep slopes, trail difficulty, scale bar, north up</string>
-    <string name="settings_map_updates_about">Automatic updates and reminders for downloaded areas</string>
-    <string name="settings_controls_about">Glove mode, button size, volume keys, lock button</string>
+    <string name="settings_map_about">Contour lines, steep slopes, trail difficulty, scale bar, north up, map updates</string>
+    <string name="settings_controls_about">Button size for gloves, volume keys, lock button</string>
     <string name="settings_appearance_about">Text size, app and map themes, full screen</string>
     <string name="settings_units_about">Metric or imperial, coordinates, each unit on its own</string>
     <string name="settings_alerts_about">Off route, water, rain and storms, sun, turnaround alarm</string>
@@ -220,17 +215,15 @@
     <string name="settings_save">Save</string>
     <string name="settings_default">Default</string>
     <string name="settings_cancel">Cancel</string>
-    <string name="settings_volume_zoom_gloves">Always on in glove mode.</string>
     <string name="settings_button_size">Button size</string>
     <string name="settings_button_size_hint">Bigger buttons are easier to hit, but cover more of the map.</string>
-    <string name="settings_button_size_gloves">Glove mode is on, so buttons are already at their biggest.</string>
+    <string name="settings_button_size_gloves">The biggest buttons, and long presses on the map reach further, so they land even with thick gloves.</string>
     <string name="settings_text_size">Text size</string>
     <string name="settings_text_size_hint">Adds to the text size set on your phone.</string>
     <string name="settings_size_small">Small</string>
     <string name="settings_size_default">Default</string>
     <string name="settings_size_standard">Standard</string>
     <string name="settings_size_large">Large</string>
-    <string name="settings_size_largest">Largest</string>
     <string name="settings_map">Map</string>
     <string name="settings_scale_bar">Scale bar</string>
     <string name="settings_lock_button">Lock button</string>
@@ -245,7 +238,7 @@
     <string name="settings_map_reminders">Remind me to update maps</string>
     <string name="settings_map_reminders_hint">Shows a reminder when you open the app and a downloaded area is more than 6 months old.</string>
     <string name="map_reminder_title">Time to update your maps</string>
-    <string name="map_reminder_text">Some downloaded areas are over 6 months old. Paths, huts and springs change: update them while you have Wi-Fi. You can turn this reminder off in Settings › Map updates.</string>
+    <string name="map_reminder_text">Some downloaded areas are over 6 months old. Paths, huts and springs change: update them while you have Wi-Fi. You can turn this reminder off in Settings › Map.</string>
     <string name="map_reminder_update">Update now</string>
     <string name="map_update_failed_title">Maps could not be updated</string>
     <plurals name="map_update_failed_text">
@@ -264,7 +257,7 @@
     <string name="settings_backup_failed">Backup failed</string>
     <string name="settings_restore_done">Restored %1$d tracks and %2$d places</string>
     <string name="settings_restore_failed">This file isn’t a Sentrek backup, or it can’t be read.</string>
-    <string name="settings_advanced_hint">Stamina mode, automatic battery modes, map frame rate, GPS timing and servers</string>
+    <string name="settings_advanced_hint">Automatic battery modes, map frame rate, GPS timing and servers</string>
     <string name="settings_reset">Reset all settings</string>
     <string name="settings_reset_title">Reset all settings?</string>
     <string name="settings_reset_text">All settings go back to how they were when you installed the app. Your tracks, places, photos and downloaded maps are kept.</string>
@@ -272,11 +265,9 @@
     <string name="settings_map_fps">Frame rate</string>
     <string name="settings_map_fps_no_cap">No cap</string>
     <string name="settings_map_fps_hint">How smoothly the map moves. Fewer frames per second save battery. Battery saver limits it to 30.</string>
-    <string name="settings_stamina_section">Survival</string>
     <string name="settings_stamina">Stamina mode</string>
-    <string name="settings_stamina_hint">For emergencies, when the battery has to last as long as possible. The map runs at %1$d frames per second, and the GPS updates every %2$s with the map open, every %3$s while following a route and every %4$s while recording. The compass, relief and contour lines are turned off, only downloaded maps are shown, and screens go black. It replaces battery saver.</string>
+    <string name="settings_stamina_hint">For emergencies, when the battery has to last as long as possible. The map runs at %1$d frames per second, and the GPS updates every %2$s with the map open, every %3$s while following a route and every %4$s while recording. The compass, relief and contour lines are turned off, only downloaded maps are shown, and screens go black.</string>
     <string name="settings_stamina_overrides">Stamina mode is on. The settings below will apply again once it’s off.</string>
-    <string name="settings_battery_saver_stamina">Off while stamina mode is on (see Advanced settings).</string>
     <string name="stamina_on_map">Stamina mode</string>
     <string name="saver_on_map">Battery saver</string>
     <string name="lock_lock">Lock the screen</string>
@@ -301,7 +292,7 @@
     <string name="auto_saver_text">Battery at %d%%. Slower GPS and no contour lines from now on. You can turn it off in Settings.</string>
     <string name="auto_saver_phone_text">The phone\u2019s battery saver is on, so Sentrek\u2019s is too. Turn it off in Settings.</string>
     <string name="auto_stamina_title">Stamina mode on</string>
-    <string name="auto_stamina_text">Battery at %d%%. Everything at the bare minimum to make it last. Turn it off in Settings › Advanced.</string>
+    <string name="auto_stamina_text">Battery at %d%%. Everything at the bare minimum to make it last. You can turn it off in Settings.</string>
     <string name="settings_gps">GPS</string>
     <string name="settings_gps_hint">How often the GPS checks your position. Less often saves battery.</string>
     <string name="settings_gps_screen">Map on screen</string>
@@ -372,4 +363,15 @@
     <string name="settings_about">About</string>
     <string name="settings_version">Sentrek %s</string>
     <string name="settings_credits">Map data © OpenStreetMap contributors, available under the Open Database License (ODbL).\nVector tiles: OpenFreeMap, OpenMapTiles.\nTerrain: Mapzen terrain tiles via AWS Open Data.\nTrail details: Overpass API (FOSSGIS, VK Maps, private.coffee).\nMap icons: OpenStreetMap Carto (CC0).</string>
+    <string name="settings_battery">Battery</string>
+    <string name="settings_battery_normal">Normal</string>
+    <string name="settings_battery_saver_short">Saver</string>
+    <string name="settings_stamina_short">Stamina</string>
+    <string name="settings_battery_normal_hint">Everything as you set it. Battery saver is for long trips, stamina mode for when the battery must last whatever it takes.</string>
+    <string name="settings_size_gloves">Gloves</string>
+    <string name="settings_size_largest">Largest</string>
+    <string name="trail_card_more">Show more</string>
+    <string name="trail_card_less">Show less</string>
+    <string name="record_line">Recorded %1$s · %2$s · ↑ %3$s</string>
+    <string name="record_line_paused">Paused at %1$s · %2$s · ↑ %3$s</string>
 </resources>

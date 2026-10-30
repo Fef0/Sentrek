@@ -1,5 +1,7 @@
 package app.sentrek.home
 
+import app.sentrek.record.Following
+import androidx.compose.ui.unit.Dp
 import app.sentrek.map.SignalLayer
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.layout.onSizeChanged
@@ -207,20 +209,12 @@ fun MapScreen(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val overlays by viewModel.overlays.collectAsStateWithLifecycle()
-    val overlaysVersion by viewModel.overlaysVersion.collectAsStateWithLifecycle()
-    val showDifficulty by viewModel.showDifficulty.collectAsStateWithLifecycle()
-    val rasters by viewModel.rasters.collectAsStateWithLifecycle()
     val recording by viewModel.recording.collectAsStateWithLifecycle()
     val breadcrumbs by viewModel.breadcrumbs.collectAsStateWithLifecycle()
-    val oldMaps by viewModel.oldMaps.collectAsStateWithLifecycle()
-    val failingMaps by viewModel.failingMaps.collectAsStateWithLifecycle()
-    val shownTracks by viewModel.shownTracks.collectAsStateWithLifecycle()
     val followedRoute by viewModel.following.collectAsStateWithLifecycle()
     val followProfile by viewModel.followProfile.collectAsStateWithLifecycle()
     val followPlaces by viewModel.followPlaces.collectAsStateWithLifecycle()
     val followPlacesExpanded by viewModel.followPlacesExpanded.collectAsStateWithLifecycle()
-    val places by viewModel.places.collectAsStateWithLifecycle()
     val plan by planner.state.collectAsStateWithLifecycle()
     val planBlock by planner.blockedBy.collectAsStateWithLifecycle()
     val planStats by planner.stats.collectAsStateWithLifecycle()
@@ -906,91 +900,23 @@ fun MapScreen(
     }
 
     pressed?.let { info ->
-        val track = info.trackId?.takeIf { info.kind == "track" }?.let(viewModel::track)
-        val place = info.placeId?.let(viewModel::place)
-        if (place != null) {
-            val here = map?.let(MapLocation::lastLocation)
-            PlaceSheet(
-                place = place,
-                distance = here?.let { Geo.distance(LatLon(it.latitude, it.longitude), place.position) },
-                onEdit = { pressed = null; placeDraft = place },
-                onShare = { pressed = null; sharing.share(place) },
-                onDelete = { pressed = null; deletingPlace = place },
-                onDismiss = { pressed = null },
-                onGoTo = { pressed = null; startGoTo(GoTo(place.name, place.position)) },
-                loadWeather = { viewModel.weatherAt(place.position) },
-            )
-        } else if (track == null) {
-            FeatureSheet(
-                info,
-                onSaveAsPlace = {
-                    pressed = null
-                    val p = info.position
-                    placeDraft = Place(
-                        id = "",
-                        name = info.name ?: info.kind?.let(::humanize) ?: unnamedPlace,
-                        kind = PlaceKind.guess(info.kind),
-                        position = LatLon(p.latitude, p.longitude, info.tags["ele"]?.toDoubleOrNull()),
-                    )
-                },
-                onGoTo = {
-                    pressed = null
-                    val p = info.position
-                    val name = info.name ?: info.kind?.let(::humanize) ?: unnamedPlace
-                    startGoTo(GoTo(name, LatLon(p.latitude, p.longitude, info.tags["ele"]?.toDoubleOrNull())))
-                },
-                onDismiss = { pressed = null },
-                loadWeather = {
-                    val p = info.position
-                    viewModel.weatherAt(LatLon(p.latitude, p.longitude, info.tags["ele"]?.toDoubleOrNull()))
-                },
-            )
-        } else {
-            TrackSheet(
-                track = track,
-                isFollowed = followedRoute?.trackId == track.id,
-                onFollow = {
-                    pressed = null
-                    val start = {
-                        routeToFollow = track
-                        withLocation(AfterPermission.FollowRoute) { viewModel.followTrack(track); routeToFollow = null }
-                    }
-                    val current = followedRoute
-                    if (current != null) confirm = FollowConfirmations.switch(context, current.name, track.name, start) else start()
-                },
-                onStopFollowing = {
-                    pressed = null
-                    confirm = FollowConfirmations.stop(context, track.name, viewModel::stopFollowing)
-                },
-                onReverse = { pressed = null; viewModel.reverseRoute() },
-                onColor = { viewModel.setTrackColor(track, it) },
-                onHide = {
-                    pressed = null
-                    if (followedRoute?.trackId == track.id) {
-                        confirm = FollowConfirmations.hideFollowed(context, track.name) {
-                            viewModel.stopFollowing()
-                            viewModel.hideTrack(track.id)
-                        }
-                    } else {
-                        viewModel.hideTrack(track.id)
-                    }
-                },
-                onEdit = if (track.imported) {
-                    {
-                        pressed = null
-                        planner.editRoute(track) { opened ->
-                            val why = planner.blockedBy.value?.message ?: PlannerR.string.plan_busy
-                            if (!opened) Toast.makeText(context, why, Toast.LENGTH_LONG).show()
-                        }
-                    }
-                } else {
-                    null
-                },
-                onDismiss = { pressed = null },
-                loadProfile = viewModel::trackProfile,
-                loadWeather = { viewModel.trackWeather(track) },
-            )
-        }
+        PressedSheet(
+            info = info,
+            map = map,
+            followedRoute = followedRoute,
+            viewModel = viewModel,
+            planner = planner,
+            onClose = { pressed = null },
+            onPlaceDraft = { placeDraft = it },
+            onShare = sharing::share,
+            onDeletePlace = { deletingPlace = it },
+            startGoTo = startGoTo,
+            followRoute = { track ->
+                routeToFollow = track
+                withLocation(AfterPermission.FollowRoute) { viewModel.followTrack(track); routeToFollow = null }
+            },
+            onConfirm = { confirm = it },
+        )
     }
 
     placeDraft?.let { draft ->
@@ -1065,6 +991,180 @@ fun MapScreen(
         )
     }
 
+    MapLayerEffects(viewModel, planner, map, style, planPreview, handleReach, goTo, lastFixForSun?.let { LatLon(it.latitude, it.longitude) })
+
+    if (askPlanName) {
+        TrackNameDialog(
+            title = stringResource(PlannerR.string.plan_save_title),
+            confirmLabel = stringResource(PlannerR.string.plan_save),
+            initial = planner.defaultName(),
+            onConfirm = { name ->
+                askPlanName = false
+                planner.save(name) { saved ->
+                    Toast.makeText(context, context.getString(PlannerR.string.plan_saved, saved.name), Toast.LENGTH_LONG).show()
+                }
+            },
+            onDismiss = { askPlanName = false },
+        )
+    }
+    confirm?.let { ConfirmDialog(it) { confirm = null } }
+    ShareDialog(sharing)
+
+    MapReminders(viewModel)
+
+    if (askPlanDiscard) {
+        DiscardPlanDialog(
+            onDiscard = { askPlanDiscard = false; planner.discard() },
+            onDismiss = { askPlanDiscard = false },
+        )
+    }
+
+    DisposableEffect(map, goTo != null, visible, hasLocation) {
+        val m = map
+        if (m == null || goTo == null || !visible) return@DisposableEffect onDispose { heading = null }
+        val stop = MapLocation.observeHeading(m) { heading = it }
+        onDispose {
+            stop()
+            heading = null
+        }
+    }
+
+
+}
+
+/** What a long press found: a saved place, a track, or a map feature, each with its sheet. */
+@Composable
+private fun PressedSheet(
+    info: MapFeatureInfo,
+    map: MapLibreMap?,
+    followedRoute: Following?,
+    viewModel: HomeViewModel,
+    planner: PlannerViewModel,
+    onClose: () -> Unit,
+    onPlaceDraft: (Place) -> Unit,
+    onShare: (Place) -> Unit,
+    onDeletePlace: (Place) -> Unit,
+    startGoTo: (GoTo) -> Unit,
+    followRoute: (SavedTrack) -> Unit,
+    onConfirm: (Confirmation) -> Unit,
+) {
+    val context = LocalContext.current
+    val unnamedPlace = stringResource(RecordR.string.places_unnamed)
+    val track = info.trackId?.takeIf { info.kind == "track" }?.let(viewModel::track)
+    val place = info.placeId?.let(viewModel::place)
+    if (place != null) {
+        val here = map?.let(MapLocation::lastLocation)
+        PlaceSheet(
+            place = place,
+            distance = here?.let { Geo.distance(LatLon(it.latitude, it.longitude), place.position) },
+            onEdit = { onClose(); onPlaceDraft(place) },
+            onShare = { onClose(); onShare(place) },
+            onDelete = { onClose(); onDeletePlace(place) },
+            onDismiss = { onClose() },
+            onGoTo = { onClose(); startGoTo(GoTo(place.name, place.position)) },
+            loadWeather = { viewModel.weatherAt(place.position) },
+        )
+    } else if (track == null) {
+        FeatureSheet(
+            info,
+            onSaveAsPlace = {
+                onClose()
+                val p = info.position
+                onPlaceDraft(Place(
+                    id = "",
+                    name = info.name ?: info.kind?.let(::humanize) ?: unnamedPlace,
+                    kind = PlaceKind.guess(info.kind),
+                    position = LatLon(p.latitude, p.longitude, info.tags["ele"]?.toDoubleOrNull()),
+                ))
+            },
+            onGoTo = {
+                onClose()
+                val p = info.position
+                val name = info.name ?: info.kind?.let(::humanize) ?: unnamedPlace
+                startGoTo(GoTo(name, LatLon(p.latitude, p.longitude, info.tags["ele"]?.toDoubleOrNull())))
+            },
+            onDismiss = { onClose() },
+            loadWeather = {
+                val p = info.position
+                viewModel.weatherAt(LatLon(p.latitude, p.longitude, info.tags["ele"]?.toDoubleOrNull()))
+            },
+        )
+    } else {
+        TrackSheet(
+            track = track,
+            isFollowed = followedRoute?.trackId == track.id,
+            onFollow = {
+                onClose()
+                val start = { followRoute(track) }
+                val current = followedRoute
+                if (current != null) onConfirm(FollowConfirmations.switch(context, current.name, track.name, start)) else start()
+            },
+            onStopFollowing = {
+                onClose()
+                onConfirm(FollowConfirmations.stop(context, track.name, viewModel::stopFollowing))
+            },
+            onReverse = { onClose(); viewModel.reverseRoute() },
+            onColor = { viewModel.setTrackColor(track, it) },
+            onHide = {
+                onClose()
+                if (followedRoute?.trackId == track.id) {
+                    onConfirm(FollowConfirmations.hideFollowed(context, track.name) {
+                        viewModel.stopFollowing()
+                        viewModel.hideTrack(track.id)
+                    })
+                } else {
+                    viewModel.hideTrack(track.id)
+                }
+            },
+            onEdit = if (track.imported) {
+                {
+                    onClose()
+                    planner.editRoute(track) { opened ->
+                        val why = planner.blockedBy.value?.message ?: PlannerR.string.plan_busy
+                        if (!opened) Toast.makeText(context, why, Toast.LENGTH_LONG).show()
+                    }
+                }
+            } else {
+                null
+            },
+            onDismiss = { onClose() },
+            loadProfile = viewModel::trackProfile,
+            loadWeather = { viewModel.trackWeather(track) },
+        )
+    }
+}
+
+/**
+ * The map's own layers kept in step with the app: overlays, contours and slopes, the plan,
+ * places, tracks, the recording, the last signal and the way to a place. Apart from the
+ * screen's layout, which keeps each part small enough for Android to optimise.
+ */
+@Composable
+private fun MapLayerEffects(
+    viewModel: HomeViewModel,
+    planner: PlannerViewModel,
+    map: MapLibreMap?,
+    style: Style?,
+    planPreview: List<LatLon>?,
+    handleReach: Dp,
+    goTo: GoTo?,
+    /** The last position known. */
+    here: LatLon?,
+) {
+    val context = LocalContext.current
+    val overlays by viewModel.overlays.collectAsStateWithLifecycle()
+    val overlaysVersion by viewModel.overlaysVersion.collectAsStateWithLifecycle()
+    val showDifficulty by viewModel.showDifficulty.collectAsStateWithLifecycle()
+    val rasters by viewModel.rasters.collectAsStateWithLifecycle()
+    val slopeTerrain by viewModel.slopeTerrain.collectAsStateWithLifecycle()
+    val powerMode by viewModel.powerMode.collectAsStateWithLifecycle()
+    val plan by planner.state.collectAsStateWithLifecycle()
+    val planLegs by planner.legs.collectAsStateWithLifecycle()
+    val lastSignal by viewModel.lastSignal.collectAsStateWithLifecycle()
+    val places by viewModel.places.collectAsStateWithLifecycle()
+    val shownTracks by viewModel.shownTracks.collectAsStateWithLifecycle()
+    val recording by viewModel.recording.collectAsStateWithLifecycle()
+
     LaunchedEffect(style, rasters, overlays, overlaysVersion, showDifficulty) {
         style?.let { MapOverlays.sync(it, rasters, overlays, showDifficulty) }
     }
@@ -1113,23 +1213,42 @@ fun MapScreen(
         }
     }
 
-    if (askPlanName) {
-        TrackNameDialog(
-            title = stringResource(PlannerR.string.plan_save_title),
-            confirmLabel = stringResource(PlannerR.string.plan_save),
-            initial = planner.defaultName(),
-            onConfirm = { name ->
-                askPlanName = false
-                planner.save(name) { saved ->
-                    Toast.makeText(context, context.getString(PlannerR.string.plan_saved, saved.name), Toast.LENGTH_LONG).show()
-                }
-            },
-            onDismiss = { askPlanName = false },
-        )
+    LaunchedEffect(style, lastSignal) {
+        val s = style ?: return@LaunchedEffect
+        SignalLayer.sync(context, s, lastSignal?.position)
     }
-    confirm?.let { ConfirmDialog(it) { confirm = null } }
-    ShareDialog(sharing)
+    LaunchedEffect(style, goTo, here) {
+        val s = style ?: return@LaunchedEffect
+        GoToLayer.sync(s, here?.takeIf { goTo != null }, goTo?.position)
+    }
 
+    LaunchedEffect(style, places) {
+        style?.let { PlaceLayers.sync(context, it, places) }
+    }
+
+    // A route open in the planner is drawn by the planner: its saved line would show twice.
+    val editedId = plan.editing?.id?.takeIf { plan.active }
+    LaunchedEffect(style, shownTracks, editedId) {
+        style?.let { TrackLayers.syncShown(it, shownTracks.filter { t -> t.id != editedId }) }
+    }
+    // Each update sends the whole line to the map: a few seconds apart is plenty at walking
+    // pace, and the newest state is always the one drawn.
+    LaunchedEffect(style) {
+        val s = style ?: return@LaunchedEffect
+        snapshotFlow { recording?.segments.orEmpty() }.conflate().collect {
+            TrackLayers.syncRecording(s, it)
+            delay(RECORDING_REDRAW_MS)
+        }
+    }
+}
+
+/** Downloaded maps that failed to update, or are old: said once in a while, never mid-hike. */
+@Composable
+private fun MapReminders(viewModel: HomeViewModel) {
+    val context = LocalContext.current
+    val recording by viewModel.recording.collectAsStateWithLifecycle()
+    val oldMaps by viewModel.oldMaps.collectAsStateWithLifecycle()
+    val failingMaps by viewModel.failingMaps.collectAsStateWithLifecycle()
     // Not mid-hike: only when nothing is being recorded. Failures first.
     if (failingMaps.isNotEmpty() && recording == null) {
         AlertDialog(
@@ -1167,49 +1286,5 @@ fun MapScreen(
                 }
             },
         )
-    }
-
-    if (askPlanDiscard) {
-        DiscardPlanDialog(
-            onDiscard = { askPlanDiscard = false; planner.discard() },
-            onDismiss = { askPlanDiscard = false },
-        )
-    }
-
-    LaunchedEffect(style, lastSignal) {
-        val s = style ?: return@LaunchedEffect
-        SignalLayer.sync(context, s, lastSignal?.position)
-    }
-    LaunchedEffect(style, goTo, lastFixForSun) {
-        val s = style ?: return@LaunchedEffect
-        GoToLayer.sync(s, lastFixForSun?.takeIf { goTo != null }?.let { LatLon(it.latitude, it.longitude) }, goTo?.position)
-    }
-    DisposableEffect(map, goTo != null, visible, hasLocation) {
-        val m = map
-        if (m == null || goTo == null || !visible) return@DisposableEffect onDispose { heading = null }
-        val stop = MapLocation.observeHeading(m) { heading = it }
-        onDispose {
-            stop()
-            heading = null
-        }
-    }
-
-    LaunchedEffect(style, places) {
-        style?.let { PlaceLayers.sync(context, it, places) }
-    }
-
-    // A route open in the planner is drawn by the planner: its saved line would show twice.
-    val editedId = plan.editing?.id?.takeIf { plan.active }
-    LaunchedEffect(style, shownTracks, editedId) {
-        style?.let { TrackLayers.syncShown(it, shownTracks.filter { t -> t.id != editedId }) }
-    }
-    // Each update sends the whole line to the map: a few seconds apart is plenty at walking
-    // pace, and the newest state is always the one drawn.
-    LaunchedEffect(style) {
-        val s = style ?: return@LaunchedEffect
-        snapshotFlow { recording?.segments.orEmpty() }.conflate().collect {
-            TrackLayers.syncRecording(s, it)
-            delay(RECORDING_REDRAW_MS)
-        }
     }
 }

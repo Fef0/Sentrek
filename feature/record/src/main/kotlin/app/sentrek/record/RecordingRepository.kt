@@ -51,6 +51,9 @@ class RecordingRepository @Inject constructor(
     private val journal = File(File(context.filesDir, "recording").apply { mkdirs() }, "current.txt")
 
     private val segments = mutableListOf<MutableList<TrackPoint>>()
+
+    /** The same points as [segments], positions only, for drawing; only ever appended to. */
+    private val lines = mutableListOf<ArrayList<LatLon>>()
     private var stats = TrackStats()
     private var startTime = 0L
     private var pausedMillis = 0L
@@ -70,6 +73,7 @@ class RecordingRepository @Inject constructor(
     fun start() {
         if (_state.value != null) return
         segments.clear()
+        lines.clear()
         stats = TrackStats()
         startTime = System.currentTimeMillis()
         pausedMillis = 0
@@ -115,8 +119,12 @@ class RecordingRepository @Inject constructor(
             if (startSegment) TrackJournal.appendSegment(it)
             TrackJournal.append(it, point)
         }
-        if (startSegment) segments += mutableListOf<TrackPoint>()
+        if (startSegment) {
+            segments += mutableListOf<TrackPoint>()
+            lines += ArrayList<LatLon>()
+        }
         segments.last() += point
+        lines.last() += position
         stats.add(point, startSegment)
         newSegment = false
         publish()
@@ -151,6 +159,7 @@ class RecordingRepository @Inject constructor(
         writer = null
         journal.delete()
         segments.clear()
+        lines.clear()
         _state.value = null
     }
 
@@ -158,6 +167,7 @@ class RecordingRepository @Inject constructor(
         runCatching {
             val contents = journal.reader().use { TrackJournal.read(it) }
             contents.segments.forEach { segments += it.toMutableList() }
+            segments.forEach { s -> lines += s.mapTo(ArrayList()) { it.position } }
             pausedMillis = contents.pausedMillis
             pausedSince = contents.pausedSince
         }.onFailure { Log.e(TAG, "Cannot read journal", it) }
@@ -200,7 +210,9 @@ class RecordingRepository @Inject constructor(
             descent = stats.descent,
             pausedMillis = pausedMillis,
             pausedSince = pausedSince,
-            segments = segments.map { s -> s.map(TrackPoint::position) },
+            // Views of the points so far, not copies: copying hours of track at every new
+            // point was most of the work of recording.
+            segments = lines.map { LineSnapshot(it, it.size) },
         )
     }
 
@@ -212,4 +224,20 @@ class RecordingRepository @Inject constructor(
 
         const val MIN_STEP_M = 5.0
     }
+}
+
+/**
+ * The first [size] points of a line that is only ever appended to: what was recorded up to a
+ * moment, without copying it. Equal only to itself, so comparing two states (which happens
+ * on every change) doesn't walk the whole track either.
+ */
+private class LineSnapshot(private val points: List<LatLon>, override val size: Int) : AbstractList<LatLon>() {
+    override fun get(index: Int): LatLon {
+        if (index !in 0 until size) throw IndexOutOfBoundsException("$index of $size")
+        return points[index]
+    }
+
+    override fun equals(other: Any?): Boolean = this === other
+
+    override fun hashCode(): Int = System.identityHashCode(this)
 }

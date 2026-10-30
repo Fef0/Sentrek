@@ -277,7 +277,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     val mapMaxFps: StateFlow<Int> =
-        settings.mapMaxFps.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+        settings.mapMaxFps.stateIn(viewModelScope, SharingStarted.Eagerly, 60)
 
     fun setMapMaxFps(fps: Int) {
         viewModelScope.launch { settings.setMapMaxFps(fps) }

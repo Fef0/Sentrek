@@ -11,6 +11,16 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import kotlinx.coroutines.flow.MutableStateFlow
+import app.sentrek.geo.track.RestDetector
+import android.os.SystemClock
+import android.os.PowerManager
+import android.hardware.TriggerEventListener
+import android.hardware.TriggerEvent
+import android.hardware.SensorManager
+import android.hardware.Sensor
+import android.content.IntentFilter
+import android.content.BroadcastReceiver
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
@@ -60,6 +70,30 @@ class TrackingService : Service() {
     private var shown: String? = null
     private var disarm: Job? = null
 
+    /** When the notification was last sent, and its alerts then (see [update]). */
+    private var notifiedAt = 0L
+    private var notifiedAlerts: String? = null
+    private val power by lazy { getSystemService(PowerManager::class.java) }
+
+    /** The screen coming on: the notification catches up at once, it's about to be read. */
+    private val screenOn = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) = update()
+    }
+
+    /**
+     * A long stop (a break, a hut, a night out): the GPS slows down to [REST_GPS_MS] until
+     * the user moves again, which the motion sensor says within seconds.
+     */
+    private val rest = RestDetector()
+    private val resting = MutableStateFlow(false)
+    private val sensors by lazy { getSystemService(SensorManager::class.java) }
+    private val motionSensor by lazy { sensors?.getDefaultSensor(Sensor.TYPE_SIGNIFICANT_MOTION) }
+    private val motion = object : TriggerEventListener() {
+        override fun onTrigger(event: TriggerEvent?) {
+            if (rest.moved()) resting.value = false
+        }
+    }
+
     @OptIn(FlowPreview::class)
     override fun onCreate() {
         super.onCreate()
@@ -78,14 +112,16 @@ class TrackingService : Service() {
         }
         // While the screen is on, the map asks for a fix every second and this gets those too;
         // in the pocket, the slower rate here is all the GPS does.
-        val interval = combine(following.state, settings.gpsTiming, settings.powerMode) { f, timing, mode ->
-            timing.forMode(mode).let { if (f != null) it.followMs else it.recordMs }
+        val interval = combine(following.state, settings.gpsTiming, settings.powerMode, resting) { f, timing, mode, still ->
+            val ms = timing.forMode(mode).let { if (f != null) it.followMs else it.recordMs }
+            if (still) maxOf(ms, REST_GPS_MS) else ms
         }.distinctUntilChanged()
         scope.launch {
             interval.collectLatest { ms ->
                 location.locations(ms).collect {
                     at = runCatching { LatLon(it.latitude, it.longitude) }.getOrNull() ?: at
                     fix = it
+                    onRestCheck(it)
                     recording.onLocation(it)
                     following.onLocation(it)
                     checkBreadcrumbs()
@@ -93,6 +129,7 @@ class TrackingService : Service() {
             }
         }
         breadcrumbs.start()
+        ContextCompat.registerReceiver(this, screenOn, IntentFilter(Intent.ACTION_SCREEN_ON), ContextCompat.RECEIVER_NOT_EXPORTED)
         // With the SOS screen off, its settings rest too (greyed out in Settings).
         scope.launch {
             combine(settings.sosEnabled, settings.breadcrumbMinutes) { sos, minutes -> if (sos) minutes else 0 }
@@ -129,8 +166,24 @@ class TrackingService : Service() {
         if ((r == null && f == null) || !manager.areNotificationsEnabled()) return
         val summary = live.summary(r, f, at, System.currentTimeMillis())
         if (!force && summary == shown) return
+        // With the screen off nobody reads it: the numbers every half minute are plenty, but
+        // what calls for attention (off route, paused, a tap to confirm) goes out at once.
+        val alerts = "${r?.isPaused} ${f?.offRoute} ${live.armed}"
+        val now = SystemClock.elapsedRealtime()
+        if (!force && power?.isInteractive == false && alerts == notifiedAlerts && now - notifiedAt < SCREEN_OFF_NOTIFICATION_MS) return
         shown = summary
+        notifiedAt = now
+        notifiedAlerts = alerts
         manager.notify(NOTIFICATION_ID, notification(r, f))
+    }
+
+    /** Slows the GPS down during a long stop, and arms the motion sensor to wake it. */
+    private fun onRestCheck(location: android.location.Location) {
+        val here = runCatching { LatLon(location.latitude, location.longitude) }.getOrNull() ?: return
+        if (!rest.update(here, location.time, location.accuracy.takeIf { location.hasAccuracy() })) return
+        resting.value = rest.resting
+        val sensor = motionSensor ?: return
+        if (rest.resting) sensors?.requestTriggerSensor(motion, sensor) else sensors?.cancelTriggerSensor(motion, sensor)
     }
 
     /**
@@ -165,6 +218,8 @@ class TrackingService : Service() {
         breadcrumbs.check(recording.state.value, fix, breadcrumbMinutes, breadcrumbTo, breadcrumbName)
 
     override fun onDestroy() {
+        runCatching { unregisterReceiver(screenOn) }
+        motionSensor?.let { sensors?.cancelTriggerSensor(motion, it) }
         if (recording.state.value == null) checkBreadcrumbs()
         breadcrumbs.stop()
         scope.cancel()
@@ -206,6 +261,12 @@ class TrackingService : Service() {
         private const val NOTIFICATION_ID = 2
         private const val NOTIFICATION_INTERVAL_MS = 5_000L
         private const val CLOCK_INTERVAL_MS = 60_000L
+
+        /** The GPS during a long stop: a fix every half minute. */
+        private const val REST_GPS_MS = 30_000L
+
+        /** Notification updates with the screen off, alerts aside. */
+        private const val SCREEN_OFF_NOTIFICATION_MS = 30_000L
         private const val CONFIRM_MS = 5_000L
         private const val ACTION_TOGGLE = "app.sentrek.record.TOGGLE_PAUSE"
 

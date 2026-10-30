@@ -229,9 +229,12 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         }
     }
 
-    /** Most frames per second the map draws; 0 for no cap (Settings > Advanced). */
+    /**
+     * Most frames per second the map draws; 0 for no cap (Settings > Advanced). 60 unless
+     * chosen: a map looks no smoother at 120, on the phones whose screens go that fast.
+     */
     val mapMaxFps: Flow<Int> =
-        context.settings.data.map { it[MAP_MAX_FPS] ?: 0 }
+        context.settings.data.map { it[MAP_MAX_FPS] ?: 60 }
 
     suspend fun setMapMaxFps(fps: Int) {
         context.settings.edit { it[MAP_MAX_FPS] = fps }

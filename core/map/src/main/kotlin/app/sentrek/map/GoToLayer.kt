@@ -1,5 +1,6 @@
 package app.sentrek.map
 
+import app.sentrek.geo.Geo
 import app.sentrek.geo.LatLon
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression.rgb
@@ -28,8 +29,24 @@ object GoToLayer {
     private const val LINE = "goto-line"
     private const val TARGET = "goto-target"
     private const val COLOR = 0xFFE85D04.toInt()
+    private const val MIN_MOVE_M = 5.0
 
+    /** What the map has now, so that an unchanged line isn't sent again. */
+    private var sentStyle: Style? = null
+    private var sentFrom: LatLon? = null
+    private var sentTo: LatLon? = null
+
+    /**
+     * Each change makes the map lay out its labels again and fade them in: a dozen frames.
+     * Called with every fix, so only a line that really moved (a few metres) is sent.
+     */
     fun sync(style: Style, from: LatLon?, to: LatLon?) {
+        val same = style === sentStyle && to == sentTo &&
+            (from == sentFrom || (from != null && sentFrom != null && Geo.distance(from, sentFrom!!) < MIN_MOVE_M))
+        if (same) return
+        sentStyle = style
+        sentFrom = from
+        sentTo = to
         val line = if (from != null && to != null) {
             listOf(Feature.fromGeometry(LineString.fromLngLats(listOf(point(from), point(to)))))
         } else {

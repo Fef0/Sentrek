@@ -5,11 +5,13 @@ import android.content.Context
 import android.location.Location
 import org.maplibre.android.location.CompassListener
 import org.maplibre.android.location.LocationComponentActivationOptions
+import org.maplibre.android.location.LocationComponentOptions
 import org.maplibre.android.location.OnCameraTrackingChangedListener
 import org.maplibre.android.location.modes.CameraMode
 import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
+import kotlin.math.abs
 
 /**
  * The user's position on the map: arrow pointing where the phone faces (compass), plus the
@@ -41,6 +43,9 @@ object MapLocation {
             component.activateLocationComponent(
                 LocationComponentActivationOptions.builder(context, style)
                     .useDefaultLocationEngine(false)
+                    // No greying out after 30 s without a new fix: standing still, fixes
+                    // that change nothing are skipped (see update).
+                    .locationComponentOptions(LocationComponentOptions.builder(context).enableStaleState(false).build())
                     .build(),
             )
         }
@@ -65,10 +70,38 @@ object MapLocation {
         if (component.isLocationComponentActivated) component.isLocationComponentEnabled = false
     }
 
+    /**
+     * Moves the marker to [location]: each move is animated, and each frame of it redraws the
+     * whole map. A fix that changes nothing visible (standing still: the same place within a
+     * couple of metres, the same accuracy, the same course) is skipped, so a break with the
+     * screen on costs no drawing at all. (MapLibre's greying of a marker without news is off:
+     * the GPS indicator says when the fix is lost.)
+     */
     fun update(map: MapLibreMap, location: Location) {
         val component = map.locationComponent
-        if (component.isLocationComponentActivated) component.forceLocationUpdate(location)
+        if (!component.isLocationComponentActivated) return
+        val last = shown
+        if (last != null && component.lastKnownLocation != null && isSame(last, location)) return
+        shown = Location(location)
+        component.forceLocationUpdate(location)
     }
+
+    /** The last fix handed to the marker. */
+    private var shown: Location? = null
+
+    private fun isSame(a: Location, b: Location): Boolean =
+        a.distanceTo(b) < STILL_M &&
+            abs(a.accuracy - b.accuracy) < STILL_M &&
+            (!b.hasBearing() || !a.hasBearing() || angle(a.bearing, b.bearing) < STILL_TURN_DEGREES)
+
+    private fun angle(a: Float, b: Float): Float {
+        val d = abs(a - b) % 360f
+        return if (d > 180f) 360f - d else d
+    }
+
+    /** Closer than this, a new fix moves the marker by a pixel or two at hiking zooms. */
+    private const val STILL_M = 2f
+    private const val STILL_TURN_DEGREES = 10f
 
     /**
      * Keeps the camera on the user: north up, or turned to the direction of travel

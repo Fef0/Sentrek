@@ -61,9 +61,9 @@ object TrackLayers {
     private const val COLOR = "c"
     private const val RECORDING_COLOR = 0xFFE85D04.toInt()
 
-    fun sync(style: Style, recording: List<List<LatLon>>, shown: List<MapTrack>) {
+    /** The tracks shown on the map and their waypoints: changes only when the user changes them. */
+    fun syncShown(style: Style, shown: List<MapTrack>) {
         setLines(style, SHOWN, shown.map { track -> lineFeature(track.segments, track.color).apply { addStringProperty("id", track.id) } })
-        setLines(style, RECORDING, listOf(lineFeature(recording, RECORDING_COLOR)))
         setWaypoints(
             style,
             shown.flatMap { track ->
@@ -77,6 +77,16 @@ object TrackLayers {
                 }
             },
         )
+    }
+
+    /**
+     * The track being recorded, on its own: it grows while the user walks, and the shown
+     * tracks needn't be sent to the map again with it.
+     */
+    fun syncRecording(style: Style, recording: List<List<LatLon>>) {
+        // Above the shown tracks: their layers come first.
+        if (style.getSource(SHOWN) == null) syncShown(style, emptyList())
+        setLines(style, RECORDING, listOf(lineFeature(recording, RECORDING_COLOR)))
     }
 
     private fun lineFeature(segments: List<List<LatLon>>, color: Int): Feature {

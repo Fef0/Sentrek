@@ -45,10 +45,13 @@ import kotlinx.coroutines.delay
 /** Live numbers while recording: time (without pauses), distance, climb. */
 @Composable
 fun RecordingStats(recording: Recording, modifier: Modifier = Modifier, position: LatLon? = null) {
-    val now by produceState(System.currentTimeMillis()) {
+    // To the minute: seconds tell nothing on a hike, and ticking each second redrew the panel
+    // 60 times as often. Woken as the next minute starts; not at all while paused.
+    val now by produceState(System.currentTimeMillis(), recording.startTime, recording.pausedMillis, recording.pausedSince) {
         while (true) {
             value = System.currentTimeMillis()
-            delay(1_000)
+            if (recording.isPaused) break
+            delay(60_000 - recording.activeMillis(value) % 60_000)
         }
     }
     Surface(
@@ -62,9 +65,9 @@ fun RecordingStats(recording: Recording, modifier: Modifier = Modifier, position
         Column(Modifier.padding(horizontal = 8.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Row {
             if (recording.isPaused) {
-                Stat(stringResource(R.string.record_paused), Format.duration(recording.activeMillis(now)), Modifier.weight(1f), MaterialTheme.colorScheme.primary)
+                Stat(stringResource(R.string.record_paused), Format.hoursMinutes(recording.activeMillis(now)), Modifier.weight(1f), MaterialTheme.colorScheme.primary)
             } else {
-                Stat(stringResource(R.string.record_time), Format.duration(recording.activeMillis(now)), Modifier.weight(1f))
+                Stat(stringResource(R.string.record_time), Format.hoursMinutes(recording.activeMillis(now)), Modifier.weight(1f))
             }
             Stat(stringResource(R.string.record_distance), Format.distance(recording.distance), Modifier.weight(1f))
             Stat(stringResource(R.string.record_ascent), "↑ " + Format.elevation(recording.ascent), Modifier.weight(1f))

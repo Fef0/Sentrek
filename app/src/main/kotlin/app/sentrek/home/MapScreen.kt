@@ -124,6 +124,11 @@ import app.sentrek.ui.ScaleBar
 import app.sentrek.ui.safeTopPadding
 import app.sentrek.ui.SentrekIcons
 import kotlinx.coroutines.delay
+import kotlin.math.log10
+import kotlin.math.floor
+import kotlin.math.pow
+import kotlinx.coroutines.flow.conflate
+import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.Flow
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -147,6 +152,13 @@ private const val NORTH_ANIMATION_MS = 300
 private const val BACK_TO_START_MIN_M = 50.0
 
 /** Ground distance across one screen pixel at the centre of the map. */
+/** [value] to 1%: the scale bar can't show finer than that. */
+private fun roughly(value: Double): Double {
+    if (value <= 0.0) return value
+    val step = 10.0.pow(floor(log10(value)) - 2)
+    return Math.round(value / step) * step
+}
+
 private fun metersPerPixel(map: MapLibreMap): Double {
     val x = map.width / 2
     val y = map.height / 2
@@ -160,6 +172,12 @@ private const val SCALE_PROBE_PX = 100f
 
 /** How long without touches before buttons and bar fade out. */
 private const val HIDE_CONTROLS_MS = 8_000L
+
+/** How often the line being recorded is drawn again as it grows. */
+private const val RECORDING_REDRAW_MS = 5_000L
+
+/** How often the map tells the app where it is, while it keeps moving. */
+private const val CAMERA_REPORT_MS = 2_000L
 
 /** How long "hold the lock to unlock" stays after a touch on a locked screen. */
 private const val LOCK_HINT_MS = 2_500L
@@ -402,17 +420,20 @@ fun MapScreen(
             val target = m.cameraPosition.target ?: return
             centreCell = RegionGrid.cellAt(LatLon(target.latitude, target.longitude.coerceIn(-180.0, 180.0)))
         }
+        // Rounded: following the user moves the map in small steps, each one ending in "idle",
+        // and the exact values, a hair different each time, redrew the whole screen with each.
         val onMove = MapLibreMap.OnCameraMoveListener {
-            metersPerPx = metersPerPixel(m)
-            bearing = m.cameraPosition.bearing
+            metersPerPx = roughly(metersPerPixel(m))
+            bearing = Math.round(m.cameraPosition.bearing).toDouble()
         }
         val onIdle = MapLibreMap.OnCameraIdleListener {
-            metersPerPx = metersPerPixel(m)
-            zoom = m.cameraPosition.zoom
-            bearing = m.cameraPosition.bearing
+            metersPerPx = roughly(metersPerPixel(m))
+            zoom = Math.round(m.cameraPosition.zoom * 100) / 100.0
+            bearing = Math.round(m.cameraPosition.bearing).toDouble()
             updateCentre()
             // Left a few degrees off north: almost certainly meant to be north.
-            val off = minOf(bearing, 360 - bearing)
+            val exact = m.cameraPosition.bearing
+            val off = minOf(exact, 360 - exact)
             if (followMode != FollowMode.Heading && off > 0.0 && off < SNAP_NORTH_DEGREES) {
                 m.animateCamera(CameraUpdateFactory.bearingTo(0.0), NORTH_ANIMATION_MS)
             }
@@ -734,9 +755,32 @@ fun MapScreen(
 
     DisposableEffect(map) {
         val m = map ?: return@DisposableEffect onDispose {}
-        val onIdle = MapLibreMap.OnCameraIdleListener { currentOnCameraChange(m.cameraPosition) }
+        // At most every couple of seconds: following the user, the camera "stops" after each
+        // small step, and each report recomposed the whole app. The latest one always goes.
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        var pending = false
+        val report = Runnable {
+            pending = false
+            currentOnCameraChange(m.cameraPosition)
+        }
+        var reportedAt = 0L
+        val onIdle = MapLibreMap.OnCameraIdleListener {
+            if (pending) return@OnCameraIdleListener
+            val wait = CAMERA_REPORT_MS - (android.os.SystemClock.uptimeMillis() - reportedAt)
+            if (wait <= 0) {
+                reportedAt = android.os.SystemClock.uptimeMillis()
+                report.run()
+            } else {
+                pending = true
+                handler.postDelayed({ reportedAt = android.os.SystemClock.uptimeMillis(); report.run() }, wait)
+            }
+        }
         m.addOnCameraIdleListener(onIdle)
-        onDispose { m.removeOnCameraIdleListener(onIdle) }
+        onDispose {
+            m.removeOnCameraIdleListener(onIdle)
+            handler.removeCallbacksAndMessages(null)
+            if (pending) report.run()
+        }
     }
 
     DisposableEffect(map) {
@@ -1127,7 +1171,16 @@ fun MapScreen(
 
     // A route open in the planner is drawn by the planner: its saved line would show twice.
     val editedId = plan.editing?.id?.takeIf { plan.active }
-    LaunchedEffect(style, recording?.segments, shownTracks, editedId) {
-        style?.let { TrackLayers.sync(it, recording?.segments.orEmpty(), shownTracks.filter { t -> t.id != editedId }) }
+    LaunchedEffect(style, shownTracks, editedId) {
+        style?.let { TrackLayers.syncShown(it, shownTracks.filter { t -> t.id != editedId }) }
+    }
+    // Each update sends the whole line to the map: a few seconds apart is plenty at walking
+    // pace, and the newest state is always the one drawn.
+    LaunchedEffect(style) {
+        val s = style ?: return@LaunchedEffect
+        snapshotFlow { recording?.segments.orEmpty() }.conflate().collect {
+            TrackLayers.syncRecording(s, it)
+            delay(RECORDING_REDRAW_MS)
+        }
     }
 }

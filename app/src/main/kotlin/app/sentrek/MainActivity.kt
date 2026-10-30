@@ -127,7 +127,7 @@ class MainActivity : ComponentActivity() {
             val mapTheme by settings.mapTheme.collectAsStateWithLifecycle(initialValue = MapTheme.Day)
             val confirmExit by settings.confirmExit.collectAsStateWithLifecycle(initialValue = true)
             val power by settings.powerMode.collectAsStateWithLifecycle(initialValue = PowerMode.Normal)
-            val chosenFps by settings.mapMaxFps.collectAsStateWithLifecycle(initialValue = 0)
+            val chosenFps by settings.mapMaxFps.collectAsStateWithLifecycle(initialValue = 60)
             val mapFps = power.mapFps(chosenFps)
             // Stamina mode: downloaded maps only, so the radio isn't woken for tiles.
             LaunchedEffect(power) {

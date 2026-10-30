@@ -27,7 +27,9 @@ sealed interface GpsStatus {
             if (!gpsOn) return Off
             val ageMs = lastFix?.let { (SystemClock.elapsedRealtimeNanos() - it.elapsedRealtimeNanos) / 1_000_000 }
             if (lastFix == null || ageMs == null || ageMs > FRESH_MS) return Searching(satellites.heard)
-            return Fix(lastFix.accuracy.takeIf { lastFix.hasAccuracy() })
+            // To the metre, as shown: the decimals changed with every fix, and each change
+            // redrew the screen for nothing.
+            return Fix(lastFix.accuracy.takeIf { lastFix.hasAccuracy() }?.let { Math.round(it).toFloat() })
         }
     }
 }

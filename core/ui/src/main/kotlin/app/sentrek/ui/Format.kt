@@ -42,6 +42,12 @@ object Format {
         return if (h > 0) String.format(Locale.ROOT, "%d:%02d:%02d", h, m, s) else String.format(Locale.ROOT, "%d:%02d", m, s)
     }
 
+    /** A time to the minute, rounded down: "1:23 h", "0:07 h". */
+    fun hoursMinutes(millis: Long): String {
+        val minutes = (millis / 60_000).coerceAtLeast(0)
+        return String.format(Locale.ROOT, "%d:%02d h", minutes / 60, minutes % 60)
+    }
+
     /** An estimated walking time, to the minute: "≈ 3:25 h". Seconds would be false precision. */
     fun estimate(millis: Long): String {
         val minutes = ((millis + 30_000) / 60_000).coerceAtLeast(0)

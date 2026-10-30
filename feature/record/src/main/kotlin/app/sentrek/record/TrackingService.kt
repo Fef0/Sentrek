@@ -36,6 +36,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import app.sentrek.geo.LatLon
 import app.sentrek.data.SettingsRepository
+import app.sentrek.data.TurnaroundMode
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -58,12 +59,19 @@ class TrackingService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val live by lazy { LiveNotification(this, CHANNEL_ID) }
     private val breadcrumbs by lazy { Breadcrumbs(this) }
+    private val turnaround by lazy { TurnaroundAlarm(this) }
 
     /** The last fix as it came, and the settings of [breadcrumbs]. */
     private var fix: android.location.Location? = null
     private var breadcrumbMinutes = 0
     private var breadcrumbTo = ""
     private var breadcrumbName = ""
+    private var lowBatterySms = true
+
+    /** The turnaround alarm's settings. */
+    private var turnaroundMode = TurnaroundMode.Off
+    private var turnaroundMargin = 30
+    private var turnaroundTime = 14 * 60
 
     /** The last fix, for the time of sunset where the user is. */
     private var at: LatLon? = null
@@ -137,6 +145,10 @@ class TrackingService : Service() {
         }
         scope.launch { settings.emergencySmsTo.collect { breadcrumbTo = it; checkBreadcrumbs() } }
         scope.launch { settings.emergencyContactName.collect { breadcrumbName = it; checkBreadcrumbs() } }
+        scope.launch { settings.lowBatterySms.collect { lowBatterySms = it; checkBreadcrumbs() } }
+        scope.launch { settings.turnaround.collect { turnaroundMode = it } }
+        scope.launch { settings.turnaroundMarginMinutes.collect { turnaroundMargin = it } }
+        scope.launch { settings.turnaroundTime.collect { turnaroundTime = it } }
         // The last text as the recording ends, before the service may stop.
         scope.launch { recording.state.collect { if (it == null) checkBreadcrumbs() } }
         val both = combine(recording.state, following.state) { r, f -> r to f }
@@ -154,6 +166,7 @@ class TrackingService : Service() {
                 update()
                 // Also when no fix comes (a gorge, a tunnel): the last one known is sent.
                 checkBreadcrumbs()
+                turnaround.check(turnaroundMode, turnaroundMargin, turnaroundTime, at, following.state.value)
             }
         }
     }
@@ -215,7 +228,7 @@ class TrackingService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun checkBreadcrumbs() =
-        breadcrumbs.check(recording.state.value, fix, breadcrumbMinutes, breadcrumbTo, breadcrumbName)
+        breadcrumbs.check(recording.state.value, fix, breadcrumbMinutes, breadcrumbTo, breadcrumbName, lowBatterySms)
 
     override fun onDestroy() {
         runCatching { unregisterReceiver(screenOn) }

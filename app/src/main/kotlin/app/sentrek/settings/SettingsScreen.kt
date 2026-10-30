@@ -22,6 +22,8 @@ import android.content.pm.PackageManager
 import android.content.Intent
 import android.Manifest
 import android.net.Uri
+import android.app.TimePickerDialog
+import app.sentrek.data.TurnaroundMode
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -156,6 +158,34 @@ class SettingsViewModel @Inject constructor(
 
     fun setBreadcrumbMinutes(minutes: Int) {
         viewModelScope.launch { settings.setBreadcrumbMinutes(minutes) }
+    }
+
+    val lowBatterySms: StateFlow<Boolean> =
+        settings.lowBatterySms.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setLowBatterySms(on: Boolean) {
+        viewModelScope.launch { settings.setLowBatterySms(on) }
+    }
+
+    val turnaround: StateFlow<TurnaroundMode> =
+        settings.turnaround.stateIn(viewModelScope, SharingStarted.Eagerly, TurnaroundMode.Off)
+
+    fun setTurnaround(mode: TurnaroundMode) {
+        viewModelScope.launch { settings.setTurnaround(mode) }
+    }
+
+    val turnaroundMarginMinutes: StateFlow<Int> =
+        settings.turnaroundMarginMinutes.stateIn(viewModelScope, SharingStarted.Eagerly, 30)
+
+    fun setTurnaroundMarginMinutes(minutes: Int) {
+        viewModelScope.launch { settings.setTurnaroundMarginMinutes(minutes) }
+    }
+
+    val turnaroundTime: StateFlow<Int> =
+        settings.turnaroundTime.stateIn(viewModelScope, SharingStarted.Eagerly, 14 * 60)
+
+    fun setTurnaroundTime(minuteOfDay: Int) {
+        viewModelScope.launch { settings.setTurnaroundTime(minuteOfDay) }
     }
 
     val servers: StateFlow<Map<String, String>> =
@@ -493,6 +523,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 checked = offRouteVibration,
                 onChange = viewModel::setOffRouteVibration,
             )
+            TurnaroundRows(viewModel)
             ToggleRow(
                 title = stringResource(R.string.settings_confirm_exit),
                 checked = confirmExit,
@@ -755,7 +786,19 @@ private fun EmergencySettings(viewModel: SettingsViewModel, onBack: () -> Unit) 
                 number = emergencySmsTo,
                 onChange = viewModel::setEmergencyContact,
             )
-            BreadcrumbRow(enabled = sos && emergencySmsTo.isNotEmpty(), viewModel = viewModel)
+            val breadcrumbsOn = sos && emergencySmsTo.isNotEmpty()
+            BreadcrumbRow(enabled = breadcrumbsOn, viewModel = viewModel)
+            val minutes by viewModel.breadcrumbMinutes.collectAsStateWithLifecycle()
+            val lowBattery by viewModel.lowBatterySms.collectAsStateWithLifecycle()
+            // Only with the texts on: it's one more of them.
+            val lowBatteryOn = breadcrumbsOn && minutes > 0
+            ToggleRow(
+                enabled = lowBatteryOn,
+                title = stringResource(R.string.settings_low_battery_sms),
+                hint = stringResource(R.string.settings_low_battery_sms_hint),
+                checked = lowBatteryOn && lowBattery,
+                onChange = viewModel::setLowBatterySms,
+            )
             Spacer(Modifier.height(16.dp))
         }
     }
@@ -1191,5 +1234,62 @@ private fun BreadcrumbRow(enabled: Boolean, viewModel: SettingsViewModel) {
                 },
             ),
         ) { warning = null }
+    }
+}
+
+/**
+ * The turnaround alarm, off unless chosen: before dark (when the end of the followed route
+ * comes too close to sunset at the user's pace), or at a time of day.
+ */
+@Composable
+private fun TurnaroundRows(viewModel: SettingsViewModel) {
+    val mode by viewModel.turnaround.collectAsStateWithLifecycle()
+    val margin by viewModel.turnaroundMarginMinutes.collectAsStateWithLifecycle()
+    val minuteOfDay by viewModel.turnaroundTime.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    ChoiceRow(
+        title = stringResource(R.string.settings_turnaround),
+        options = listOf(
+            TurnaroundMode.Off to stringResource(R.string.settings_turnaround_off),
+            TurnaroundMode.BeforeDark to stringResource(R.string.settings_turnaround_dark),
+            TurnaroundMode.AtTime to stringResource(R.string.settings_turnaround_time),
+        ),
+        selected = mode,
+        onChange = viewModel::setTurnaround,
+        hint = when (mode) {
+            TurnaroundMode.Off -> stringResource(R.string.settings_turnaround_hint)
+            TurnaroundMode.BeforeDark -> stringResource(R.string.settings_turnaround_dark_hint)
+            TurnaroundMode.AtTime -> stringResource(R.string.settings_turnaround_time_hint)
+        },
+    )
+    when (mode) {
+        TurnaroundMode.Off -> Unit
+        TurnaroundMode.BeforeDark -> ChoiceRow(
+            title = stringResource(R.string.settings_turnaround_margin),
+            options = listOf(
+                0 to stringResource(R.string.settings_turnaround_margin_none),
+                30 to stringResource(R.string.settings_turnaround_margin_minutes, 30),
+                60 to stringResource(R.string.settings_turnaround_margin_hour),
+            ),
+            selected = margin,
+            onChange = viewModel::setTurnaroundMarginMinutes,
+        )
+        TurnaroundMode.AtTime -> {
+            val shown = android.text.format.DateFormat.getTimeFormat(context).format(
+                java.util.Calendar.getInstance().apply {
+                    set(java.util.Calendar.HOUR_OF_DAY, minuteOfDay / 60)
+                    set(java.util.Calendar.MINUTE, minuteOfDay % 60)
+                }.time,
+            )
+            NavRow(stringResource(R.string.settings_turnaround_at), shown) {
+                TimePickerDialog(
+                    context,
+                    { _, hour, minute -> viewModel.setTurnaroundTime(hour * 60 + minute) },
+                    minuteOfDay / 60,
+                    minuteOfDay % 60,
+                    android.text.format.DateFormat.is24HourFormat(context),
+                ).show()
+            }
+        }
     }
 }

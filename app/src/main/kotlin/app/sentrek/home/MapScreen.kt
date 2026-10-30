@@ -276,6 +276,8 @@ fun MapScreen(
     val sharing = rememberSharing()
     val goTo by viewModel.goTo.collectAsStateWithLifecycle()
     val lastSignal by viewModel.lastSignal.collectAsStateWithLifecycle()
+    val battery by viewModel.battery.collectAsStateWithLifecycle()
+    val wet by viewModel.wet.collectAsStateWithLifecycle()
     // The phone's compass while pointing the way: the arrow then points the real way.
     var heading by remember { mutableStateOf<Float?>(null) }
     val showLockButton by viewModel.showLockButton.collectAsStateWithLifecycle()
@@ -521,6 +523,16 @@ fun MapScreen(
                         onStop = { confirm = FollowConfirmations.stop(context, it.name, viewModel::stopFollowing) },
                         modifier = Modifier.fillMaxWidth(),
                         position = sunPosition,
+                    )
+                }
+                if (recording != null || followedRoute != null) {
+                    TrailNotes(
+                        battery = battery,
+                        arrival = followedRoute?.let { System.currentTimeMillis() + it.remaining.millis },
+                        powerMode = powerMode,
+                        onStamina = viewModel::setStaminaMode,
+                        water = followedRoute?.water,
+                        wet = wet,
                     )
                 }
                 // Top left, under any panel. It stays when the other controls fade out.

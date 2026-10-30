@@ -302,6 +302,30 @@
     <string name="settings_trail_difficulty_hint">In downloaded areas. Yellow is T1, red T2–T3 and blue T4–T6 on the SAC scale. Dotted lines are faint trails.</string>
     <string name="settings_off_route_vibration">Vibrate when off route</string>
     <string name="settings_off_route_vibration_hint">3 long buzzes when you leave the route, 2 short ones when you’re back on it.</string>
+    <!-- The peak finder. -->
+    <string name="peaks_open">What\'s that peak?</string>
+    <string name="peaks_title">Peaks around</string>
+    <string name="peaks_working">Working out the view…</string>
+    <string name="peaks_no_position">No position yet. Go outside, or allow location, and try again.</string>
+    <string name="peaks_no_data">No peaks to show here. Download this area in Library › Maps, or connect to the internet.</string>
+    <string name="peaks_direction">Looking %s</string>
+    <string name="peaks_no_compass">no compass</string>
+    <string name="peaks_follow_compass">Follow the compass</string>
+    <string name="peaks_hint">Hold the phone up and turn: the view turns with you. Drag it to look around. Peaks closer than 30 km, from the downloaded map data.</string>
+    <!-- Notes under the recording or route panel. -->
+    <string name="note_battery_route">Battery runs out ≈ %1$s, before the end (≈ %2$s)</string>
+    <string name="note_battery">Battery runs out ≈ %s at this rate</string>
+    <string name="note_battery_stamina">Stamina</string>
+    <string name="note_wet_rain">Rain</string>
+    <string name="note_wet_snow">Snow</string>
+    <string name="note_wet_storm">Thunderstorms</string>
+    <string name="note_wet_now">%s likely now</string>
+    <string name="note_wet_from">%1$s likely from %2$s</string>
+    <string name="note_wet_route">%1$s likely from %2$s, %3$s on%4$s</string>
+    <string name="note_wet_height">, at %s</string>
+    <string name="note_water_last">Last water for %1$s: %2$s in %3$s</string>
+    <string name="note_water_unnamed">a spring</string>
+    <string name="note_water_none">No water for the rest of the route (%s)</string>
     <!-- The last place with a phone signal, while there's none. -->
     <string name="signal_note">No signal · last %1$s away</string>
     <string name="signal_note_time">No signal · last at %s</string>

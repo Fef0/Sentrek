@@ -118,6 +118,9 @@ class Route(val points: List<LatLon>) {
         return Remaining(distance, up, down, HikingTime.millis(distance, up, down))
     }
 
+    /** The route's point at or just before [along] metres from the start. */
+    fun pointAt(along: Double): LatLon = points[indexAt(along)]
+
     /** Last point at or before [along]. */
     private fun indexAt(along: Double): Int {
         var lo = 0

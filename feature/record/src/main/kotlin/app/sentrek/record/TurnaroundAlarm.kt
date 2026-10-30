@@ -1,17 +1,7 @@
 package app.sentrek.record
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
-import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import android.text.format.DateFormat
-import android.util.Log
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import app.sentrek.data.TurnaroundMode
 import app.sentrek.feature.record.R
 import app.sentrek.geo.LatLon
@@ -69,55 +59,9 @@ class TurnaroundAlarm(private val context: Context) {
 
     private fun time(millis: Long) = DateFormat.getTimeFormat(context).format(Date(millis))
 
-    private fun ring(title: String, text: String) {
-        vibrate()
-        val manager = NotificationManagerCompat.from(context)
-        if (!manager.areNotificationsEnabled()) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // High: it pops up over whatever is open. The buzzing is done here, as strong as
-            // the off-route one, whatever the phone does with notifications.
-            context.getSystemService(NotificationManager::class.java).createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, context.getString(R.string.turnaround_channel), NotificationManager.IMPORTANCE_HIGH)
-                    .apply { enableVibration(false) },
-            )
-        }
-        val openApp = context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {
-            PendingIntent.getActivity(context, 0, it, PendingIntent.FLAG_IMMUTABLE)
-        }
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_record)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-            .setContentIntent(openApp)
-            .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .build()
-        runCatching { manager.notify(NOTIFICATION_ID, notification) }
-    }
-
-    private fun vibrate() {
-        runCatching {
-            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                context.getSystemService(VibratorManager::class.java).defaultVibrator
-            } else {
-                @Suppress("DEPRECATION")
-                context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createWaveform(PATTERN, -1))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(PATTERN, -1)
-            }
-        }.onFailure { Log.w(TAG, "Cannot vibrate", it) }
-    }
+    private fun ring(title: String, text: String) = TrailAlerts.ring(context, NOTIFICATION_ID, title, text, PATTERN)
 
     private companion object {
-        const val TAG = "TurnaroundAlarm"
-        const val CHANNEL_ID = "turnaround"
         const val NOTIFICATION_ID = 5
 
         /** Four long buzzes: unlike anything else the app does. */

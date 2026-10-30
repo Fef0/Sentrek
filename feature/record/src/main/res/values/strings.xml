@@ -6,7 +6,15 @@
     <string name="breadcrumb_position">Sentrek: my position at %1$s: %2$s</string>
     <string name="breadcrumb_low_battery">Sentrek: battery at %1$d%%, my phone may switch off soon. Position at %2$s: %3$s</string>
     <string name="breadcrumb_finished">Sentrek: hike finished. I\'m at %1$s</string>
-    <string name="turnaround_channel">Turnaround alarm</string>
+    <string name="alerts_channel">Trail alerts</string>
+    <string name="water_alert_title">Fill up your water here</string>
+    <string name="water_alert_text">It\'s the last on the route for %1$s (about %2$s).</string>
+    <string name="storm_alert_title">Storm on the way</string>
+    <string name="storm_alert_route">Thunderstorms likely from %1$s, %2$s on along the route. Think about where to shelter.</string>
+    <string name="storm_alert_here">Thunderstorms likely here from %s. Think about where to shelter.</string>
+    <string name="battery_alert_title">The battery may not last</string>
+    <string name="battery_alert_route">At this rate it runs out at about %1$s, and you\'d reach the end at %2$s.</string>
+    <string name="battery_alert_left">At this rate it runs out at about %s.</string>
     <string name="turnaround_dark_title">Time to turn back?</string>
     <string name="turnaround_dark_text">You\'d reach the end of the route at %1$s, and sunset is at %2$s.</string>
     <string name="turnaround_time_title">Time to turn back</string>
@@ -169,6 +177,10 @@ Long-press the map to add one.</string>
     <string name="weather_at_highest">Weather at the highest point, %1$s</string>
     <string name="weather_credit">Weather data by Open-Meteo.com</string>
     <string name="weather_today">Today</string>
+    <string name="weather_hours">Hour by hour</string>
+    <string name="weather_hours_title">%s, hour by hour</string>
+    <string name="weather_hours_close">Close</string>
+    <string name="weather_windy">Strong gusts</string>
     <string name="weather_storm">Thunderstorms</string>
     <string name="weather_gusts">Gusts up to %1$s</string>
     <string name="weather_sky_clear">Sunny</string>

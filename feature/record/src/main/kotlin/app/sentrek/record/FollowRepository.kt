@@ -16,6 +16,9 @@ import app.sentrek.geo.route.PaceTracker
 import app.sentrek.geo.route.RoutePlace
 import app.sentrek.geo.route.RoutePlaces
 import app.sentrek.geo.route.UpcomingPlace
+import app.sentrek.geo.route.WaterAhead
+import app.sentrek.feature.record.R
+import app.sentrek.ui.Format
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -55,6 +58,8 @@ data class Following(
     val upcoming: List<UpcomingPlace> = emptyList(),
     /** The times are more the user's pace than the standard one. */
     val ownPace: Boolean = false,
+    /** The next water and the dry stretch after it, times at the user's pace; null: no water known on the route. */
+    val water: WaterAhead? = null,
 ) {
     /**
      * Where the user is along the route, only while actually on it: off it, the nearest
@@ -92,6 +97,9 @@ class FollowRepository @Inject constructor(
     /** The user's pace on this route, learnt as it's walked: the times left follow it. */
     private var pace = PaceTracker()
 
+    /** Where along the route the user was told to fill up: once per spring. */
+    private var filledUpAt: Double? = null
+
     private val _state = MutableStateFlow<Following?>(null)
     val state: StateFlow<Following?> = _state.asStateFlow()
 
@@ -115,6 +123,7 @@ class FollowRepository @Inject constructor(
         routePlaces = emptyList()
         detector = OffRouteDetector()
         pace = PaceTracker()
+        filledUpAt = null
         tracks.show(track)
         runCatching { saved.writeText("${track.id}\n$reversed") }
         _state.value = Following(
@@ -152,7 +161,7 @@ class FollowRepository @Inject constructor(
             val found = withContext(Dispatchers.Default) { RoutePlaces.along(r, candidates) }
             if (route !== r) return@launch
             routePlaces = found
-            _state.value = _state.value?.copy(upcoming = upcoming(r, found, along ?: 0.0))
+            _state.value = _state.value?.copy(upcoming = upcoming(r, found, along ?: 0.0), water = water(r, found, along ?: 0.0))
         }
     }
 
@@ -208,8 +217,46 @@ class FollowRepository @Inject constructor(
             offRoute = detector.isOff,
             along = position.along,
             upcoming = upcoming(r, routePlaces, position.along),
+            water = water(r, routePlaces, position.along)?.also(::fillUpAlert),
         )
     }
+
+    private fun water(r: Route, found: List<RoutePlace>, at: Double): WaterAhead? =
+        WaterAhead.of(r, found, at)?.let { w -> w.copy(next = w.next?.let { it.copy(millis = atPace(it.millis)) }, dryMillis = atPace(w.dryMillis)) }
+
+    /** Close to the last water before a long dry stretch: a word, once, before walking past it. */
+    private fun fillUpAlert(water: WaterAhead) {
+        val next = water.next ?: return
+        if (!water.long || next.distance > FILL_UP_M || filledUpAt == next.place.along) return
+        filledUpAt = next.place.along
+        val text = context.getString(
+            R.string.water_alert_text,
+            Format.distance(water.dryDistance),
+            Format.hoursMinutes(water.dryMillis),
+        )
+        TrailAlerts.ring(context, WATER_NOTIFICATION_ID, context.getString(R.string.water_alert_title), text, WATER_PATTERN)
+    }
+
+    /**
+     * Points of the way ahead, every [stepM] metres from where the user is and the end: metres
+     * along the route and where. Empty when not following.
+     */
+    fun wayAhead(stepM: Double, max: Int): List<Pair<Double, LatLon>> {
+        val r = route ?: return emptyList()
+        val from = along ?: 0.0
+        val alongs = generateSequence(from) { it + stepM }.takeWhile { it < r.length }.take(max - 1).toList() + r.length
+        return alongs.map { it to r.pointAt(it) }
+    }
+
+    /** Walking time from where the user is to [to] metres along the route, at their pace. */
+    fun timeTo(to: Double): Long? {
+        val r = route ?: return null
+        val here = r.remaining(along ?: 0.0).millis
+        return atPace(maxOf(0L, here - r.remaining(to).millis))
+    }
+
+    /** Metres along the route to the user, null before the first fix or not following. */
+    val alongNow: Double? get() = along.takeIf { route != null }
 
     private fun atPace(standardMillis: Long): Long = (standardMillis * pace.factor).toLong()
 
@@ -237,6 +284,11 @@ class FollowRepository @Inject constructor(
     private companion object {
         const val TAG = "FollowRepository"
         const val MAX_ACCURACY_M = 40f
+        const val FILL_UP_M = 150.0
+        const val WATER_NOTIFICATION_ID = 7
+
+        /** Three short pulses, as a drip. */
+        val WATER_PATTERN = longArrayOf(0, 200, 150, 200, 150, 200)
 
         /** Three long pulses: hard to miss in a pocket. */
         val OFF_ROUTE_PATTERN = longArrayOf(0, 700, 300, 700, 300, 700)

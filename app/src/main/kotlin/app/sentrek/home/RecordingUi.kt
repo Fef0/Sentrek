@@ -14,13 +14,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -33,7 +30,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.sentrek.R
-import app.sentrek.geo.LatLon
 import app.sentrek.record.Breadcrumbs
 import app.sentrek.record.Recording
 import androidx.compose.ui.platform.LocalContext
@@ -42,9 +38,9 @@ import app.sentrek.ui.Format
 import app.sentrek.ui.TouchTarget
 import kotlinx.coroutines.delay
 
-/** Live numbers while recording: time (without pauses), distance, climb. */
+/** Live numbers while recording: time (without pauses), distance, climb; on one line when [compact]. */
 @Composable
-fun RecordingStats(recording: Recording, modifier: Modifier = Modifier, position: LatLon? = null) {
+fun RecordingNumbers(recording: Recording, modifier: Modifier = Modifier, compact: Boolean = false) {
     // To the minute: seconds tell nothing on a hike, and ticking each second redrew the panel
     // 60 times as often. Woken as the next minute starts; not at all while paused.
     val now by produceState(System.currentTimeMillis(), recording.startTime, recording.pausedMillis, recording.pausedSince) {
@@ -54,42 +50,46 @@ fun RecordingStats(recording: Recording, modifier: Modifier = Modifier, position
             delay(60_000 - recording.activeMillis(value) % 60_000)
         }
     }
-    Surface(
+    if (compact) {
+        Text(
+            stringResource(
+                if (recording.isPaused) R.string.record_line_paused else R.string.record_line,
+                Format.hoursMinutes(recording.activeMillis(now)),
+                Format.distance(recording.distance),
+                Format.elevation(recording.ascent),
+            ),
+            style = MaterialTheme.typography.titleSmall,
+            modifier = modifier,
+        )
+        return
+    }
+    Row(modifier) {
+        if (recording.isPaused) {
+            Stat(stringResource(R.string.record_paused), Format.hoursMinutes(recording.activeMillis(now)), Modifier.weight(1f), MaterialTheme.colorScheme.primary)
+        } else {
+            Stat(stringResource(R.string.record_time), Format.hoursMinutes(recording.activeMillis(now)), Modifier.weight(1f))
+        }
+        Stat(stringResource(R.string.record_distance), Format.distance(recording.distance), Modifier.weight(1f))
+        Stat(stringResource(R.string.record_ascent), "↑ " + Format.elevation(recording.ascent), Modifier.weight(1f))
+    }
+}
+
+/** Where the position texts are at, small and muted: it's there to be checked, not to be noticed. */
+@Composable
+fun BreadcrumbLine(modifier: Modifier = Modifier) {
+    val breadcrumbs by Breadcrumbs.status.collectAsStateWithLifecycle()
+    val status = breadcrumbs ?: return
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-        // See-through, so not matched to a theme colour: name the text colour.
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shadowElevation = 4.dp,
     ) {
-        Column(Modifier.padding(horizontal = 8.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Row {
-            if (recording.isPaused) {
-                Stat(stringResource(R.string.record_paused), Format.hoursMinutes(recording.activeMillis(now)), Modifier.weight(1f), MaterialTheme.colorScheme.primary)
-            } else {
-                Stat(stringResource(R.string.record_time), Format.hoursMinutes(recording.activeMillis(now)), Modifier.weight(1f))
-            }
-            Stat(stringResource(R.string.record_distance), Format.distance(recording.distance), Modifier.weight(1f))
-            Stat(stringResource(R.string.record_ascent), "↑ " + Format.elevation(recording.ascent), Modifier.weight(1f))
-        }
-        SunsetLine(position, remainingMillis = null, Modifier.padding(top = 4.dp))
-        // Small and muted: it's there to be checked, not to be noticed.
-        val breadcrumbs by Breadcrumbs.status.collectAsStateWithLifecycle()
-        breadcrumbs?.let {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.padding(top = 2.dp),
-            ) {
-                TrackedDot(it)
-                Text(
-                    stringResource(R.string.breadcrumb_chip, it.minutes, Breadcrumbs.statusLine(LocalContext.current, it)),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        }
+        TrackedDot(status)
+        Text(
+            stringResource(R.string.breadcrumb_chip, status.minutes, Breadcrumbs.statusLine(LocalContext.current, status)),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

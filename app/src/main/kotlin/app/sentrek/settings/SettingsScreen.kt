@@ -127,8 +127,12 @@ class SettingsViewModel @Inject constructor(
     val buttonSize: StateFlow<ButtonSize> =
         settings.buttonSize.stateIn(viewModelScope, SharingStarted.Eagerly, ButtonSize.Standard)
 
-    val gloveMode: StateFlow<Boolean> =
-        settings.gloveMode.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val powerMode: StateFlow<PowerMode> =
+        settings.powerMode.stateIn(viewModelScope, SharingStarted.Eagerly, PowerMode.Normal)
+
+    fun setPowerMode(mode: PowerMode) {
+        viewModelScope.launch { settings.setPowerMode(mode) }
+    }
 
     val sosEnabled: StateFlow<Boolean> =
         settings.sosEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, true)
@@ -246,10 +250,6 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setButtonSize(size) }
     }
 
-    fun setGloveMode(on: Boolean) {
-        viewModelScope.launch { settings.setGloveMode(on) }
-    }
-
     fun setOffRouteVibration(on: Boolean) {
         viewModelScope.launch { settings.setOffRouteVibration(on) }
     }
@@ -296,19 +296,6 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setShowScaleBar(show) }
     }
 
-    val batterySaver: StateFlow<Boolean> =
-        settings.batterySaver.stateIn(viewModelScope, SharingStarted.Eagerly, false)
-
-    fun setBatterySaver(on: Boolean) {
-        viewModelScope.launch { settings.setBatterySaver(on) }
-    }
-
-    val staminaMode: StateFlow<Boolean> =
-        settings.staminaMode.stateIn(viewModelScope, SharingStarted.Eagerly, false)
-
-    fun setStaminaMode(on: Boolean) {
-        viewModelScope.launch { settings.setStaminaMode(on) }
-    }
 
     val autoPower: StateFlow<AutoPower> =
         settings.autoPower.stateIn(viewModelScope, SharingStarted.Eagerly, AutoPower())
@@ -390,7 +377,7 @@ class SettingsViewModel @Inject constructor(
 }
 
 /** The pages of Settings, each opened from a row of the main one. */
-private enum class SettingsPageId { Map, MapUpdates, Controls, Appearance, Units, Alerts, Emergency, Advanced, Data, About }
+private enum class SettingsPageId { Map, Controls, Appearance, Units, Alerts, Emergency, Advanced, Data, About }
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
@@ -402,7 +389,6 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
         BackHandler(onBack = close)
         return when (open) {
             SettingsPageId.Map -> MapSettings(viewModel, close)
-            SettingsPageId.MapUpdates -> MapUpdateSettings(viewModel, close)
             SettingsPageId.Controls -> ControlSettings(viewModel, close)
             SettingsPageId.Appearance -> AppearanceSettings(viewModel, close)
             SettingsPageId.Units -> UnitSettings(viewModel, close)
@@ -413,8 +399,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
             SettingsPageId.About -> AboutSettings(close)
         }
     }
-    val batterySaver by viewModel.batterySaver.collectAsStateWithLifecycle()
-    val staminaMode by viewModel.staminaMode.collectAsStateWithLifecycle()
+    val powerMode by viewModel.powerMode.collectAsStateWithLifecycle()
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
@@ -429,21 +414,30 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 Text(stringResource(R.string.bar_settings), style = MaterialTheme.typography.headlineMedium)
             }
 
-            // First, and right here: on a long trip, the one switch that matters most.
-            ToggleRow(
-                icon = SentrekIcons.BatterySaver,
-                title = stringResource(R.string.settings_battery_saver),
-                hint = stringResource(if (staminaMode) R.string.settings_battery_saver_stamina else R.string.settings_battery_saver_hint),
-                checked = batterySaver && !staminaMode,
-                onChange = viewModel::setBatterySaver,
-                // Stamina mode replaces it: off there.
-                enabled = !staminaMode,
+            // First, and right here: on a long trip, the one choice that matters most.
+            ChoiceRow(
+                title = stringResource(R.string.settings_battery),
+                options = listOf(
+                    PowerMode.Normal to stringResource(R.string.settings_battery_normal),
+                    PowerMode.Saver to stringResource(R.string.settings_battery_saver_short),
+                    PowerMode.Stamina to stringResource(R.string.settings_stamina_short),
+                ),
+                selected = powerMode,
+                onChange = viewModel::setPowerMode,
+                hint = when (powerMode) {
+                    PowerMode.Normal -> stringResource(R.string.settings_battery_normal_hint)
+                    PowerMode.Saver -> stringResource(R.string.settings_battery_saver_hint)
+                    PowerMode.Stamina -> stringResource(
+                        R.string.settings_stamina_hint,
+                        PowerMode.STAMINA_FPS,
+                        seconds(GpsTiming.Stamina.screenMs), seconds(GpsTiming.Stamina.followMs), seconds(GpsTiming.Stamina.recordMs),
+                    )
+                },
             )
 
             // The rest a page each, a line under each saying what's in it: everything at a glance.
             // By how often they're changed: the map and the controls first, units are set once.
             NavRow(stringResource(R.string.settings_map), stringResource(R.string.settings_map_about)) { page = SettingsPageId.Map }
-            NavRow(stringResource(R.string.settings_map_updates), stringResource(R.string.settings_map_updates_about)) { page = SettingsPageId.MapUpdates }
             NavRow(stringResource(R.string.settings_controls), stringResource(R.string.settings_controls_about)) { page = SettingsPageId.Controls }
             NavRow(stringResource(R.string.settings_appearance), stringResource(R.string.settings_appearance_about)) { page = SettingsPageId.Appearance }
             NavRow(stringResource(R.string.settings_units), stringResource(R.string.settings_units_about)) { page = SettingsPageId.Units }
@@ -521,14 +515,10 @@ private fun MapSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
             checked = rotationLocked,
             onChange = viewModel::setRotationLocked,
         )
-    }
-}
 
-@Composable
-private fun MapUpdateSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
-    val autoUpdateMaps by viewModel.autoUpdateMaps.collectAsStateWithLifecycle()
-    val mapUpdateReminders by viewModel.mapUpdateReminders.collectAsStateWithLifecycle()
-    SettingsPage(stringResource(R.string.settings_map_updates), onBack) {
+        val autoUpdateMaps by viewModel.autoUpdateMaps.collectAsStateWithLifecycle()
+        val mapUpdateReminders by viewModel.mapUpdateReminders.collectAsStateWithLifecycle()
+        SectionTitle(stringResource(R.string.settings_map_updates))
         ToggleRow(
             title = stringResource(R.string.settings_auto_update_maps),
             hint = stringResource(R.string.settings_auto_update_maps_hint),
@@ -548,37 +538,27 @@ private fun MapUpdateSettings(viewModel: SettingsViewModel, onBack: () -> Unit) 
 
 @Composable
 private fun ControlSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
-    val gloveMode by viewModel.gloveMode.collectAsStateWithLifecycle()
     val buttonSize by viewModel.buttonSize.collectAsStateWithLifecycle()
     val volumeKeysZoom by viewModel.volumeKeysZoom.collectAsStateWithLifecycle()
     val showLockButton by viewModel.showLockButton.collectAsStateWithLifecycle()
     val autoHideControls by viewModel.autoHideControls.collectAsStateWithLifecycle()
     val confirmExit by viewModel.confirmExit.collectAsStateWithLifecycle()
     SettingsPage(stringResource(R.string.settings_controls), onBack) {
-        ToggleRow(
-            title = stringResource(R.string.settings_glove_mode),
-            hint = stringResource(R.string.settings_glove_mode_hint),
-            checked = gloveMode,
-            onChange = viewModel::setGloveMode,
-        )
-        // Glove mode decides these two: greyed out until it's off.
         ChoiceRow(
-            enabled = !gloveMode,
             title = stringResource(R.string.settings_button_size),
-            hint = stringResource(if (gloveMode) R.string.settings_button_size_gloves else R.string.settings_button_size_hint),
+            hint = stringResource(if (buttonSize == ButtonSize.Gloves) R.string.settings_button_size_gloves else R.string.settings_button_size_hint),
             options = listOf(
                 ButtonSize.Standard to stringResource(R.string.settings_size_standard),
                 ButtonSize.Large to stringResource(R.string.settings_size_large),
-                ButtonSize.Largest to stringResource(R.string.settings_size_largest),
+                ButtonSize.Gloves to stringResource(R.string.settings_size_gloves),
             ),
             selected = buttonSize,
             onChange = viewModel::setButtonSize,
         )
         ToggleRow(
-            enabled = !gloveMode,
             title = stringResource(R.string.settings_volume_zoom),
-            hint = stringResource(if (gloveMode) R.string.settings_volume_zoom_gloves else R.string.settings_volume_zoom_hint),
-            checked = gloveMode || volumeKeysZoom,
+            hint = stringResource(R.string.settings_volume_zoom_hint),
+            checked = volumeKeysZoom,
             onChange = viewModel::setVolumeKeysZoom,
         )
         ToggleRow(
@@ -779,9 +759,8 @@ private fun AboutSettings(onBack: () -> Unit) {
 /** Battery saver or stamina mode on: what they override waits, greyed out. */
 @Composable
 private fun rememberSaving(viewModel: SettingsViewModel): Boolean {
-    val batterySaver by viewModel.batterySaver.collectAsStateWithLifecycle()
-    val staminaMode by viewModel.staminaMode.collectAsStateWithLifecycle()
-    return batterySaver || staminaMode
+    val powerMode by viewModel.powerMode.collectAsStateWithLifecycle()
+    return powerMode != PowerMode.Normal
 }
 
 /** Why some rows are greyed out on this page. */
@@ -952,7 +931,7 @@ private fun EmergencySettings(viewModel: SettingsViewModel, onBack: () -> Unit) 
 private fun AdvancedSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val fps by viewModel.mapMaxFps.collectAsStateWithLifecycle()
     val gps by viewModel.gpsTiming.collectAsStateWithLifecycle()
-    val stamina by viewModel.staminaMode.collectAsStateWithLifecycle()
+    val stamina = viewModel.powerMode.collectAsStateWithLifecycle().value == PowerMode.Stamina
     val auto by viewModel.autoPower.collectAsStateWithLifecycle()
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
@@ -967,18 +946,7 @@ private fun AdvancedSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
                 Text(stringResource(R.string.settings_advanced), style = MaterialTheme.typography.headlineMedium)
             }
 
-            SectionTitle(stringResource(R.string.settings_stamina_section))
-            ToggleRow(
-                icon = SentrekIcons.BatteryAlert,
-                title = stringResource(R.string.settings_stamina),
-                hint = stringResource(
-                    R.string.settings_stamina_hint,
-                    PowerMode.STAMINA_FPS,
-                    seconds(GpsTiming.Stamina.screenMs), seconds(GpsTiming.Stamina.followMs), seconds(GpsTiming.Stamina.recordMs),
-                ),
-                checked = stamina,
-                onChange = viewModel::setStaminaMode,
-            )
+            SectionTitle(stringResource(R.string.settings_battery))
             ToggleRow(
                 title = stringResource(R.string.settings_auto_power),
                 hint = stringResource(R.string.settings_auto_hint),

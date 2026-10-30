@@ -45,12 +45,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sentrek.R
+import app.sentrek.ui.TouchTarget
+import app.sentrek.data.PowerMode
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.Box
 import app.sentrek.geo.LatLon
 import app.sentrek.record.GpsStatus
 import app.sentrek.record.LocationRepository
 import app.sentrek.record.formatCoordinates
 import app.sentrek.ui.Format
-import app.sentrek.ui.TouchTarget
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 
@@ -305,4 +308,29 @@ fun SignalNote(spot: SignalWatch.Spot, here: LatLon?, onClick: () -> Unit) {
             .heightIn(min = TouchTarget)
             .clickable(onClickLabel = stringResource(R.string.signal_goto), onClick = onClick),
     )
+}
+
+/**
+ * Battery saver or stamina mode on: a small round badge under the compass, as they change how
+ * the whole app behaves. A tap opens Settings, where they're turned off.
+ */
+@Composable
+fun PowerBadge(mode: PowerMode, onClick: () -> Unit) {
+    val (icon, label) = when (mode) {
+        PowerMode.Normal -> return
+        PowerMode.Saver -> SentrekIcons.BatterySaver to R.string.saver_on_map
+        PowerMode.Stamina -> SentrekIcons.BatteryAlert to R.string.stamina_on_map
+    }
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.primary,
+        shadowElevation = 4.dp,
+        modifier = Modifier.size(TouchTarget),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = stringResource(label))
+        }
+    }
 }

@@ -230,11 +230,11 @@ class HomeViewModel @Inject constructor(
             if (sos && minutes > 0 && to.isNotBlank() && allowed) name.ifBlank { to } to minutes else null
         }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    val followPlaces: StateFlow<Boolean> =
-        settings.followPlaces.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    val trailCardExpanded: StateFlow<Boolean> =
+        settings.trailCardExpanded.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    fun setFollowPlaces(show: Boolean) {
-        viewModelScope.launch { settings.setFollowPlaces(show) }
+    fun setTrailCardExpanded(expanded: Boolean) {
+        viewModelScope.launch { settings.setTrailCardExpanded(expanded) }
     }
 
     val followPlacesExpanded: StateFlow<Boolean> =
@@ -243,9 +243,6 @@ class HomeViewModel @Inject constructor(
     fun setFollowPlacesExpanded(expanded: Boolean) {
         viewModelScope.launch { settings.setFollowPlacesExpanded(expanded) }
     }
-
-    val followProfile: StateFlow<Boolean> =
-        settings.followProfile.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     val autoHideControls: StateFlow<Boolean> =
         settings.autoHideControls.stateIn(viewModelScope, SharingStarted.Eagerly, false)
@@ -264,10 +261,6 @@ class HomeViewModel @Inject constructor(
 
     fun setRotationLocked(locked: Boolean) {
         viewModelScope.launch { settings.setRotationLocked(locked) }
-    }
-
-    fun setFollowProfile(show: Boolean) {
-        viewModelScope.launch { settings.setFollowProfile(show) }
     }
 
     val places: StateFlow<List<Place>> = placeRepository.places

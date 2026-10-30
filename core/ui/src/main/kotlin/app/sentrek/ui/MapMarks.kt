@@ -30,14 +30,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.sentrek.geo.units.DistanceUnit
 import app.sentrek.geo.units.UnitFormat
 import kotlinx.coroutines.delay
 import kotlin.math.max
 
 /**
- * Scale bar with metric above the line and imperial below, both measured from the left tick:
- * the longer tick up marks the metric length, the one down the imperial length. Black with a
- * white outline ([night]: the other way round), readable over any map.
+ * Scale bar in the user's distance unit, the length written above the line. Black with a white
+ * outline ([night]: the other way round), readable over any map.
  */
 @Composable
 fun ScaleBar(metersPerPx: Double, modifier: Modifier = Modifier, night: Boolean = false) {
@@ -49,41 +49,38 @@ fun ScaleBar(metersPerPx: Double, modifier: Modifier = Modifier, night: Boolean 
     val style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ink)
 
     val maxMeters = with(density) { SCALE_MAX_WIDTH.toPx() } * metersPerPx
-    val metric = UnitFormat.roundDown(maxMeters)
-    val metricLabel = if (metric >= 1_000) "${number(metric / 1_000)} km" else "${number(metric)} m"
-    val maxFeet = maxMeters / UnitFormat.FOOT_M
-    val (imperial, imperialLabel) = if (maxFeet < FEET_PER_MILE) {
-        val feet = UnitFormat.roundDown(maxFeet)
-        feet * UnitFormat.FOOT_M to "${number(feet)} ft"
-    } else {
-        val miles = UnitFormat.roundDown(maxMeters / UnitFormat.MILE_M)
-        miles * UnitFormat.MILE_M to "${number(miles)} mi"
-    }
-
-    val metricText = measurer.measure(metricLabel, style)
-    val imperialText = measurer.measure(imperialLabel, style)
-    val metricPx = (metric / metersPerPx).toFloat()
-    val imperialPx = (imperial / metersPerPx).toFloat()
+    val (meters, label) = scaleLength(maxMeters, Format.units.distance)
+    val text = measurer.measure(label, style)
+    val px = (meters / metersPerPx).toFloat()
     with(density) {
         val line = 2.dp.toPx()
         val outline = 4.dp.toPx()
         val gap = 3.dp.toPx()
-        val tick = metricText.size.height + gap
-        val width = max(max(metricPx, imperialPx), max(metricText.size.width, imperialText.size.width) + gap) + outline
-        val height = 2 * tick + outline
+        val tick = text.size.height + gap
+        val width = max(px, text.size.width + gap) + outline
+        val height = tick + outline
         Canvas(modifier.size(width.toDp(), height.toDp())) {
             val x0 = outline / 2
             val y = tick + outline / 2
             for ((color, w) in listOf(halo to outline, ink to line)) {
-                drawLine(color, Offset(x0, y), Offset(x0 + max(metricPx, imperialPx), y), w, StrokeCap.Square)
-                drawLine(color, Offset(x0, y - tick + outline / 2), Offset(x0, y + tick - outline / 2), w, StrokeCap.Square)
-                drawLine(color, Offset(x0 + metricPx, y - tick + outline / 2), Offset(x0 + metricPx, y), w, StrokeCap.Square)
-                drawLine(color, Offset(x0 + imperialPx, y), Offset(x0 + imperialPx, y + tick - outline / 2), w, StrokeCap.Square)
+                drawLine(color, Offset(x0, y), Offset(x0 + px, y), w, StrokeCap.Square)
+                drawLine(color, Offset(x0, y - tick + outline / 2), Offset(x0, y), w, StrokeCap.Square)
+                drawLine(color, Offset(x0 + px, y - tick + outline / 2), Offset(x0 + px, y), w, StrokeCap.Square)
             }
-            haloText(metricText, Offset(x0 + gap, y - gap - metricText.size.height), halo)
-            haloText(imperialText, Offset(x0 + gap, y + gap), halo)
+            haloText(text, Offset(x0 + gap, y - gap - text.size.height), halo)
         }
     }
+}
+
+/** The longest round length up to [maxMeters], in metres, and its label. */
+private fun scaleLength(maxMeters: Double, unit: DistanceUnit): Pair<Double, String> = when {
+    unit == DistanceUnit.Miles && maxMeters < UnitFormat.MILE_M / 10 ->
+        UnitFormat.roundDown(maxMeters / UnitFormat.FOOT_M).let { it * UnitFormat.FOOT_M to "${number(it)} ft" }
+    unit == DistanceUnit.Miles ->
+        UnitFormat.roundDown(maxMeters / UnitFormat.MILE_M).let { it * UnitFormat.MILE_M to "${number(it)} mi" }
+    unit == DistanceUnit.NauticalMiles && maxMeters >= UnitFormat.NAUTICAL_MILE_M / 10 ->
+        UnitFormat.roundDown(maxMeters / UnitFormat.NAUTICAL_MILE_M).let { it * UnitFormat.NAUTICAL_MILE_M to "${number(it)} nmi" }
+    else -> UnitFormat.roundDown(maxMeters).let { it to if (it >= 1_000) "${number(it / 1_000)} km" else "${number(it)} m" }
 }
 
 private fun DrawScope.haloText(text: TextLayoutResult, at: Offset, halo: Color) {
@@ -123,7 +120,6 @@ fun MapCredit(modifier: Modifier = Modifier) {
 }
 
 private val SCALE_MAX_WIDTH = 110.dp
-private const val FEET_PER_MILE = 5_280.0
 private const val CREDIT_MS = 5_000L
 
 /** Once per start of the app, not on every screen that draws a map. */

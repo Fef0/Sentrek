@@ -12,6 +12,7 @@ import app.sentrek.geo.LatLon
 import app.sentrek.geo.route.OffRouteDetector
 import app.sentrek.geo.overlay.OverlayPoiSource
 import app.sentrek.geo.route.Route
+import app.sentrek.geo.route.PaceTracker
 import app.sentrek.geo.route.RoutePlace
 import app.sentrek.geo.route.RoutePlaces
 import app.sentrek.geo.route.UpcomingPlace
@@ -37,7 +38,10 @@ data class Following(
     val trackId: String,
     val name: String,
     val reversed: Boolean,
-    /** Distance, climb and walking time to the end; the whole route until the first fix. */
+    /**
+     * Distance, climb and walking time to the end; the whole route until the first fix. The
+     * time is at the user's own pace, once there's enough walking to tell it ([ownPace]).
+     */
     val remaining: Route.Remaining,
     /** Metres from the route, or null before the first fix. */
     val offset: Double?,
@@ -49,6 +53,8 @@ data class Following(
     val along: Double? = null,
     /** Huts, water, passes, the user's places… still ahead, nearest first. */
     val upcoming: List<UpcomingPlace> = emptyList(),
+    /** The times are more the user's pace than the standard one. */
+    val ownPace: Boolean = false,
 ) {
     /**
      * Where the user is along the route, only while actually on it: off it, the nearest
@@ -83,6 +89,9 @@ class FollowRepository @Inject constructor(
     private var placesJob: Job? = null
     private var detector = OffRouteDetector()
 
+    /** The user's pace on this route, learnt as it's walked: the times left follow it. */
+    private var pace = PaceTracker()
+
     private val _state = MutableStateFlow<Following?>(null)
     val state: StateFlow<Following?> = _state.asStateFlow()
 
@@ -105,6 +114,7 @@ class FollowRepository @Inject constructor(
         along = null
         routePlaces = emptyList()
         detector = OffRouteDetector()
+        pace = PaceTracker()
         tracks.show(track)
         runCatching { saved.writeText("${track.id}\n$reversed") }
         _state.value = Following(
@@ -142,7 +152,7 @@ class FollowRepository @Inject constructor(
             val found = withContext(Dispatchers.Default) { RoutePlaces.along(r, candidates) }
             if (route !== r) return@launch
             routePlaces = found
-            _state.value = _state.value?.copy(upcoming = RoutePlaces.upcoming(r, found, along ?: 0.0))
+            _state.value = _state.value?.copy(upcoming = upcoming(r, found, along ?: 0.0))
         }
     }
 
@@ -188,14 +198,23 @@ class FollowRepository @Inject constructor(
             OffRouteDetector.Event.BackOnRoute -> vibrate(BACK_ON_ROUTE_PATTERN)
             null -> Unit
         }
+        val standard = r.remaining(position.along)
+        val onRoute = !detector.isOff && position.offset <= OffRouteDetector.OFF_ROUTE_M
+        pace.update(position.along, standard.millis, location.time, onRoute)
         _state.value = current.copy(
-            remaining = r.remaining(position.along),
+            remaining = standard.copy(millis = atPace(standard.millis)),
+            ownPace = pace.learnt,
             offset = position.offset,
             offRoute = detector.isOff,
             along = position.along,
-            upcoming = RoutePlaces.upcoming(r, routePlaces, position.along),
+            upcoming = upcoming(r, routePlaces, position.along),
         )
     }
+
+    private fun atPace(standardMillis: Long): Long = (standardMillis * pace.factor).toLong()
+
+    private fun upcoming(r: Route, found: List<RoutePlace>, at: Double): List<UpcomingPlace> =
+        RoutePlaces.upcoming(r, found, at).map { it.copy(millis = atPace(it.millis)) }
 
     private fun vibrate(pattern: LongArray) {
         if (!vibrationOn.value) return

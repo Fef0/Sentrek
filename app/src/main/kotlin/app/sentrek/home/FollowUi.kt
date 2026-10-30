@@ -113,7 +113,12 @@ fun FollowPanel(
                 if (following.hasElevation) {
                     FollowStat(stringResource(R.string.follow_ascent_left), "↑ " + Format.elevation(left.ascent), Modifier.weight(1f))
                 }
-                FollowStat(stringResource(R.string.follow_time_left), Format.duration(left.millis), Modifier.weight(1f))
+                // To the minute: an estimate, and seconds would only redraw the panel.
+                FollowStat(
+                    stringResource(if (following.ownPace) R.string.follow_time_left_own else R.string.follow_time_left),
+                    Format.hoursMinutes(left.millis),
+                    Modifier.weight(1f),
+                )
             }
             SunsetLine(position, following.remaining.millis, Modifier.padding(bottom = 8.dp))
             if (showPlaces) {

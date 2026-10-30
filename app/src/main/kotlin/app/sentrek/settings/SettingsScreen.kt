@@ -433,20 +433,18 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 enabled = !staminaMode,
             )
 
-            // The rest a page each, a line under each saying what's set: everything at a glance.
+            // The rest a page each, a line under each saying what's in it: everything at a glance.
             // By how often they're changed: the map and the controls first, units are set once.
-            NavRow(stringResource(R.string.settings_map), mapSummary(viewModel)) { page = SettingsPageId.Map }
-            NavRow(stringResource(R.string.settings_map_updates), mapUpdatesSummary(viewModel)) { page = SettingsPageId.MapUpdates }
-            NavRow(stringResource(R.string.settings_controls), controlsSummary(viewModel)) { page = SettingsPageId.Controls }
-            NavRow(stringResource(R.string.settings_appearance), appearanceSummary(viewModel)) { page = SettingsPageId.Appearance }
-            NavRow(stringResource(R.string.settings_units), unitsSummary(viewModel)) { page = SettingsPageId.Units }
-            NavRow(stringResource(R.string.settings_alerts_page), alertsSummary(viewModel)) { page = SettingsPageId.Alerts }
-            NavRow(stringResource(R.string.settings_emergency_page), emergencySummary(viewModel)) { page = SettingsPageId.Emergency }
+            NavRow(stringResource(R.string.settings_map), stringResource(R.string.settings_map_about)) { page = SettingsPageId.Map }
+            NavRow(stringResource(R.string.settings_map_updates), stringResource(R.string.settings_map_updates_about)) { page = SettingsPageId.MapUpdates }
+            NavRow(stringResource(R.string.settings_controls), stringResource(R.string.settings_controls_about)) { page = SettingsPageId.Controls }
+            NavRow(stringResource(R.string.settings_appearance), stringResource(R.string.settings_appearance_about)) { page = SettingsPageId.Appearance }
+            NavRow(stringResource(R.string.settings_units), stringResource(R.string.settings_units_about)) { page = SettingsPageId.Units }
+            NavRow(stringResource(R.string.settings_alerts_page), stringResource(R.string.settings_alerts_about)) { page = SettingsPageId.Alerts }
+            NavRow(stringResource(R.string.settings_emergency_page), stringResource(R.string.settings_emergency_about)) { page = SettingsPageId.Emergency }
             NavRow(stringResource(R.string.settings_advanced), stringResource(R.string.settings_advanced_hint)) { page = SettingsPageId.Advanced }
-            NavRow(stringResource(R.string.settings_data), stringResource(R.string.settings_data_summary)) { page = SettingsPageId.Data }
-            NavRow(stringResource(R.string.settings_about), stringResource(R.string.settings_version, BuildConfig.VERSION_NAME)) {
-                page = SettingsPageId.About
-            }
+            NavRow(stringResource(R.string.settings_data), stringResource(R.string.settings_data_about)) { page = SettingsPageId.Data }
+            NavRow(stringResource(R.string.settings_about), stringResource(R.string.settings_about_about)) { page = SettingsPageId.About }
             Spacer(Modifier.height(16.dp))
         }
     }
@@ -795,135 +793,6 @@ private fun unitSystem(units: Units): Units? = listOf(Units.Metric, Units.Imperi
     it.distance == units.distance && it.elevation == units.elevation && it.speed == units.speed
 }
 
-/** The parts that are on, joined, the first capitalised; [none] when nothing is. */
-private fun joined(parts: List<String>, none: String): String =
-    if (parts.isEmpty()) none else parts.joinToString(", ").replaceFirstChar { it.uppercase() }
-
-@Composable
-private fun mapSummary(viewModel: SettingsViewModel): String {
-    val contours by viewModel.showContours.collectAsStateWithLifecycle()
-    val slopes by viewModel.showSlopes.collectAsStateWithLifecycle()
-    val difficulty by viewModel.showTrailDifficulty.collectAsStateWithLifecycle()
-    val scaleBar by viewModel.showScaleBar.collectAsStateWithLifecycle()
-    val north by viewModel.rotationLocked.collectAsStateWithLifecycle()
-    return joined(
-        listOfNotNull(
-            stringResource(R.string.settings_sum_contours).takeIf { contours },
-            stringResource(R.string.settings_sum_slopes).takeIf { slopes },
-            stringResource(R.string.settings_sum_difficulty).takeIf { difficulty },
-            stringResource(R.string.settings_sum_scale_bar).takeIf { scaleBar },
-            stringResource(R.string.settings_sum_north).takeIf { north },
-        ),
-        stringResource(R.string.settings_sum_plain_map),
-    )
-}
-
-@Composable
-private fun mapUpdatesSummary(viewModel: SettingsViewModel): String {
-    val auto by viewModel.autoUpdateMaps.collectAsStateWithLifecycle()
-    val reminders by viewModel.mapUpdateReminders.collectAsStateWithLifecycle()
-    return stringResource(
-        when {
-            auto -> R.string.settings_sum_updates_auto
-            reminders -> R.string.settings_sum_updates_reminders
-            else -> R.string.settings_sum_updates_hand
-        },
-    )
-}
-
-@Composable
-private fun controlsSummary(viewModel: SettingsViewModel): String {
-    val gloves by viewModel.gloveMode.collectAsStateWithLifecycle()
-    val size by viewModel.buttonSize.collectAsStateWithLifecycle()
-    val volume by viewModel.volumeKeysZoom.collectAsStateWithLifecycle()
-    val lock by viewModel.showLockButton.collectAsStateWithLifecycle()
-    val autoHide by viewModel.autoHideControls.collectAsStateWithLifecycle()
-    val buttons = if (gloves) {
-        stringResource(R.string.settings_sum_gloves)
-    } else {
-        stringResource(
-            R.string.settings_sum_buttons,
-            stringResource(
-                when (size) {
-                    ButtonSize.Standard -> R.string.settings_size_standard
-                    ButtonSize.Large -> R.string.settings_size_large
-                    ButtonSize.Largest -> R.string.settings_size_largest
-                },
-            ).lowercase(),
-        )
-    }
-    return joined(
-        listOfNotNull(
-            buttons,
-            stringResource(R.string.settings_sum_volume).takeIf { volume && !gloves },
-            stringResource(R.string.settings_sum_lock).takeIf { lock },
-            stringResource(R.string.settings_sum_auto_hide).takeIf { autoHide },
-        ),
-        buttons,
-    )
-}
-
-@Composable
-private fun appearanceSummary(viewModel: SettingsViewModel): String {
-    val theme by viewModel.theme.collectAsStateWithLifecycle()
-    val mapTheme by viewModel.mapTheme.collectAsStateWithLifecycle()
-    val textSize by viewModel.textSize.collectAsStateWithLifecycle()
-    val themeName = stringResource(
-        when (theme) {
-            AppTheme.System -> R.string.settings_theme_system
-            AppTheme.Light -> R.string.settings_theme_light
-            AppTheme.Dark -> R.string.settings_theme_dark
-            AppTheme.Black -> R.string.settings_theme_black
-        },
-    )
-    val mapName = stringResource(
-        when (mapTheme) {
-            MapTheme.Auto -> R.string.settings_map_theme_auto
-            MapTheme.Day -> R.string.settings_map_theme_day
-            MapTheme.Night -> R.string.settings_map_theme_night
-        },
-    ).lowercase()
-    val textName = stringResource(
-        when (textSize) {
-            TextSize.Small -> R.string.settings_size_small
-            TextSize.Default -> R.string.settings_size_default
-            TextSize.Large -> R.string.settings_size_large
-            TextSize.Largest -> R.string.settings_size_largest
-        },
-    ).lowercase()
-    return stringResource(R.string.settings_sum_appearance, themeName, mapName, textName)
-}
-
-@Composable
-private fun unitsSummary(viewModel: SettingsViewModel): String {
-    val units by viewModel.units.collectAsStateWithLifecycle()
-    val system = when (unitSystem(units)) {
-        Units.Metric -> stringResource(R.string.settings_sum_units_metric)
-        Units.Imperial -> stringResource(R.string.settings_sum_units_imperial)
-        else -> stringResource(R.string.settings_sum_units_mixed)
-    }
-    val format = when (units.coordinates) {
-        CoordinateFormat.Decimal -> "DD.ddd"
-        CoordinateFormat.DegreesMinutes -> "DD MM.mmm"
-        CoordinateFormat.DegreesMinutesSeconds -> "DD MM SS"
-    }
-    return stringResource(R.string.settings_sum_units, system, format)
-}
-
-@Composable
-private fun emergencySummary(viewModel: SettingsViewModel): String {
-    val sos by viewModel.sosEnabled.collectAsStateWithLifecycle()
-    val to by viewModel.emergencySmsTo.collectAsStateWithLifecycle()
-    val name by viewModel.emergencyContactName.collectAsStateWithLifecycle()
-    val minutes by viewModel.breadcrumbMinutes.collectAsStateWithLifecycle()
-    if (!sos) return stringResource(R.string.settings_sum_sos_off)
-    return listOfNotNull(
-        stringResource(R.string.settings_sum_sos_on),
-        name.ifBlank { to }.takeIf { it.isNotBlank() },
-        stringResource(R.string.settings_sum_texts, minutes).takeIf { minutes > 0 && to.isNotBlank() },
-    ).joinToString(" · ")
-}
-
 @Composable
 private fun ToggleRow(
     title: String,
@@ -996,29 +865,6 @@ private fun AlertsSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
             Spacer(Modifier.height(16.dp))
         }
     }
-}
-
-/** "Off route, water, rain · turnaround off": what's on, without opening the page. */
-@Composable
-private fun alertsSummary(viewModel: SettingsViewModel): String {
-    val offRoute by viewModel.offRouteVibration.collectAsStateWithLifecycle()
-    val water by viewModel.waterAdvice.collectAsStateWithLifecycle()
-    val rain by viewModel.rainAdvice.collectAsStateWithLifecycle()
-    val turnaround by viewModel.turnaround.collectAsStateWithLifecycle()
-    val on = listOfNotNull(
-        stringResource(R.string.settings_alerts_off_route).takeIf { offRoute },
-        stringResource(R.string.settings_alerts_water).takeIf { water },
-        stringResource(R.string.settings_alerts_rain).takeIf { rain },
-    )
-    val alerts = if (on.isEmpty()) stringResource(R.string.settings_alerts_none) else on.joinToString(", ").replaceFirstChar { it.uppercase() }
-    val turn = stringResource(
-        when (turnaround) {
-            TurnaroundMode.Off -> R.string.settings_alerts_turnaround_off
-            TurnaroundMode.BeforeDark -> R.string.settings_alerts_turnaround_dark
-            TurnaroundMode.AtTime -> R.string.settings_alerts_turnaround_time
-        },
-    )
-    return "$alerts · $turn"
 }
 
 /** Map frame rate and GPS timing: rarely changed, so on a page of their own. */

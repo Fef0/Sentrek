@@ -95,6 +95,8 @@
     <string name="follow_distance_left">Left</string>
     <string name="follow_ascent_left">Climb left</string>
     <string name="follow_time_left">Time left</string>
+    <!-- Once the time left follows the user's own pace, learnt on this walk. -->
+    <string name="follow_time_left_own">At your pace</string>
     <string name="follow_profile">Elevation profile</string>
     <string name="follow_you_are_here">You are here</string>
     <string name="record_back_to_start">Back to start</string>

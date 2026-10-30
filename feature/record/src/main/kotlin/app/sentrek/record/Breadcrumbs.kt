@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.Location
+import android.os.BatteryManager
 import android.os.Build
 import android.telephony.SmsManager
 import android.util.Log
@@ -30,7 +31,8 @@ import java.util.Locale
  * 60 minutes, like the tracking of a satellite messenger but over the phone network. One text
  * when the recording starts, one each period, one when it ends. A text that doesn't go (no
  * signal, often, in the mountains) is tried again every couple of minutes with the newest
- * position. Texts cost what the user's plan charges for them: the settings say so.
+ * position. Texts cost what the user's plan charges for them: the settings say so. When the
+ * battery runs low, one more text says so, with the position: the last one may come from there.
  *
  * Driven by [TrackingService]: [check] with each fix and every minute. While texts go out, a
  * quiet notification and a line on the map ([status]) say so.
@@ -42,7 +44,7 @@ class Breadcrumbs(private val context: Context) {
     private var pending: Pending? = null
     private var retryAt = 0L
 
-    private class Pending(val session: Long, val sentAt: Long, val parts: Int) {
+    private class Pending(val session: Long, val sentAt: Long, val parts: Int, val lowBattery: Boolean) {
         var results = 0
         var failed = false
     }
@@ -59,7 +61,9 @@ class Breadcrumbs(private val context: Context) {
                 retryAt = System.currentTimeMillis() + RETRY_MS
                 _status.value = _status.value?.copy(noSignal = true)
             } else {
-                saved.edit().putLong(SESSION, p.session).putLong(LAST_SENT, p.sentAt).apply()
+                saved.edit().putLong(SESSION, p.session).putLong(LAST_SENT, p.sentAt)
+                    .apply { if (p.lowBattery) putLong(LOW_BATTERY_SENT, p.session) }
+                    .apply()
                 _status.value = _status.value?.copy(lastSent = p.sentAt, noSignal = false)
             }
             notifyStatus()
@@ -79,9 +83,10 @@ class Breadcrumbs(private val context: Context) {
 
     /**
      * Sends a text when one is due: [recording] going on (null: just ended), [fix] the latest
-     * position, every [minutes] (0: off) to [to], called [name] in the contacts.
+     * position, every [minutes] (0: off) to [to], called [name] in the contacts; with
+     * [lowBattery], one more when the battery runs low.
      */
-    fun check(recording: Recording?, fix: Location?, minutes: Int, to: String, name: String) {
+    fun check(recording: Recording?, fix: Location?, minutes: Int, to: String, name: String, lowBattery: Boolean) {
         val now = System.currentTimeMillis()
         val session = saved.getLong(SESSION, 0)
         val on = minutes > 0 && to.isNotBlank() && canSend()
@@ -90,7 +95,7 @@ class Breadcrumbs(private val context: Context) {
             if (session == 0L) return
             // The last one, without retries: nothing keeps running after the recording.
             if (on && fix != null) send(to, finished(fix), session, now)
-            saved.edit().remove(SESSION).remove(LAST_SENT).apply()
+            saved.edit().remove(SESSION).remove(LAST_SENT).remove(LOW_BATTERY_SENT).apply()
             return
         }
         if (!on) return setStatus(null)
@@ -100,6 +105,8 @@ class Breadcrumbs(private val context: Context) {
         pending?.let { if (now - it.sentAt < PENDING_TIMEOUT_MS) return else pending = null }
         when {
             session != recording.startTime -> send(to, started(fix, minutes), recording.startTime, now)
+            lowBattery && saved.getLong(LOW_BATTERY_SENT, 0) != session && battery()?.let { it <= LOW_BATTERY_PERCENT } == true ->
+                send(to, lowBattery(fix, battery() ?: LOW_BATTERY_PERCENT), session, now, lowBattery = true)
             now - saved.getLong(LAST_SENT, 0) >= minutes * 60_000L -> send(to, position(fix), session, now)
         }
     }
@@ -108,7 +115,14 @@ class Breadcrumbs(private val context: Context) {
         ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED &&
             context.packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY_MESSAGING)
 
-    private fun send(to: String, text: String, session: Long, now: Long) {
+    /** The battery level in percent, null while charging (a power bank) or unknown. */
+    private fun battery(): Int? {
+        val manager = context.getSystemService(BatteryManager::class.java) ?: return null
+        if (manager.isCharging) return null
+        return manager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY).takeIf { it in 0..100 }
+    }
+
+    private fun send(to: String, text: String, session: Long, now: Long, lowBattery: Boolean = false) {
         val sms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             context.getSystemService(SmsManager::class.java)
         } else {
@@ -120,7 +134,7 @@ class Breadcrumbs(private val context: Context) {
             val sent = PendingIntent.getBroadcast(
                 context, 0, Intent(ACTION_SENT).setPackage(context.packageName), PendingIntent.FLAG_IMMUTABLE,
             )
-            pending = Pending(session, now, parts.size)
+            pending = Pending(session, now, parts.size, lowBattery)
             sms.sendMultipartTextMessage(to, null, parts, ArrayList(List(parts.size) { sent }), null)
         }.onFailure {
             Log.w(TAG, "Cannot send breadcrumb", it)
@@ -134,6 +148,9 @@ class Breadcrumbs(private val context: Context) {
 
     private fun position(fix: Location) =
         context.getString(R.string.breadcrumb_position, time(fix.time), where(fix))
+
+    private fun lowBattery(fix: Location, percent: Int) =
+        context.getString(R.string.breadcrumb_low_battery, percent, time(fix.time), where(fix))
 
     private fun finished(fix: Location) =
         context.getString(R.string.breadcrumb_finished, where(fix))
@@ -201,6 +218,10 @@ class Breadcrumbs(private val context: Context) {
         private const val NOTIFICATION_ID = 4
         private const val SESSION = "session"
         private const val LAST_SENT = "last_sent"
+        private const val LOW_BATTERY_SENT = "low_battery_sent"
+
+        /** Low enough that it may soon be off, high enough that the text still gets out. */
+        private const val LOW_BATTERY_PERCENT = 15
         /**
          * Soon: without signal nothing leaves the phone, so a try costs nothing, and the
          * signal is often back within a few steps (over a ridge, out of a gorge).

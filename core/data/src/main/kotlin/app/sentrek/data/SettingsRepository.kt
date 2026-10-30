@@ -95,6 +95,38 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[BREADCRUMB_MINUTES] = minutes }
     }
 
+    /** With breadcrumbs on: one more text when the battery runs low, before the phone goes off. */
+    val lowBatterySms: Flow<Boolean> =
+        context.settings.data.map { it[LOW_BATTERY_SMS] ?: true }
+
+    suspend fun setLowBatterySms(on: Boolean) {
+        context.settings.edit { it[LOW_BATTERY_SMS] = on }
+    }
+
+    /** The turnaround alarm: off, before dark, or at a set time. */
+    val turnaround: Flow<TurnaroundMode> =
+        context.settings.data.map { p -> TurnaroundMode.entries.firstOrNull { it.name == p[TURNAROUND] } ?: TurnaroundMode.Off }
+
+    suspend fun setTurnaround(mode: TurnaroundMode) {
+        context.settings.edit { it[TURNAROUND] = mode.name }
+    }
+
+    /** Before dark: the daylight to spare at the end of the route, in minutes. */
+    val turnaroundMarginMinutes: Flow<Int> =
+        context.settings.data.map { it[TURNAROUND_MARGIN] ?: 30 }
+
+    suspend fun setTurnaroundMarginMinutes(minutes: Int) {
+        context.settings.edit { it[TURNAROUND_MARGIN] = minutes }
+    }
+
+    /** At a time: the time of day, in minutes from midnight. */
+    val turnaroundTime: Flow<Int> =
+        context.settings.data.map { it[TURNAROUND_TIME] ?: (14 * 60) }
+
+    suspend fun setTurnaroundTime(minuteOfDay: Int) {
+        context.settings.edit { it[TURNAROUND_TIME] = minuteOfDay }
+    }
+
     /** The user's own servers by name (see the map module's Server); missing: the default. */
     val servers: Flow<Map<String, String>> =
         context.settings.data.map { p ->
@@ -451,6 +483,10 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val EMERGENCY_SMS_TO = stringPreferencesKey("emergency_sms_to")
         val EMERGENCY_CONTACT_NAME = stringPreferencesKey("emergency_contact_name")
         val BREADCRUMB_MINUTES = intPreferencesKey("breadcrumb_minutes")
+        val LOW_BATTERY_SMS = booleanPreferencesKey("low_battery_sms")
+        val TURNAROUND = stringPreferencesKey("turnaround")
+        val TURNAROUND_MARGIN = intPreferencesKey("turnaround_margin")
+        val TURNAROUND_TIME = intPreferencesKey("turnaround_time")
         private const val SERVER_PREFIX = "server_"
         val OFF_ROUTE_VIBRATION = booleanPreferencesKey("off_route_vibration")
         val FOLLOW_PROFILE = booleanPreferencesKey("follow_profile")
@@ -521,3 +557,6 @@ data class SavedCamera(val lat: Double, val lon: Double, val zoom: Double, val b
         const val DEFAULT_ZOOM = 11.0
     }
 }
+
+/** When the turnaround alarm rings. */
+enum class TurnaroundMode { Off, BeforeDark, AtTime }

@@ -188,6 +188,8 @@
     <string name="settings_breadcrumbs_cost_title">SMS can cost money</string>
     <string name="settings_breadcrumbs_cost_text">Sentrek will send these texts by itself, from your SIM. Every %1$d minutes, an 8-hour hike is about %2$d texts.</string>
     <string name="settings_breadcrumbs_cost_confirm">Turn on</string>
+    <string name="settings_low_battery_sms">Text when the battery runs low</string>
+    <string name="settings_low_battery_sms_hint">At 15%, one more text with your position, in case the phone switches off. Needs the position texts on.</string>
     <string name="settings_servers">Servers</string>
     <string name="settings_servers_hint">Where Sentrek gets its maps and data. If you run your own copy of one of these services, you can use it here. Areas downloaded from a different server may need to be downloaded again.</string>
     <string name="settings_server_tiles">Map tiles</string>
@@ -300,6 +302,18 @@
     <string name="settings_trail_difficulty_hint">In downloaded areas. Yellow is T1, red T2–T3 and blue T4–T6 on the SAC scale. Dotted lines are faint trails.</string>
     <string name="settings_off_route_vibration">Vibrate when off route</string>
     <string name="settings_off_route_vibration_hint">3 long buzzes when you leave the route, 2 short ones when you’re back on it.</string>
+    <string name="settings_turnaround">Turnaround alarm</string>
+    <string name="settings_turnaround_off">Off</string>
+    <string name="settings_turnaround_dark">Before dark</string>
+    <string name="settings_turnaround_time">At a time</string>
+    <string name="settings_turnaround_hint">4 long buzzes and a notification when it’s time to think about turning back.</string>
+    <string name="settings_turnaround_dark_hint">While you follow a route: rings if, at your pace, you’d reach the end too close to sunset.</string>
+    <string name="settings_turnaround_time_hint">While you record or follow a route: rings once at this time.</string>
+    <string name="settings_turnaround_margin">Daylight to spare at the end</string>
+    <string name="settings_turnaround_margin_none">None</string>
+    <string name="settings_turnaround_margin_minutes">%d min</string>
+    <string name="settings_turnaround_margin_hour">1 hour</string>
+    <string name="settings_turnaround_at">Turn back at</string>
     <string name="settings_about">About</string>
     <string name="settings_version">Sentrek %s</string>
     <string name="settings_osm_credit">Map data © OpenStreetMap contributors (ODbL).</string>

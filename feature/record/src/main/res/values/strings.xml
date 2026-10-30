@@ -4,7 +4,13 @@
     <!-- Breadcrumb texts to the emergency contact. Plain characters only, and short: one SMS each (160 characters with the position). -->
     <string name="breadcrumb_started">Sentrek: I\'m starting a hike. My position every %1$d min: %2$s</string>
     <string name="breadcrumb_position">Sentrek: my position at %1$s: %2$s</string>
+    <string name="breadcrumb_low_battery">Sentrek: battery at %1$d%%, my phone may switch off soon. Position at %2$s: %3$s</string>
     <string name="breadcrumb_finished">Sentrek: hike finished. I\'m at %1$s</string>
+    <string name="turnaround_channel">Turnaround alarm</string>
+    <string name="turnaround_dark_title">Time to turn back?</string>
+    <string name="turnaround_dark_text">You\'d reach the end of the route at %1$s, and sunset is at %2$s.</string>
+    <string name="turnaround_time_title">Time to turn back</string>
+    <string name="turnaround_time_text">It\'s %s, the turnaround time you set.</string>
     <string name="breadcrumb_channel">Position texts</string>
     <string name="breadcrumb_notification">Texting your position to %1$s every %2$d min</string>
     <string name="breadcrumb_last">Last sent at %s</string>

@@ -6,7 +6,7 @@ import app.sentrek.geo.dem.Panorama
 
 /**
  * Sun and shade on the way ahead: for points along the route, whether the sun is above the
- * terrain around them at the time the user gets there. On a hot day the long sunny climb is
+ * terrain around them at the time the user gets there, and not under trees. On a hot day the long sunny climb is
  * the one to start early; on a cold one, the shaded stretch is where the ice stays.
  */
 object Shade {
@@ -20,13 +20,15 @@ object Shade {
 
     /**
      * The way ahead as stretches of sun and shade. Night counts as shade: the sun is down.
-     * [points] in walking order; the terrain from [panorama].
+     * [points] in walking order; the terrain from [panorama]; [underTrees] says where trees
+     * shade the path whatever the sun does.
      */
-    fun stretches(points: List<Point>, panorama: Panorama): List<Stretch> {
+    fun stretches(points: List<Point>, panorama: Panorama, underTrees: (LatLon) -> Boolean = { false }): List<Stretch> {
         val stretches = mutableListOf<Stretch>()
         for (p in points) {
             val sun = Sun.position(p.eta, p.position.lat, p.position.lon)
-            val lit = sun.altitude > 0 && sun.altitude > panorama.horizon(p.position, EYE_M, sun.azimuth, SHADOW_DISTANCE_M)
+            val lit = sun.altitude > 0 && !underTrees(p.position) &&
+                sun.altitude > panorama.horizon(p.position, EYE_M, sun.azimuth, SHADOW_DISTANCE_M)
             val last = stretches.lastOrNull()
             if (last != null && last.sun == lit) {
                 stretches[stretches.size - 1] = last.copy(to = p.ahead, end = p.eta)

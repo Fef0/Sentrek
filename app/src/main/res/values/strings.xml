@@ -356,7 +356,7 @@
     <string name="settings_rain_advice">Rain and storms on the way</string>
     <string name="settings_rain_advice_hint">While you record or follow a route, says when rain or snow is likely where you will be, and buzzes for storms. Checks the forecast once an hour when there is a connection.</string>
     <string name="settings_shade_advice">Sun on the way</string>
-    <string name="settings_shade_advice_hint">While you follow a route: when you\'ll be walking in full sun for a while, worked out from the terrain at your pace.</string>
+    <string name="settings_shade_advice_hint">While you follow a route: when you\'ll be walking in full sun for a while, worked out from the mountains around and the woods on the map, at your pace.</string>
     <string name="settings_turnaround">Turnaround alarm</string>
     <string name="settings_turnaround_off">Off</string>
     <string name="settings_turnaround_dark">Before dark</string>

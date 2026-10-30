@@ -16,12 +16,14 @@ import javax.inject.Singleton
 
 /**
  * Sun and shade on the rest of the followed route, at the user's pace: worked out from the
- * terrain every few minutes by [TrackingService], offline. A fraction of a second each time.
+ * terrain and the trees on the map every few minutes by [TrackingService], offline. A
+ * fraction of a second each time.
  */
 @Singleton
 class ShadeWatch @Inject constructor(
     private val follow: FollowRepository,
     private val elevation: ElevationRepository,
+    private val trees: TreeCover,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var job: Job? = null
@@ -50,7 +52,7 @@ class ShadeWatch @Inject constructor(
                 Shade.Point(along - (follow.alongNow ?: 0.0), eta, position.copy(ele = null))
             }.filter { it.eta - now <= Shade.HORIZON_MS + Shade.LONG_MS }
             _state.value = withContext(Dispatchers.Default) {
-                Shade.nextSunny(Shade.stretches(points, Panorama(elevation)), now)
+                Shade.nextSunny(Shade.stretches(points, Panorama(elevation), trees::covers), now)
             }
         }
     }

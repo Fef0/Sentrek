@@ -56,6 +56,15 @@ class ShadeTest {
     }
 
     @Test
+    fun `trees shade the afternoon too`() {
+        val p = Panorama(tiles)
+        // West of the start, out of the wall's way; the middle stretch in a wood.
+        val points = (0..10).map { i -> Shade.Point(i * 500.0, june(13) + i * 450_000L, Geo.destination(from, 270.0, i * 500.0)) }
+        val stretches = Shade.stretches(points, p) { pos -> Geo.distance(from, pos) in 1_800.0..3_200.0 }
+        assertEquals(listOf(true, false, true), stretches.map { it.sun })
+    }
+
+    @Test
     fun `long sunny stretches only`() {
         val now = 0L
         val short = Shade.Stretch(true, 0.0, 500.0, 0, 10 * 60_000L)

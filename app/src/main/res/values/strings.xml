@@ -164,6 +164,15 @@
     <string name="settings_glove_mode">Glove mode</string>
     <string name="settings_glove_mode_hint">The biggest buttons, easier long presses on the map, and zoom with the volume keys.</string>
     <string name="settings_volume_zoom">Volume keys zoom</string>
+    <string name="settings_alerts_section">On the trail</string>
+    <string name="settings_alerts_page">Alerts on the trail</string>
+    <string name="settings_alerts_off_route">off route</string>
+    <string name="settings_alerts_water">water</string>
+    <string name="settings_alerts_rain">rain</string>
+    <string name="settings_alerts_none">No alerts</string>
+    <string name="settings_alerts_turnaround_off">turnaround off</string>
+    <string name="settings_alerts_turnaround_dark">turnaround before dark</string>
+    <string name="settings_alerts_turnaround_time">turnaround at a set time</string>
     <string name="settings_emergency">Emergency</string>
     <string name="settings_emergency_page">Emergency settings</string>
     <string name="settings_emergency_page_hint">The SOS screen, who to call and the emergency SMS.</string>

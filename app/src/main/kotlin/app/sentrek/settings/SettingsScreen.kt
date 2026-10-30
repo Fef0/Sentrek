@@ -390,6 +390,11 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
         BackHandler { advanced = false }
         return AdvancedSettings(viewModel, onBack = { advanced = false })
     }
+    var alertsPage by rememberSaveable { mutableStateOf(false) }
+    if (alertsPage) {
+        BackHandler { alertsPage = false }
+        return AlertsSettings(viewModel, onBack = { alertsPage = false })
+    }
     var emergencyPage by rememberSaveable { mutableStateOf(false) }
     if (emergencyPage) {
         BackHandler { emergencyPage = false }
@@ -400,7 +405,6 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
     val buttonSize by viewModel.buttonSize.collectAsStateWithLifecycle()
     val gloveMode by viewModel.gloveMode.collectAsStateWithLifecycle()
     val volumeKeysZoom by viewModel.volumeKeysZoom.collectAsStateWithLifecycle()
-    val offRouteVibration by viewModel.offRouteVibration.collectAsStateWithLifecycle()
     val theme by viewModel.theme.collectAsStateWithLifecycle()
     val mapTheme by viewModel.mapTheme.collectAsStateWithLifecycle()
     val fullScreen by viewModel.fullScreen.collectAsStateWithLifecycle()
@@ -532,27 +536,6 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 onChange = viewModel::setAutoHideControls,
             )
             ToggleRow(
-                title = stringResource(R.string.settings_off_route_vibration),
-                hint = stringResource(R.string.settings_off_route_vibration_hint),
-                checked = offRouteVibration,
-                onChange = viewModel::setOffRouteVibration,
-            )
-            val waterAdvice by viewModel.waterAdvice.collectAsStateWithLifecycle()
-            ToggleRow(
-                title = stringResource(R.string.settings_water_advice),
-                hint = stringResource(R.string.settings_water_advice_hint),
-                checked = waterAdvice,
-                onChange = viewModel::setWaterAdvice,
-            )
-            val rainAdvice by viewModel.rainAdvice.collectAsStateWithLifecycle()
-            ToggleRow(
-                title = stringResource(R.string.settings_rain_advice),
-                hint = stringResource(R.string.settings_rain_advice_hint),
-                checked = rainAdvice,
-                onChange = viewModel::setRainAdvice,
-            )
-            TurnaroundRows(viewModel)
-            ToggleRow(
                 title = stringResource(R.string.settings_confirm_exit),
                 checked = confirmExit,
                 onChange = viewModel::setConfirmExit,
@@ -671,6 +654,13 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                     )
             }
 
+            SectionTitle(stringResource(R.string.settings_alerts_section))
+            NavRow(
+                title = stringResource(R.string.settings_alerts_page),
+                hint = alertsSummary(viewModel),
+                onClick = { alertsPage = true },
+            )
+
             SectionTitle(stringResource(R.string.settings_emergency))
             NavRow(
                 title = stringResource(R.string.settings_emergency_page),
@@ -763,6 +753,74 @@ private fun ToggleRow(
         // The whole row toggles; the switch only shows the state.
         Switch(checked = checked, onCheckedChange = null, enabled = enabled)
     }
+}
+
+/**
+ * What the app warns about on the way: leaving the route, the last water, rain and storms,
+ * time to turn back. On a page of their own, with a summary on the main one.
+ */
+@Composable
+private fun AlertsSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
+    val offRouteVibration by viewModel.offRouteVibration.collectAsStateWithLifecycle()
+    val waterAdvice by viewModel.waterAdvice.collectAsStateWithLifecycle()
+    val rainAdvice by viewModel.rainAdvice.collectAsStateWithLifecycle()
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(
+            modifier = Modifier
+                .safeDrawingPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                MapButton(SentrekIcons.Back, stringResource(R.string.settings_back), onBack, Modifier.padding(vertical = 12.dp))
+                Text(stringResource(R.string.settings_alerts_page), style = MaterialTheme.typography.headlineMedium)
+            }
+            ToggleRow(
+                title = stringResource(R.string.settings_off_route_vibration),
+                hint = stringResource(R.string.settings_off_route_vibration_hint),
+                checked = offRouteVibration,
+                onChange = viewModel::setOffRouteVibration,
+            )
+            ToggleRow(
+                title = stringResource(R.string.settings_water_advice),
+                hint = stringResource(R.string.settings_water_advice_hint),
+                checked = waterAdvice,
+                onChange = viewModel::setWaterAdvice,
+            )
+            ToggleRow(
+                title = stringResource(R.string.settings_rain_advice),
+                hint = stringResource(R.string.settings_rain_advice_hint),
+                checked = rainAdvice,
+                onChange = viewModel::setRainAdvice,
+            )
+            TurnaroundRows(viewModel)
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+/** "Off route, water, rain · turnaround off": what's on, without opening the page. */
+@Composable
+private fun alertsSummary(viewModel: SettingsViewModel): String {
+    val offRoute by viewModel.offRouteVibration.collectAsStateWithLifecycle()
+    val water by viewModel.waterAdvice.collectAsStateWithLifecycle()
+    val rain by viewModel.rainAdvice.collectAsStateWithLifecycle()
+    val turnaround by viewModel.turnaround.collectAsStateWithLifecycle()
+    val on = listOfNotNull(
+        stringResource(R.string.settings_alerts_off_route).takeIf { offRoute },
+        stringResource(R.string.settings_alerts_water).takeIf { water },
+        stringResource(R.string.settings_alerts_rain).takeIf { rain },
+    )
+    val alerts = if (on.isEmpty()) stringResource(R.string.settings_alerts_none) else on.joinToString(", ").replaceFirstChar { it.uppercase() }
+    val turn = stringResource(
+        when (turnaround) {
+            TurnaroundMode.Off -> R.string.settings_alerts_turnaround_off
+            TurnaroundMode.BeforeDark -> R.string.settings_alerts_turnaround_dark
+            TurnaroundMode.AtTime -> R.string.settings_alerts_turnaround_time
+        },
+    )
+    return "$alerts · $turn"
 }
 
 /** Map frame rate and GPS timing: rarely changed, so on a page of their own. */

@@ -3,6 +3,7 @@ package app.sentrek
 import app.sentrek.search.PeaksScreen
 import app.sentrek.home.GoTo
 import app.sentrek.home.HomeViewModel
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
@@ -116,6 +117,10 @@ class MainActivity : ComponentActivity() {
     // The map view to remember. Written at most every few seconds (the camera moves with every
     // fix while following), and at once when the app goes to the background.
     private val cameraToSave = MutableStateFlow<CameraPosition?>(null)
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLanguage.wrap(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()

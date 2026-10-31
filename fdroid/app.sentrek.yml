@@ -20,8 +20,8 @@ Builds:
     subdir: app
     gradle:
       - yes
-    binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-armv7.apk
     output: build/outputs/apk/release/app-armeabi-v7a-release-unsigned.apk
+    binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-armv7.apk
 
   - versionName: 0.17.1
     versionCode: 232
@@ -29,8 +29,8 @@ Builds:
     subdir: app
     gradle:
       - yes
-    binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-arm64.apk
     output: build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk
+    binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-arm64.apk
 
   - versionName: 0.17.1
     versionCode: 234
@@ -38,8 +38,8 @@ Builds:
     subdir: app
     gradle:
       - yes
-    binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-x86_64.apk
     output: build/outputs/apk/release/app-x86_64-release-unsigned.apk
+    binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-x86_64.apk
 
 AllowedAPKSigningKeys: 74e093678be51816e75b0870b663eaab89f6cd71e00b32c32719f2c796ec65d5
 

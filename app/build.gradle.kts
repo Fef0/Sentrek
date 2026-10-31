@@ -16,8 +16,8 @@ android {
         applicationId = "app.sentrek"
         minSdk = 24
         targetSdk = 37
-        versionCode = 21
-        versionName = "0.16.0"
+        versionCode = 22
+        versionName = "0.17.0"
 
         // The languages the app is translated into, from its res/values-<language> folders: a
         // new translation shows in the language list by itself (see TRANSLATING.md).

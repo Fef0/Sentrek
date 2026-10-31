@@ -6,6 +6,8 @@ It's free and open source. It has no ads and no account, and it doesn't need Goo
 
 Sentrek is heavily inspired by [Trekarta](https://github.com/andreynovikov/trekarta), one of the best open source hiking apps out there. Trekarta is sadly no longer maintained, so think of Sentrek as its spiritual successor.
 
+The name comes from *sentiero*, Italian for trail, and *trek*.
+
 <table>
   <tr>
     <td align="center"><img src="docs/media/map.gif" width="200" alt="Moving around the map"><br>The map</td>

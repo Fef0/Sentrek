@@ -170,7 +170,7 @@
     <string name="settings_power_note">Some of these wait, greyed out, while battery saver or stamina mode is on.</string>
     <!-- Settings: what each page holds, under its name on the main page. -->
     <string name="settings_map_about">Contour lines, steep slopes, trail difficulty, scale bar, north up, map updates</string>
-    <string name="settings_controls_about">Button size for gloves, volume keys, lock button</string>
+    <string name="settings_controls_about">Button size, volume keys, lock button</string>
     <string name="settings_appearance_about">Text size, app and map themes, full screen</string>
     <string name="settings_units_about">Metric or imperial, coordinates, each unit on its own</string>
     <string name="settings_alerts_about">Off route, water, rain and storms, sun, turnaround alarm</string>
@@ -217,7 +217,10 @@
     <string name="settings_cancel">Cancel</string>
     <string name="settings_button_size">Button size</string>
     <string name="settings_button_size_hint">Bigger buttons are easier to hit, but cover more of the map.</string>
-    <string name="settings_button_size_gloves">The biggest buttons, and long presses on the map reach further, so they land even with thick gloves.</string>
+    <string name="settings_button_size_gloves">Glove mode is on, so buttons are already at their biggest.</string>
+    <string name="settings_glove_mode">Glove mode</string>
+    <string name="settings_glove_mode_hint">The biggest buttons, easier long presses on the map, and zoom with the volume keys.</string>
+    <string name="settings_volume_zoom_gloves">Always on in glove mode.</string>
     <string name="settings_text_size">Text size</string>
     <string name="settings_text_size_hint">Adds to the text size set on your phone.</string>
     <string name="settings_size_small">Small</string>
@@ -368,7 +371,6 @@
     <string name="settings_battery_saver_short">Saver</string>
     <string name="settings_stamina_short">Stamina</string>
     <string name="settings_battery_normal_hint">Everything as you set it. Battery saver is for long trips, stamina mode for when the battery must last whatever it takes.</string>
-    <string name="settings_size_gloves">Gloves</string>
     <string name="settings_size_largest">Largest</string>
     <string name="trail_card_more">Show more</string>
     <string name="trail_card_less">Show less</string>

@@ -30,9 +30,23 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[SHOW_TRAIL_DIFFICULTY] = show }
     }
 
-    /** Volume keys zoom the map. On for those who had the old glove mode on, which forced it. */
+    /**
+     * Biggest buttons, wider long-press area, and the volume keys zoom whatever [volumeKeysZoom]
+     * says. On for those who chose "Gloves" as button size in 0.14, when it was one.
+     */
+    val gloveMode: Flow<Boolean> =
+        context.settings.data.map { it[GLOVE_MODE] ?: (it[BUTTON_SIZE] == GLOVES_SIZE) }
+
+    suspend fun setGloveMode(on: Boolean) {
+        context.settings.edit {
+            if (it[BUTTON_SIZE] == GLOVES_SIZE) it[BUTTON_SIZE] = ButtonSize.Largest.name
+            it[GLOVE_MODE] = on
+        }
+    }
+
+    /** Volume keys zoom the map, without glove mode too. */
     val volumeKeysZoom: Flow<Boolean> =
-        context.settings.data.map { it[VOLUME_KEYS_ZOOM] ?: (it[GLOVE_MODE] ?: false) }
+        context.settings.data.map { it[VOLUME_KEYS_ZOOM] ?: false }
 
     suspend fun setVolumeKeysZoom(on: Boolean) {
         context.settings.edit { it[VOLUME_KEYS_ZOOM] = on }
@@ -172,22 +186,20 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[TEXT_SIZE] = size.name }
     }
 
-    /** The old glove mode (a switch of its own until 0.14) and "Largest" read as [ButtonSize.Gloves]. */
+    /** 0.14's "Gloves" size reads as [ButtonSize.Largest], with [gloveMode] on. */
     val buttonSize: Flow<ButtonSize> =
         context.settings.data.map { p ->
-            val stored = p[BUTTON_SIZE]
-            when {
-                p[GLOVE_MODE] == true || stored == "Largest" -> ButtonSize.Gloves
-                stored == null -> ButtonSize.Standard
+            when (val stored = p[BUTTON_SIZE]) {
+                null -> ButtonSize.Standard
+                GLOVES_SIZE -> ButtonSize.Largest
                 else -> runCatching { ButtonSize.valueOf(stored) }.getOrDefault(ButtonSize.Standard)
             }
         }
 
     suspend fun setButtonSize(size: ButtonSize) {
         context.settings.edit {
-            // Its volume keys stay as they were: written out before the old switch goes.
-            if (it[GLOVE_MODE] == true && it[VOLUME_KEYS_ZOOM] == null) it[VOLUME_KEYS_ZOOM] = true
-            it.remove(GLOVE_MODE)
+            // Glove mode stays as it was: written out before the old size goes.
+            if (it[BUTTON_SIZE] == GLOVES_SIZE && it[GLOVE_MODE] == null) it[GLOVE_MODE] = true
             it[BUTTON_SIZE] = size.name
         }
     }
@@ -297,11 +309,11 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     }
 
     /**
-     * Most frames per second the map draws; 0 for no cap (Settings > Advanced). 60 unless
-     * chosen: a map looks no smoother at 120, on the phones whose screens go that fast.
+     * Most frames per second the map draws; 0 for no cap (Settings > Advanced). No cap unless
+     * chosen: as smooth as the screen allows, until the user trades it for battery.
      */
     val mapMaxFps: Flow<Int> =
-        context.settings.data.map { it[MAP_MAX_FPS] ?: 60 }
+        context.settings.data.map { it[MAP_MAX_FPS] ?: 0 }
 
     suspend fun setMapMaxFps(fps: Int) {
         context.settings.edit { it[MAP_MAX_FPS] = fps }
@@ -501,6 +513,9 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     private companion object {
         val SHOW_TRAIL_DIFFICULTY = booleanPreferencesKey("show_trail_difficulty")
         val GLOVE_MODE = booleanPreferencesKey("glove_mode")
+
+        /** Button size in 0.14, when glove mode was one: now glove mode on, Largest buttons. */
+        private const val GLOVES_SIZE = "Gloves"
         val TEXT_SIZE = stringPreferencesKey("text_size")
         val BUTTON_SIZE = stringPreferencesKey("button_size")
         val VOLUME_KEYS_ZOOM = booleanPreferencesKey("volume_keys_zoom")

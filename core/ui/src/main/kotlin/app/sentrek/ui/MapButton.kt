@@ -31,7 +31,9 @@ data class Touch(val target: Dp, val icon: Dp, val pressRadius: Dp) {
     companion object {
         val Standard = Touch(48.dp, 24.dp, 4.dp)
         val Large = Touch(56.dp, 28.dp, 8.dp)
-        /** The biggest buttons, and long presses on the map that reach much further. */
+        val Largest = Touch(64.dp, 32.dp, 12.dp)
+
+        /** As big as [Largest], and long presses on the map reach much further. */
         val Gloves = Touch(64.dp, 32.dp, 28.dp)
     }
 }

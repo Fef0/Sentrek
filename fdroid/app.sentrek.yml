@@ -1,10 +1,9 @@
-# Build recipe for F-Droid. It goes in the fdroiddata repository as metadata/app.sentrek.yml,
-# through a merge request at https://gitlab.com/fdroid/fdroiddata. Descriptions, screenshots
-# and changelogs come from fastlane/metadata in this repository.
 Categories:
   - Navigation
   - Sports & Health
 License: GPL-3.0-only
+AuthorName: Fef0
+AuthorWebSite: https://github.com/Fef0
 SourceCode: https://github.com/Fef0/Sentrek
 IssueTracker: https://github.com/Fef0/Sentrek/issues
 Changelog: https://github.com/Fef0/Sentrek/releases
@@ -15,17 +14,40 @@ RepoType: git
 Repo: https://github.com/Fef0/Sentrek.git
 
 Builds:
-  - versionName: 0.17.0
-    versionCode: 22
-    commit: v0.17.0
+  - versionName: 0.17.1
+    versionCode: 231
+    commit: COMMIT
     subdir: app
     gradle:
       - yes
-    # The build makes one APK per processor type and a universal one, all with the same
-    # version code: F-Droid ships the universal one.
-    output: build/outputs/apk/release/app-universal-release-unsigned.apk
+    binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-armv7.apk
+    output: build/outputs/apk/release/app-armeabi-v7a-release-unsigned.apk
+
+  - versionName: 0.17.1
+    versionCode: 232
+    commit: COMMIT
+    subdir: app
+    gradle:
+      - yes
+    binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-arm64.apk
+    output: build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk
+
+  - versionName: 0.17.1
+    versionCode: 234
+    commit: COMMIT
+    subdir: app
+    gradle:
+      - yes
+    binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-x86_64.apk
+    output: build/outputs/apk/release/app-x86_64-release-unsigned.apk
+
+AllowedAPKSigningKeys: 74e093678be51816e75b0870b663eaab89f6cd71e00b32c32719f2c796ec65d5
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 0.17.0
-CurrentVersionCode: 22
+VercodeOperation:
+  - 10*%c+1
+  - 10*%c+2
+  - 10*%c+4
+CurrentVersion: 0.17.1
+CurrentVersionCode: 234

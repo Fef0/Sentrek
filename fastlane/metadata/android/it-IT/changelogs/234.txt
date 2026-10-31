@@ -1,0 +1,1 @@
+• Un APK per ogni tipo di processore (arm64, armv7, x86_64): il download è circa un terzo

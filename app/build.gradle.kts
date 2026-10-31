@@ -1,3 +1,4 @@
+import com.android.build.api.variant.FilterConfiguration
 import java.util.Properties
 
 plugins {
@@ -16,8 +17,9 @@ android {
         applicationId = "app.sentrek"
         minSdk = 24
         targetSdk = 37
-        versionCode = 22
-        versionName = "0.17.0"
+        // Each APK gets versionCode × 10 + its CPU number (see ABI_CODES below).
+        versionCode = 23
+        versionName = "0.17.1"
 
         // The languages the app is translated into, from its res/values-<language> folders: a
         // new translation shows in the language list by itself (see TRANSLATING.md).
@@ -63,6 +65,14 @@ android {
         }
     }
 
+    // MapLibre's libraries come already stripped. Stripping again depends on which NDK is
+    // installed, and F-Droid has to build the exact same APK as the release.
+    packaging {
+        jniLibs {
+            keepDebugSymbols += "**/*.so"
+        }
+    }
+
     // F-Droid rejects the encrypted dependency list Google adds to the signing block.
     dependenciesInfo {
         includeInApk = false
@@ -77,6 +87,20 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+}
+
+// The CPU number in each APK's version code. 64-bit ARM is above 32-bit, since those phones
+// can run both and should get the 64-bit one. The universal APK has 0.
+val ABI_CODES = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2, "x86_64" to 4)
+
+androidComponents {
+    onVariants { variant ->
+        val base = android.defaultConfig.versionCode!!
+        variant.outputs.forEach { output ->
+            val abi = output.filters.find { it.filterType == FilterConfiguration.FilterType.ABI }?.identifier
+            output.versionCode.set(base * 10 + (ABI_CODES[abi] ?: 0))
+        }
     }
 }
 

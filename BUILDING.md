@@ -14,7 +14,7 @@ You don't need Android Studio itself. The Gradle wrapper in the repository is en
 ## 1. Get the code
 
 ```sh
-git clone <this repository>
+git clone https://github.com/Fef0/Sentrek.git
 cd Sentrek
 ```
 

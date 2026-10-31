@@ -89,7 +89,7 @@ Download the APK from the [Releases](../../releases) page. The `arm64` file is t
 See [BUILDING.md](BUILDING.md). You need JDK 17 or newer and the Android SDK. Then:
 
 ```sh
-git clone <this repository>
+git clone https://github.com/Fef0/Sentrek.git
 cd Sentrek
 ./gradlew assembleDebug
 ```

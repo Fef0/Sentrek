@@ -67,6 +67,12 @@ You can also set a turnaround alarm.
 - It can send your position by SMS to someone every few minutes while you walk. SMS works without mobile data.
 - "Peaks around" tells you the names of the mountains you can see.
 
+### Your own servers
+Sentrek gets its data from free public services, so it doesn't depend on a server of mine. If one of them shuts down or changes its rules, you can host your own copy and point the app to it in Settings › Advanced › Servers. This works for:
+- map tiles (any server in the OpenFreeMap format)
+- terrain (Terrarium elevation tiles)
+- trail details (any Overpass API server)
+
 ## Privacy
 
 Everything you save (tracks, routes, places, photos) stays on your phone. You can back it up to a file from the settings.

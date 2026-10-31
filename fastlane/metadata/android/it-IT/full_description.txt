@@ -1,0 +1,37 @@
+Sentrek è una mappa per escursioni per Android. Scarichi le zone dove vai, così la mappa funziona senza segnale. Puoi pianificare un percorso sui sentieri, seguirlo e registrare le tue camminate.
+
+<b>Mappe</b>
+<ul>
+<li>Sentieri, percorsi segnati con i loro segnavia, rifugi, sorgenti, cime e punti panoramici, con curve di livello e ombreggiatura del rilievo.</li>
+<li>Per usarla offline, scarichi dei quadrati da una griglia, di circa 55 × 55 km e 30 MB l’uno.</li>
+<li>Pendii ripidi colorati come in una carta valanghe, e sentieri colorati per difficoltà (scala SAC).</li>
+<li>Tieni il dito su un sentiero, una cima, un rifugio, un fiume o un lago per vedere cos’è: nome, difficoltà, i percorsi segnati che ci passano e le previsioni meteo lì.</li>
+<li>Puoi aprire anche i tuoi file .mbtiles e .pmtiles.</li>
+</ul>
+
+<b>Pianificazione</b>
+<ul>
+<li>Tocca la mappa per aggiungere punti e il percorso segue i sentieri tra uno e l’altro, anche offline nelle zone scaricate.</li>
+<li>Distanza, salita, discesa, tempo di cammino e profilo altimetrico mentre pianifichi.</li>
+<li>Salva il percorso, o esportalo in GPX o KML.</li>
+</ul>
+
+<b>Seguire e registrare</b>
+<ul>
+<li>Distanza, salita e tempo che mancano, al tuo passo, e i luoghi in arrivo.</li>
+<li>Vibra quando esci dal percorso e, se vuoi, prima di una svolta.</li>
+<li>Registra a schermo spento, con i dati sulla schermata di blocco.</li>
+<li>Importa file GPX, KML e KMZ.</li>
+</ul>
+
+<b>Avvisi</b>, solo quando servono: arrivo dopo il tramonto, batteria che non basta, pioggia e temporali dove sarai, l’ultima acqua prima di un lungo tratto senza, lunghi tratti in pieno sole, segnale perso.
+
+<b>Guanti, pioggia e freddo</b>: modalità guanti con i pulsanti più grandi e lo zoom con i tasti del volume, un pulsante di blocco, testo grande, temi scuro e nero, una mappa notturna, risparmio batteria e modalità estrema.
+
+<b>Sicurezza</b>: una schermata SOS con la tua posizione a caratteri grandi (coordinate, UTM e Plus Code), e la tua posizione inviata via SMS a qualcuno ogni pochi minuti, senza dati mobili.
+
+Nessun account, nessuna pubblicità, nessun tracciamento. Tracce, percorsi e luoghi restano sul telefono. L’app va online solo per le tile della mappa e del terreno, i dettagli dei sentieri delle zone che scarichi e le previsioni meteo se le attivi. Per ognuno puoi indicare un tuo server.
+
+Sentrek è fortemente ispirata a Trekarta, che non è più mantenuta.
+
+Dati della mappa © contributori di OpenStreetMap. Tile: OpenFreeMap. Terreno: tile del terreno di Mapzen su AWS Open Data. Dettagli dei sentieri: Overpass API. Meteo: Open-Meteo.

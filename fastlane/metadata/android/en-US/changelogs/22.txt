@@ -1,0 +1,4 @@
+• Italian, and a language setting in Settings › Appearance
+• A short guide the first time the app opens
+• Optional buzz before a turn while following a route (off by default)
+• Names for the points, paths and water on the map cards

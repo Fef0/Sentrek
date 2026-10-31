@@ -1,6 +1,7 @@
 package app.sentrek
 
 import app.sentrek.search.PeaksScreen
+import app.sentrek.home.FirstRunGuide
 import app.sentrek.home.GoTo
 import app.sentrek.home.HomeViewModel
 import android.content.Context
@@ -134,6 +135,8 @@ class MainActivity : ComponentActivity() {
             val textSize by settings.textSize.collectAsStateWithLifecycle(initialValue = TextSize.Default)
             val buttonSize by settings.buttonSize.collectAsStateWithLifecycle(initialValue = ButtonSize.Standard)
             val gloves by settings.gloveMode.collectAsStateWithLifecycle(initialValue = false)
+            // Seen until known otherwise: the guide mustn't flash up while settings load.
+            val guideSeen by settings.guideSeen.collectAsStateWithLifecycle(initialValue = true)
             val volumeZoom by settings.volumeKeysZoom.collectAsStateWithLifecycle(initialValue = false)
             val theme by settings.theme.collectAsStateWithLifecycle(initialValue = AppTheme.System)
             val fullScreen by settings.fullScreen.collectAsStateWithLifecycle(initialValue = false)
@@ -287,6 +290,7 @@ class MainActivity : ComponentActivity() {
                             }
                             }
                         }
+                        if (!guideSeen) FirstRunGuide { scope.launch { settings.setGuideSeen(true) } }
                     }
                 }
             }

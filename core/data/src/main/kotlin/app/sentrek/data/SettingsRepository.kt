@@ -44,6 +44,14 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         }
     }
 
+    /** The first-run guide was seen (or skipped); Settings › About can show it again. */
+    val guideSeen: Flow<Boolean> =
+        context.settings.data.map { it[GUIDE_SEEN] ?: false }
+
+    suspend fun setGuideSeen(seen: Boolean) {
+        context.settings.edit { it[GUIDE_SEEN] = seen }
+    }
+
     /** A buzz before each junction where a followed route turns. Off unless chosen. */
     val turnBuzz: Flow<Boolean> =
         context.settings.data.map { it[TURN_BUZZ] ?: false }
@@ -522,6 +530,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val SHOW_TRAIL_DIFFICULTY = booleanPreferencesKey("show_trail_difficulty")
         val GLOVE_MODE = booleanPreferencesKey("glove_mode")
         val TURN_BUZZ = booleanPreferencesKey("turn_buzz")
+        val GUIDE_SEEN = booleanPreferencesKey("guide_seen")
 
         /** Button size in 0.14, when glove mode was one: now glove mode on, Largest buttons. */
         private const val GLOVES_SIZE = "Gloves"

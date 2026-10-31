@@ -452,4 +452,17 @@
     <string name="kind_toilets">Toilets</string>
     <string name="settings_language">Language</string>
     <string name="settings_language_system">Same as the phone</string>
+    <string name="guide_step">%1$d of %2$d</string>
+    <string name="guide_skip">Skip</string>
+    <string name="guide_next">Next</string>
+    <string name="guide_start">Start</string>
+    <string name="guide_download_title">Download before you go</string>
+    <string name="guide_download_text">The map works without signal in the areas you download. Open Library › Maps and tap the squares of the places you hike in. Downloaded areas also get trail difficulty, marked routes, springs and huts.</string>
+    <string name="guide_press_title">Hold your finger on the map</string>
+    <string name="guide_press_text">Hold your finger on a trail, a peak, a hut, a river or a lake to see what it is: its name, difficulty, the routes on it and the weather there. On an empty spot, you can save it as a place.</string>
+    <string name="guide_location_title">Your position</string>
+    <string name="guide_location_text">Tap the round button on the right to see where you are and keep the map on you. Tap it again to turn the map with the way you walk. Hold it for your coordinates and height.</string>
+    <string name="guide_walk_title">Plan, follow, record</string>
+    <string name="guide_walk_text">Plan draws a route along the trails as you tap. In Library › Tracks, Follow guides you along a route and tells you what’s left. Record keeps your track, with the screen off too. SOS is in Library, with your position in big text.</string>
+    <string name="settings_show_guide">Show the first-run guide</string>
 </resources>

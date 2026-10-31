@@ -386,6 +386,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setConfirmExit(on) }
     }
 
+    fun showGuide() {
+        viewModelScope.launch { settings.setGuideSeen(false) }
+    }
+
     val units: StateFlow<Units> =
         settings.units.stateIn(viewModelScope, SharingStarted.Eagerly, Format.units)
 
@@ -414,7 +418,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
             SettingsPageId.Emergency -> EmergencySettings(viewModel, close)
             SettingsPageId.Advanced -> AdvancedSettings(viewModel, close)
             SettingsPageId.Data -> DataSettings(viewModel, close)
-            SettingsPageId.About -> AboutSettings(close)
+            SettingsPageId.About -> AboutSettings(close) { viewModel.showGuide(); onBack() }
         }
     }
     val powerMode by viewModel.powerMode.collectAsStateWithLifecycle()
@@ -781,9 +785,13 @@ private fun DataSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun AboutSettings(onBack: () -> Unit) {
+private fun AboutSettings(onBack: () -> Unit, onShowGuide: () -> Unit) {
     SettingsPage(stringResource(R.string.settings_about), onBack) {
         Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodyLarge)
+        OutlinedButton(
+            onClick = onShowGuide,
+            modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget).padding(vertical = 4.dp),
+        ) { Text(stringResource(R.string.settings_show_guide)) }
         Text(
             stringResource(R.string.settings_credits),
             style = MaterialTheme.typography.bodyMedium,

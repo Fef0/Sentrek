@@ -1,0 +1,37 @@
+Sentrek is a hiking map for Android. You download the areas you're going to, so the map works without signal. You can plan a route on the trails, follow it, and record your walks.
+
+<b>Maps</b>
+<ul>
+<li>Trails, marked routes with their signs, huts, springs, peaks and viewpoints, with contour lines and hill shading.</li>
+<li>To use it offline, download squares from a grid, about 55 × 55 km and 30 MB each.</li>
+<li>Steep slopes coloured like an avalanche map, and trails coloured by difficulty (SAC scale).</li>
+<li>Hold your finger on a trail, peak, hut, river or lake to see what it is: name, difficulty, the marked routes on it, and the weather forecast there.</li>
+<li>Your own .mbtiles and .pmtiles files can be opened too.</li>
+</ul>
+
+<b>Planning</b>
+<ul>
+<li>Tap the map to add points and the route follows the paths between them, offline too in downloaded areas.</li>
+<li>Distance, climb, descent, walking time and the elevation profile while you plan.</li>
+<li>Save the route, or export it as GPX or KML.</li>
+</ul>
+
+<b>Following and recording</b>
+<ul>
+<li>Distance, climb and time left, at your own pace, and the places coming up.</li>
+<li>Vibrates when you leave the route, and optionally before a turn.</li>
+<li>Records with the screen off, with your stats on the lock screen.</li>
+<li>Imports GPX, KML and KMZ files.</li>
+</ul>
+
+<b>Warnings</b>, only when they apply: finishing after sunset, a battery that won't last, rain and storms where you'll be, the last water before a long dry stretch, long stretches in full sun, lost signal.
+
+<b>Gloves, rain and cold</b>: glove mode with the biggest buttons and zoom with the volume keys, a lock button, large text, dark and black themes, a night map, battery saver and stamina mode.
+
+<b>Safety</b>: an SOS screen with your position in big text (coordinates, UTM and Plus Code), and your position sent by SMS to someone every few minutes, without mobile data.
+
+No account, no ads, no tracking. Your tracks, routes and places stay on your phone. The app goes online only for map and terrain tiles, trail details of the areas you download, and the weather forecast if you turn it on. You can point it to your own servers for each of them.
+
+Sentrek is heavily inspired by Trekarta, which is no longer maintained.
+
+Map data © OpenStreetMap contributors. Tiles: OpenFreeMap. Terrain: Mapzen terrain tiles on AWS Open Data. Trail details: Overpass API. Weather: Open-Meteo.

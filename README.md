@@ -2,7 +2,7 @@
 
 Sentrek is a hiking map app for Android. You download the areas you're going to, so the map works without signal. You can plan a route on the trails, follow it, and record your walks.
 
-It's free and open source. It has no ads and no account, and it doesn't need Google Play Services.
+It's in English and Italian, free and open source. It has no ads and no account, and it doesn't need Google Play Services.
 
 Sentrek is heavily inspired by [Trekarta](https://github.com/andreynovikov/trekarta), one of the best open source hiking apps out there. Trekarta is sadly no longer maintained, so think of Sentrek as its spiritual successor.
 
@@ -114,7 +114,7 @@ cd Sentrek
 
 ## Contributing
 
-Bug reports and ideas are welcome in the issues. Please say which phone and Android version you have, and which Sentrek version (Settings › About). If you want to work on something big, open an issue first so we can talk about it.
+Bug reports and ideas are welcome in the issues. Translations too: [TRANSLATING.md](TRANSLATING.md) explains how to add a language, no code needed. Please say which phone and Android version you have, and which Sentrek version (Settings › About). If you want to work on something big, open an issue first so we can talk about it.
 
 ## License
 

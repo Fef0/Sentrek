@@ -1,5 +1,8 @@
 package app.sentrek.maps
 
+import app.sentrek.geo.overlay.OverlayLineSource
+import app.sentrek.geo.overlay.OverlayLines
+import app.sentrek.geo.LatLon
 import android.content.Context
 import android.util.Log
 import app.sentrek.geo.BoundingBox
@@ -94,7 +97,7 @@ data class RegionState(
 class RegionRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val trailSource: TrailOverlaySource,
-) : OverlayPoiSource {
+) : OverlayPoiSource, OverlayLineSource {
     private val offline = OfflineManager.getInstance(context)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val trailsDir = File(context.filesDir, "trails").apply {
@@ -137,6 +140,17 @@ class RegionRepository @Inject constructor(
             .flatMap { file ->
                 runCatching { file.bufferedReader().use { OverlayPois.read(it, box) } }
                     .onFailure { Log.w(TAG, "Cannot read points of ${file.name}", it) }
+                    .getOrDefault(emptyList())
+            }
+    }
+
+    /** Trail lines of the downloaded areas in [box]: the path network, for the turns on a route. */
+    override suspend fun lines(box: BoundingBox): List<List<LatLon>> = withContext(Dispatchers.IO) {
+        val files = trailsDir.listFiles { f -> f.name.endsWith(OVERLAY_SUFFIX) }.orEmpty()
+        files.filter { f -> RegionCell.parse(f.name.removeSuffix(OVERLAY_SUFFIX))?.bbox?.intersects(box) == true }
+            .flatMap { file ->
+                runCatching { file.bufferedReader().use { OverlayLines.read(it, box) } }
+                    .onFailure { Log.w(TAG, "Cannot read lines of ${file.name}", it) }
                     .getOrDefault(emptyList())
             }
     }

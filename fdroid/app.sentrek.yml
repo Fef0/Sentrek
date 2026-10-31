@@ -1,0 +1,31 @@
+# Build recipe for F-Droid. It goes in the fdroiddata repository as metadata/app.sentrek.yml,
+# through a merge request at https://gitlab.com/fdroid/fdroiddata. Descriptions, screenshots
+# and changelogs come from fastlane/metadata in this repository.
+Categories:
+  - Navigation
+  - Sports & Health
+License: GPL-3.0-only
+SourceCode: https://github.com/Fef0/Sentrek
+IssueTracker: https://github.com/Fef0/Sentrek/issues
+Changelog: https://github.com/Fef0/Sentrek/releases
+
+AutoName: Sentrek
+
+RepoType: git
+Repo: https://github.com/Fef0/Sentrek.git
+
+Builds:
+  - versionName: 0.17.0
+    versionCode: 22
+    commit: v0.17.0
+    subdir: app
+    gradle:
+      - yes
+    # The build makes one APK per processor type and a universal one, all with the same
+    # version code: F-Droid ships the universal one.
+    output: build/outputs/apk/release/app-universal-release-unsigned.apk
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 0.17.0
+CurrentVersionCode: 22

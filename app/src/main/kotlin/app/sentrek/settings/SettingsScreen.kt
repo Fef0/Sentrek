@@ -1,5 +1,9 @@
 package app.sentrek.settings
 
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.material3.RadioButton
+import androidx.activity.compose.LocalActivity
+import app.sentrek.AppLanguage
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.focus.focusRequester
@@ -261,6 +265,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setOffRouteVibration(on) }
     }
 
+    val turnBuzz: StateFlow<Boolean> =
+        settings.turnBuzz.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setTurnBuzz(on: Boolean) {
+        viewModelScope.launch { settings.setTurnBuzz(on) }
+    }
+
     val theme: StateFlow<AppTheme> =
         settings.theme.stateIn(viewModelScope, SharingStarted.Eagerly, AppTheme.System)
 
@@ -375,6 +386,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setConfirmExit(on) }
     }
 
+    fun showGuide() {
+        viewModelScope.launch { settings.setGuideSeen(false) }
+    }
+
     val units: StateFlow<Units> =
         settings.units.stateIn(viewModelScope, SharingStarted.Eagerly, Format.units)
 
@@ -403,7 +418,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
             SettingsPageId.Emergency -> EmergencySettings(viewModel, close)
             SettingsPageId.Advanced -> AdvancedSettings(viewModel, close)
             SettingsPageId.Data -> DataSettings(viewModel, close)
-            SettingsPageId.About -> AboutSettings(close)
+            SettingsPageId.About -> AboutSettings(close) { viewModel.showGuide(); onBack() }
         }
     }
     val powerMode by viewModel.powerMode.collectAsStateWithLifecycle()
@@ -607,8 +622,15 @@ private fun AppearanceSettings(viewModel: SettingsViewModel, onBack: () -> Unit)
     val mapTheme by viewModel.mapTheme.collectAsStateWithLifecycle()
     val fullScreen by viewModel.fullScreen.collectAsStateWithLifecycle()
     val saving = rememberSaving(viewModel)
+    val activity = LocalActivity.current
+    val context = LocalContext.current
+    var language by remember { mutableStateOf(AppLanguage.current(context)) }
     SettingsPage(stringResource(R.string.settings_appearance), onBack) {
         if (saving) PowerNote()
+        LanguageRow(language) { tag ->
+            language = tag
+            activity?.let { AppLanguage.set(it, tag) }
+        }
         ChoiceRow(
             title = stringResource(R.string.settings_text_size),
             hint = stringResource(R.string.settings_text_size_hint),
@@ -763,9 +785,13 @@ private fun DataSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun AboutSettings(onBack: () -> Unit) {
+private fun AboutSettings(onBack: () -> Unit, onShowGuide: () -> Unit) {
     SettingsPage(stringResource(R.string.settings_about), onBack) {
         Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodyLarge)
+        OutlinedButton(
+            onClick = onShowGuide,
+            modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget).padding(vertical = 4.dp),
+        ) { Text(stringResource(R.string.settings_show_guide)) }
         Text(
             stringResource(R.string.settings_credits),
             style = MaterialTheme.typography.bodyMedium,
@@ -833,6 +859,7 @@ private fun ToggleRow(
 @Composable
 private fun AlertsSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val offRouteVibration by viewModel.offRouteVibration.collectAsStateWithLifecycle()
+    val turnBuzz by viewModel.turnBuzz.collectAsStateWithLifecycle()
     val waterAdvice by viewModel.waterAdvice.collectAsStateWithLifecycle()
     val rainAdvice by viewModel.rainAdvice.collectAsStateWithLifecycle()
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -852,6 +879,12 @@ private fun AlertsSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
                 hint = stringResource(R.string.settings_off_route_vibration_hint),
                 checked = offRouteVibration,
                 onChange = viewModel::setOffRouteVibration,
+            )
+            ToggleRow(
+                title = stringResource(R.string.settings_turn_buzz),
+                hint = stringResource(R.string.settings_turn_buzz_hint),
+                checked = turnBuzz,
+                onChange = viewModel::setTurnBuzz,
             )
             ToggleRow(
                 title = stringResource(R.string.settings_water_advice),
@@ -1184,6 +1217,51 @@ private fun NavRow(title: String, hint: String?, onClick: () -> Unit) {
         }
         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
     }
+}
+
+/**
+ * The app's language, a tap away from a list of every translation. Each under its own name,
+ * so it's found by someone who can't read the language the app is in.
+ */
+@Composable
+private fun LanguageRow(selected: String?, onChange: (String?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val system = stringResource(R.string.settings_language_system)
+    NavRow(
+        stringResource(R.string.settings_language),
+        selected?.let(AppLanguage::name) ?: system,
+    ) { open = true }
+    if (!open) return
+    val choices = listOf(null) + AppLanguage.available.sortedBy(AppLanguage::name)
+    AlertDialog(
+        onDismissRequest = { open = false },
+        title = { Text(stringResource(R.string.settings_language)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                for (tag in choices) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = TouchTarget)
+                            .selectable(selected = tag == selected, role = Role.RadioButton) {
+                                open = false
+                                if (tag != selected) onChange(tag)
+                            },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        RadioButton(selected = tag == selected, onClick = null)
+                        Text(tag?.let(AppLanguage::name) ?: system, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { open = false }, modifier = Modifier.heightIn(min = TouchTarget)) {
+                Text(stringResource(R.string.settings_cancel))
+            }
+        },
+    )
 }
 
 /** A row that opens or closes the rows below it. */

@@ -1,5 +1,7 @@
 package app.sentrek.home
 
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -69,7 +71,8 @@ fun FeatureSheet(
                 .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            val kind = info.kind?.let(::humanize)
+            val context = LocalContext.current
+            val kind = info.kind?.let { kindName(context, it) }
             // A route pressed off any path (on a road, say) is named after the route.
             val routeName = info.routes.firstOrNull()?.name?.takeIf { info.kind == "route" }
             Text(
@@ -90,12 +93,12 @@ fun FeatureSheet(
                         Fact(stringResource(R.string.feature_elevation), ele.toDoubleOrNull()?.let(Format::elevation) ?: "$ele m")
                     }
                     info.sacGrade?.let { grade ->
-                        val name = SacScale.entries.firstOrNull { it.grade == grade }?.osm?.let(::humanize)
+                        val name = SacScale.entries.firstOrNull { it.grade == grade }?.osm?.let { kindName(context, it) }
                         Fact(stringResource(R.string.feature_difficulty), listOfNotNull("T$grade", name).joinToString(" · "))
                     }
                     info.visibility?.takeIf { it > 0 }?.let { level ->
                         TrailVisibility.entries.firstOrNull { it.level == level }?.let {
-                            Fact(stringResource(R.string.feature_visibility), humanize(it.osm))
+                            Fact(stringResource(R.string.feature_visibility), kindName(context, it.osm))
                         }
                     }
                     // Only what the map data says: "intermittent" when tagged so, nothing otherwise
@@ -216,6 +219,82 @@ private fun Fact(label: String, value: String) {
 }
 
 /** "demanding_mountain_hiking" → "Demanding mountain hiking". OSM values aren't translated yet. */
+/** What a map feature is, in the app's language where it has a name of its own, else as OSM writes it. */
+fun kindName(context: Context, osm: String): String =
+    KIND_NAMES[osm]?.let(context::getString) ?: humanize(osm)
+
+/**
+ * OSM values Sentrek names in the app's language: what a pressed feature is (paths, water,
+ * fords, the points on the map), SAC grades and trail visibility. Anything else as OSM has it.
+ */
+private val KIND_NAMES = mapOf(
+    "path" to R.string.kind_path,
+    "track" to R.string.kind_track,
+    "route" to R.string.kind_route,
+    "river" to R.string.kind_river,
+    "stream" to R.string.kind_stream,
+    "canal" to R.string.kind_canal,
+    "ditch" to R.string.kind_ditch,
+    "drain" to R.string.kind_drain,
+    "lake" to R.string.kind_lake,
+    "ford" to R.string.kind_ford,
+    "guidepost" to R.string.kind_guidepost,
+    "board" to R.string.kind_board,
+    "map" to R.string.kind_map,
+    "basic_hut" to R.string.kind_basic_hut,
+    "weather_shelter" to R.string.kind_weather_shelter,
+    "lean_to" to R.string.kind_lean_to,
+    "rock_shelter" to R.string.kind_rock_shelter,
+    "memorial" to R.string.kind_memorial,
+    "wayside_cross" to R.string.kind_wayside_cross,
+    "wayside_shrine" to R.string.kind_wayside_shrine,
+    "archaeological_site" to R.string.kind_archaeological_site,
+    "castle" to R.string.kind_castle,
+    "ruins" to R.string.kind_ruins,
+    "monument" to R.string.kind_monument,
+    "cross" to R.string.kind_cross,
+    "alpine_hut" to R.string.kind_alpine_hut,
+    "wilderness_hut" to R.string.kind_wilderness_hut,
+    "viewpoint" to R.string.kind_viewpoint,
+    "camp_site" to R.string.kind_camp_site,
+    "waterfall" to R.string.kind_waterfall,
+    "spring" to R.string.kind_spring,
+    "cave_entrance" to R.string.kind_cave_entrance,
+    "peak" to R.string.kind_peak,
+    "saddle" to R.string.kind_saddle,
+    "volcano" to R.string.kind_volcano,
+    "drinking_water" to R.string.kind_drinking_water,
+    "water_point" to R.string.kind_water_point,
+    "shelter" to R.string.kind_shelter,
+    "phone" to R.string.kind_phone,
+    "place_of_worship" to R.string.kind_place_of_worship,
+    "chalet" to R.string.kind_chalet,
+    "picnic_site" to R.string.kind_picnic_site,
+    "restaurant" to R.string.kind_restaurant,
+    "cafe" to R.string.kind_cafe,
+    "bar" to R.string.kind_bar,
+    "pub" to R.string.kind_pub,
+    "biergarten" to R.string.kind_biergarten,
+    "hotel" to R.string.kind_hotel,
+    "hostel" to R.string.kind_hostel,
+    "guest_house" to R.string.kind_guest_house,
+    "motel" to R.string.kind_motel,
+    "parking" to R.string.kind_parking,
+    "toilets" to R.string.kind_toilets,
+    "hiking" to R.string.sac_hiking,
+    "mountain_hiking" to R.string.sac_mountain_hiking,
+    "demanding_mountain_hiking" to R.string.sac_demanding_mountain_hiking,
+    "alpine_hiking" to R.string.sac_alpine_hiking,
+    "demanding_alpine_hiking" to R.string.sac_demanding_alpine_hiking,
+    "difficult_alpine_hiking" to R.string.sac_difficult_alpine_hiking,
+    "excellent" to R.string.visibility_excellent,
+    "good" to R.string.visibility_good,
+    "intermediate" to R.string.visibility_intermediate,
+    "bad" to R.string.visibility_bad,
+    "horrible" to R.string.visibility_horrible,
+    "no" to R.string.visibility_no,
+)
+
 fun humanize(osm: String): String =
     osm.replace('_', ' ').replaceFirstChar { it.titlecase(Locale.getDefault()) }
 

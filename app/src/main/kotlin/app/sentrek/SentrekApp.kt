@@ -20,6 +20,7 @@ class SentrekApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        AppLanguage.applyToApp(this)
         MapEngine.init(this, BuildConfig.VERSION_NAME)
         // For the whole process: screens and the recording notification alike.
         MainScope().launch { settings.units.collect { Format.units = it } }

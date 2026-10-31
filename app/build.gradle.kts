@@ -18,6 +18,15 @@ android {
         targetSdk = 37
         versionCode = 21
         versionName = "0.16.0"
+
+        // The languages the app is translated into, from its res/values-<language> folders: a
+        // new translation shows in the language list by itself (see TRANSLATING.md).
+        buildConfigField("String[]", "LANGUAGES", languages().joinToString(prefix = "{", postfix = "}") { "\"$it\"" })
+    }
+
+    // The same list for the phone's own per-app language setting (Android 13+).
+    androidResources {
+        generateLocaleConfig = true
     }
 
     // The release key lives outside the repo; keystore.properties (git-ignored) points to it.
@@ -91,4 +100,19 @@ dependencies {
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+}
+
+/** "en" (res/values), then each translation's tag, from values-it, values-pt-rBR, values-b+sr+Latn. */
+fun languages(): List<String> {
+    val res = file("src/main/res")
+    val simple = Regex("""values-([a-z]{2,3})(?:-r([A-Z]{2}))?""")
+    val bcp = Regex("""values-b\+([A-Za-z0-9+]+)""")
+    val tags = res.listFiles().orEmpty()
+        .filter { File(it, "strings.xml").exists() }
+        .mapNotNull { dir ->
+            simple.matchEntire(dir.name)?.let { m -> listOfNotNull(m.groupValues[1], m.groupValues[2].ifEmpty { null }).joinToString("-") }
+                ?: bcp.matchEntire(dir.name)?.groupValues?.get(1)?.replace('+', '-')
+        }
+        .sorted()
+    return listOf("en") + tags
 }

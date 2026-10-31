@@ -1,88 +1,92 @@
 # Sentrek
 
-A hiking map for Android that keeps working when the signal is gone, the battery is low and your hands are cold.
+Sentrek is a hiking map app for Android. You download the areas you're going to, so the map works without signal. You can plan a route on the trails, follow it, and record your walks.
 
-Download the areas you need, plan a route that sticks to real trails, and follow it. Along the way, Sentrek tells you what matters: how far and how high is left, when you'll get there, and whether that's before dark.
+It's free and open source. It has no ads and no account, and it doesn't need Google Play Services.
+
+Sentrek is heavily inspired by [Trekarta](https://github.com/andreynovikov/trekarta), one of the best open source hiking apps out there. Trekarta is sadly no longer maintained, so think of Sentrek as its spiritual successor.
 
 <table>
   <tr>
-    <td align="center"><img src="docs/media/map.gif" width="200" alt="Moving around the hiking map"><br><b>A map made for walking</b></td>
-    <td align="center"><img src="docs/media/plan.gif" width="200" alt="Planning a route that follows the trails"><br><b>Plan along the trails</b></td>
-    <td align="center"><img src="docs/media/download.gif" width="200" alt="Downloading an area for offline use"><br><b>Download an area</b></td>
-    <td align="center"><img src="docs/media/follow.gif" width="200" alt="Following a route with the trail card"><br><b>Follow a route</b></td>
+    <td align="center"><img src="docs/media/map.gif" width="200" alt="Moving around the map"><br>The map</td>
+    <td align="center"><img src="docs/media/plan.gif" width="200" alt="Planning a route on the trails, saving it and opening it in the library"><br>Planning a route</td>
+    <td align="center"><img src="docs/media/download.gif" width="200" alt="Downloading an area for offline use"><br>Downloading an area</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/media/trail.gif" width="200" alt="Long-pressing a trail to see its route, difficulty and the weather"><br>Trail info and weather</td>
+    <td align="center"><img src="docs/media/follow.gif" width="200" alt="Following a route"><br>Following a route</td>
+    <td></td>
   </tr>
 </table>
 
-## What it does
+## Features
 
-### Maps that work offline
-- Tap squares on a grid to download them. Each one is about 55 × 55 km and takes around 30 MB.
-- Hiking trails, waymarked routes with their painted signs, huts, springs, peaks and viewpoints.
-- Contour lines and hill shading, both worked out on the phone from terrain data.
-- Optional colours for steep slopes (avalanche-map style) and for trail difficulty on the SAC scale.
+### Maps
+- The map shows trails, marked routes with their signs, huts, springs, peaks and viewpoints, with contour lines and hill shading.
+- To use it offline, download squares from a grid. A square is about 55 × 55 km and takes around 30 MB.
+- You can colour steep slopes like an avalanche map, and colour trails by difficulty (SAC scale).
+- Long-press a trail to see its difficulty and the marked routes that use it, with length, climb, walking time and who looks after them. From there you can get the weather forecast for that spot, day by day or hour by hour.
 - You can also open your own `.mbtiles` and `.pmtiles` files.
 
-### Route planner
-- Tap where you want to go. The route follows paths and tracks from the map data, and it works offline in downloaded areas.
-- Distance, climb, descent and walking time update as you add points, along with the elevation profile.
-- Drag points to move them, drag a midpoint to add one, and undo or redo as much as you like.
+### Planning
+- Tap the map to add points and the route follows the paths between them. This works offline too, in downloaded areas.
+- You see distance, climb, descent, walking time and the elevation profile while you plan.
+- Drag a point to move it, or drag the middle of a segment to add one. Undo and redo are there.
 - Save the route, or export it as GPX or KML.
 
 ### Following a route
-- The trail card shows three big numbers: distance left, climb left and time left. After a while the time is based on your own pace.
-- Tap the card to see the places ahead (huts, springs, peaks), how far each one is, and the elevation profile with your position on it.
-- The phone vibrates when you leave the route and again when you're back on it.
-- Import GPX, KML and KMZ files, or open them from another app with "Open with Sentrek".
+- A card at the top shows distance left, climb left and time left. After a while the time is based on how fast you actually walk.
+- Tap the card for the places coming up (huts, springs, peaks) and the elevation profile with your position on it.
+- The phone vibrates when you go off the route, and again when you're back on it.
+- You can import GPX, KML and KMZ files, or open them from another app.
 
 ### Recording
-- Records in the background with the screen off, with a live notification on the lock screen.
-- Pause and resume. Add places and photos along the way.
-- Your recorded tracks add up to walking totals for this year and for all time.
+- It keeps recording with the screen off, and shows your stats in a notification on the lock screen.
+- You can pause, and add places and photos as you go.
+- Your recorded hikes add up to totals for the year and for all time.
 
-### Warnings before they matter
-These show up only when there's something to say:
-- **Sunset:** if you'd reach the end of the route after dark, and a countdown in the last hours of daylight.
-- **Battery:** if it looks like it'll run out before you're done, with a one-tap switch to stamina mode.
-- **Rain, snow and storms:** where you'll be, from the forecast.
-- **Water:** the last spring or fountain before a long dry stretch.
-- **Sun:** long stretches without shade, worked out from the terrain and the woods on the map.
-- **No signal:** where your phone last had signal, with "Take me there".
-- A turnaround alarm, at a time you choose or when the light won't last.
+### Warnings
+The app warns you about these things, only when they apply:
+- you'd finish the route after sunset
+- the battery won't last to the end (one tap turns on stamina mode)
+- rain, snow or storms where you're going to be
+- the last spring before a long stretch with no water
+- long stretches in full sun
+- you've lost signal (it remembers where you last had it, so you can go back)
 
-### Made for bad conditions
-- **Glove mode:** the biggest buttons, long presses that are easier to land, and zoom with the volume keys.
-- A lock button, so rain and pockets can't press anything.
-- Large text, dark and black themes, a night map, and full screen.
-- **Battery saver** and **stamina mode** for long days. Stamina mode can switch itself on at a battery level you choose.
+You can also set a turnaround alarm.
+
+### Gloves, rain and cold
+- Glove mode makes the buttons as big as they go and lets you zoom with the volume keys.
+- The lock button stops rain or your pocket from pressing things.
+- There's large text, dark and black themes, a night map and a full screen mode.
+- Battery saver and stamina mode make the battery last longer on long days. Stamina mode can turn itself on at a battery level you pick.
 
 ### Safety
-- An SOS screen with your position in big text, as coordinates, UTM and Plus Code, with buttons to call or text for help.
-- It can text your position to someone every few minutes while you walk. This uses plain SMS, so it works without mobile data.
-- "Peaks around" names the summits you can see from where you stand.
+- The SOS screen shows your position in big text (coordinates, UTM and Plus Code), with buttons to call or text for help.
+- It can send your position by SMS to someone every few minutes while you walk. SMS works without mobile data.
+- "Peaks around" tells you the names of the mountains you can see.
 
-## What it doesn't do
+## Privacy
 
-- No account, no ads, no analytics and no tracking.
-- No Google Play Services, so it runs on phones without them.
+Everything you save (tracks, routes, places, photos) stays on your phone. You can back it up to a file from the settings.
 
-Your tracks, routes and places stay on your phone. You can back them up to a file whenever you like.
+The app only goes online to:
+- load map and terrain tiles
+- get trail details for the areas you download
+- get the weather forecast, if you turn it on
 
-The app goes online only for:
-- map and terrain tiles, when you browse or download an area
-- trail details (difficulty, huts, springs) for downloaded areas
-- the weather forecast, if you turn it on
+There's no tracking or analytics of any kind.
 
 ## Install
 
-Sentrek needs Android 7.0 or newer.
+You need Android 7.0 or newer.
 
-Get the APK from the [Releases](../../releases) page:
-- `Sentrek-x.y.z-arm64.apk` is right for almost every phone from the last ten years.
-- `Sentrek-x.y.z-universal.apk` works on any device, but it's a bigger download.
+Download the APK from the [Releases](../../releases) page. The `arm64` file is the right one for nearly every phone. If it doesn't install, use the `universal` one, which is bigger but works on any device.
 
-## Build it yourself
+## Building
 
-See [BUILDING.md](BUILDING.md). In short, with JDK 17+ and the Android SDK installed:
+See [BUILDING.md](BUILDING.md). You need JDK 17 or newer and the Android SDK. Then:
 
 ```sh
 git clone <this repository>
@@ -90,21 +94,20 @@ cd Sentrek
 ./gradlew assembleDebug
 ```
 
-## Where the data comes from
+## Data sources
 
-- Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, available under the Open Database License.
-- Vector tiles from [OpenFreeMap](https://openfreemap.org/), using the [OpenMapTiles](https://openmaptiles.org/) schema.
-- Terrain from the Mapzen terrain tiles, hosted on [AWS Open Data](https://registry.opendata.aws/terrain-tiles/).
-- Trail details from the [Overpass API](https://overpass-api.de/) (FOSSGIS, VK Maps, private.coffee).
-- Weather from [Open-Meteo](https://open-meteo.com/).
-- Map icons from [OpenStreetMap Carto](https://github.com/gravitystorm/openstreetmap-carto) (CC0).
-
-The maps are drawn with [MapLibre Native](https://github.com/maplibre/maplibre-native).
+- Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, under the Open Database License
+- Vector tiles: [OpenFreeMap](https://openfreemap.org/), [OpenMapTiles](https://openmaptiles.org/) schema
+- Terrain: Mapzen terrain tiles on [AWS Open Data](https://registry.opendata.aws/terrain-tiles/)
+- Trail details: [Overpass API](https://overpass-api.de/) (FOSSGIS, VK Maps, private.coffee)
+- Weather: [Open-Meteo](https://open-meteo.com/)
+- Map icons: [OpenStreetMap Carto](https://github.com/gravitystorm/openstreetmap-carto) (CC0)
+- Map rendering: [MapLibre Native](https://github.com/maplibre/maplibre-native)
 
 ## Contributing
 
-Bug reports and ideas are welcome in the issues. Please include your phone model, Android version and the Sentrek version from Settings › About. For anything bigger than a small fix, open an issue first so we can agree on the approach.
+Bug reports and ideas are welcome in the issues. Please say which phone and Android version you have, and which Sentrek version (Settings › About). If you want to work on something big, open an issue first so we can talk about it.
 
 ## License
 
-Sentrek is free software, released under the [GNU General Public License v3.0](LICENSE).
+[GNU GPL v3.0](LICENSE)

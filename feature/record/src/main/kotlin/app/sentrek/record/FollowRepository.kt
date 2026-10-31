@@ -11,6 +11,8 @@ import app.sentrek.data.SettingsRepository
 import app.sentrek.geo.LatLon
 import app.sentrek.geo.route.OffRouteDetector
 import app.sentrek.geo.overlay.OverlayPoiSource
+import app.sentrek.geo.overlay.OverlayLineSource
+import app.sentrek.geo.route.Turns
 import app.sentrek.geo.route.Route
 import app.sentrek.geo.route.PaceTracker
 import app.sentrek.geo.route.RoutePlace
@@ -80,6 +82,7 @@ class FollowRepository @Inject constructor(
     private val tracks: TrackRepository,
     private val places: PlaceRepository,
     private val pois: OverlayPoiSource,
+    private val lines: OverlayLineSource,
     settings: SettingsRepository,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -88,6 +91,9 @@ class FollowRepository @Inject constructor(
     /** The off-route alert still shows on screen and in the notification when this is off. */
     private val vibrationOn = settings.offRouteVibration.stateIn(scope, SharingStarted.Eagerly, true)
 
+    /** A buzz before each turn at a junction: off by default. */
+    private val turnBuzzOn = settings.turnBuzz.stateIn(scope, SharingStarted.Eagerly, false)
+
     /** Off: no word about water, on screen or in the pocket. */
     private val waterOn = settings.waterAdvice.stateIn(scope, SharingStarted.Eagerly, true)
 
@@ -95,6 +101,11 @@ class FollowRepository @Inject constructor(
     private var along: Double? = null
     private var routePlaces: List<RoutePlace> = emptyList()
     private var placesJob: Job? = null
+
+    /** Where the route turns at a junction, metres along it; and those already buzzed for. */
+    private var turns: List<Double> = emptyList()
+    private var buzzedTurns = mutableSetOf<Double>()
+    private var turnsJob: Job? = null
     private var detector = OffRouteDetector()
 
     /** The user's pace on this route, learnt as it's walked: the times left follow it. */
@@ -127,6 +138,8 @@ class FollowRepository @Inject constructor(
         detector = OffRouteDetector()
         pace = PaceTracker()
         filledUpAt = null
+        turns = emptyList()
+        buzzedTurns = mutableSetOf()
         tracks.show(track)
         runCatching { saved.writeText("${track.id}\n$reversed") }
         _state.value = Following(
@@ -140,6 +153,7 @@ class FollowRepository @Inject constructor(
             profile = route!!.profile(),
         )
         findPlaces(track, route!!)
+        findTurns(route!!)
         ensureService()
         return true
     }
@@ -168,6 +182,27 @@ class FollowRepository @Inject constructor(
         }
     }
 
+    /** The junctions where [r] turns, from the downloaded areas' paths, once, in the background. */
+    private fun findTurns(r: Route) {
+        turnsJob?.cancel()
+        turnsJob = scope.launch {
+            val box = RoutePlaces.box(r) ?: return@launch
+            val network = lines.lines(box)
+            val found = withContext(Dispatchers.Default) { Turns.find(r, network) }
+            if (route === r) turns = found
+        }
+    }
+
+    /** About [TURN_LEAD_M] before a turn, a buzz, once; on the route only, and if wanted. */
+    private fun turnBuzz(at: Double, onRoute: Boolean) {
+        if (!turnBuzzOn.value || !onRoute) return
+        val next = turns.firstOrNull { it !in buzzedTurns && it > at - TURN_PASSED_M } ?: return
+        if (next - at > TURN_LEAD_M) return
+        buzzedTurns += next
+        // Already past it (a gap in the fixes): nothing to warn about.
+        if (next > at) buzz(TURN_PATTERN)
+    }
+
     /** Starts the tracking service if following. Only from the foreground (see [RecordingRepository.ensureService]). */
     fun ensureService() {
         if (_state.value == null) return
@@ -189,6 +224,8 @@ class FollowRepository @Inject constructor(
 
     fun stop() {
         placesJob?.cancel()
+        turnsJob?.cancel()
+        turns = emptyList()
         route = null
         along = null
         routePlaces = emptyList()
@@ -213,6 +250,7 @@ class FollowRepository @Inject constructor(
         val standard = r.remaining(position.along)
         val onRoute = !detector.isOff && position.offset <= OffRouteDetector.OFF_ROUTE_M
         pace.update(position.along, standard.millis, location.time, onRoute)
+        turnBuzz(position.along, onRoute)
         _state.value = current.copy(
             remaining = standard.copy(millis = atPace(standard.millis)),
             ownPace = pace.learnt,
@@ -268,6 +306,10 @@ class FollowRepository @Inject constructor(
 
     private fun vibrate(pattern: LongArray) {
         if (!vibrationOn.value) return
+        buzz(pattern)
+    }
+
+    private fun buzz(pattern: LongArray) {
         runCatching {
             val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 context.getSystemService(VibratorManager::class.java).defaultVibrator
@@ -298,5 +340,12 @@ class FollowRepository @Inject constructor(
 
         /** Two short pulses. */
         val BACK_ON_ROUTE_PATTERN = longArrayOf(0, 150, 120, 150)
+
+        /** One long, one short: unlike the others. */
+        val TURN_PATTERN = longArrayOf(0, 450, 150, 150)
+
+        /** How far before a turn the buzz comes; fixes every few seconds still land in it. */
+        const val TURN_LEAD_M = 60.0
+        const val TURN_PASSED_M = 15.0
     }
 }

@@ -44,6 +44,14 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         }
     }
 
+    /** A buzz before each junction where a followed route turns. Off unless chosen. */
+    val turnBuzz: Flow<Boolean> =
+        context.settings.data.map { it[TURN_BUZZ] ?: false }
+
+    suspend fun setTurnBuzz(on: Boolean) {
+        context.settings.edit { it[TURN_BUZZ] = on }
+    }
+
     /** Volume keys zoom the map, without glove mode too. */
     val volumeKeysZoom: Flow<Boolean> =
         context.settings.data.map { it[VOLUME_KEYS_ZOOM] ?: false }
@@ -513,6 +521,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     private companion object {
         val SHOW_TRAIL_DIFFICULTY = booleanPreferencesKey("show_trail_difficulty")
         val GLOVE_MODE = booleanPreferencesKey("glove_mode")
+        val TURN_BUZZ = booleanPreferencesKey("turn_buzz")
 
         /** Button size in 0.14, when glove mode was one: now glove mode on, Largest buttons. */
         private const val GLOVES_SIZE = "Gloves"

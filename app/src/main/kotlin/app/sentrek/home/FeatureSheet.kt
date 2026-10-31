@@ -80,7 +80,8 @@ fun FeatureSheet(
             if (info.name != null && kind != null) {
                 Text(kind, style = MaterialTheme.typography.titleMedium)
             }
-            if (!downloaded) NotDownloadedNote(onDownload)
+            // What a download adds is about trails: nothing for a river, a lake or a ford.
+            if (!downloaded && !info.isWater && !info.ford) NotDownloadedNote(onDownload)
 
             SelectionContainer {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -97,6 +98,13 @@ fun FeatureSheet(
                             Fact(stringResource(R.string.feature_visibility), humanize(it.osm))
                         }
                     }
+                    // Only what the map data says: "intermittent" when tagged so, nothing otherwise
+                    // (an untagged stream isn't known to flow all year).
+                    if (info.intermittent == true) {
+                        Fact(stringResource(R.string.feature_water), stringResource(R.string.feature_water_intermittent))
+                    }
+                    // On a path's card; a pressed ford is already named so in the title.
+                    if (info.ford && info.kind != "ford") Fact(stringResource(R.string.feature_crossing), stringResource(R.string.feature_ford))
                     Fact(
                         stringResource(R.string.feature_coordinates),
                         Format.coordinates(info.position.latitude, info.position.longitude),

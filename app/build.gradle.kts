@@ -16,8 +16,8 @@ android {
         applicationId = "app.sentrek"
         minSdk = 24
         targetSdk = 37
-        versionCode = 20
-        versionName = "0.15.0"
+        versionCode = 21
+        versionName = "0.16.0"
     }
 
     // The release key lives outside the repo; keystore.properties (git-ignored) points to it.

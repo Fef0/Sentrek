@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="regions_back">Torna alla mappa</string>
+    <string name="regions_zoom_in">Ingrandisci per selezionare le zone</string>
+    <string name="regions_hint">Tocca i quadrati per selezionarli</string>
+    <plurals name="regions_stored">
+        <item quantity="one">%1$d zona · %2$s sul dispositivo</item>
+        <item quantity="many">%1$d zone · %2$s sul dispositivo</item>
+        <item quantity="other">%1$d zone · %2$s sul dispositivo</item>
+    </plurals>
+    <plurals name="regions_selected">
+        <item quantity="one">%d zona selezionata</item>
+        <item quantity="many">%d zone selezionate</item>
+        <item quantity="other">%d zone selezionate</item>
+    </plurals>
+    <string name="regions_download">Scarica (%d)</string>
+    <string name="regions_delete">Elimina (%d)</string>
+    <string name="regions_clear">Deseleziona</string>
+    <string name="regions_update">Aggiorna (%d)</string>
+    <string name="regions_downloaded_on">%1$s sul telefono · scaricate il %2$s</string>
+    <plurals name="regions_old">
+        <item quantity="one">%d zona ha più di 6 mesi</item>
+        <item quantity="many">%d zone hanno più di 6 mesi</item>
+        <item quantity="other">%d zone hanno più di 6 mesi</item>
+    </plurals>
+    <string name="regions_update_old">Aggiorna</string>
+    <string name="regions_cell_queued">In coda</string>
+    <string name="regions_cell_map">Mappa %d%%</string>
+    <string name="regions_cell_trails_waiting">Poi i sentieri</string>
+    <string name="regions_cell_trails">Sentieri…</string>
+    <string name="regions_cell_busy">Server occupato</string>
+    <plurals name="regions_progress">
+        <item quantity="one">%1$d zona pronta su %2$d</item>
+        <item quantity="many">%1$d zone pronte su %2$d</item>
+        <item quantity="other">%1$d zone pronte su %2$d</item>
+    </plurals>
+    <string name="regions_map_progress">Mappa: %1$d%% · %2$s</string>
+    <plurals name="regions_more_waiting">
+        <item quantity="one">ancora %d in attesa</item>
+        <item quantity="many">ancora %d in attesa</item>
+        <item quantity="other">ancora %d in attesa</item>
+    </plurals>
+    <plurals name="regions_maps_waiting">
+        <item quantity="one">%d mappa in attesa di download</item>
+        <item quantity="many">%d mappe in attesa di download</item>
+        <item quantity="other">%d mappe in attesa di download</item>
+    </plurals>
+    <string name="regions_trails_progress">Sentieri: scarico difficoltà, rifugi e sorgenti</string>
+    <string name="regions_trails_next">Sentieri: arrivano dopo la mappa</string>
+    <string name="regions_trails_busy">Sentieri: il server è occupato, riprovo tra mezzo minuto</string>
+    <string name="regions_trails_explain">I dettagli dei sentieri vengono da OpenStreetMap, una zona alla volta. Una zona grande o un server occupato possono richiedere qualche minuto. La mappa funziona anche senza.</string>
+    <string name="regions_size">Circa %1$s da scaricare · %2$s liberi</string>
+    <string name="regions_no_space">Spazio insufficiente: servono circa %1$s, ne restano solo %2$s.</string>
+    <plurals name="regions_trails_failed">
+        <item quantity="one">Dettagli dei sentieri non scaricati per %d zona</item>
+        <item quantity="many">Dettagli dei sentieri non scaricati per %d zone</item>
+        <item quantity="other">Dettagli dei sentieri non scaricati per %d zone</item>
+    </plurals>
+    <string name="regions_retry">Riprova</string>
+    <string name="regions_import">Importa un file mappa</string>
+    <plurals name="regions_imported">
+        <item quantity="one">%d mappa importata</item>
+        <item quantity="many">%d mappe importate</item>
+        <item quantity="other">%d mappe importate</item>
+    </plurals>
+    <string name="imported_title">Mappe importate</string>
+    <string name="imported_show">Mostra sulla mappa</string>
+    <string name="imported_delete">Elimina</string>
+    <plurals name="confirm_delete_regions_title">
+        <item quantity="one">Eliminare %d zona scaricata?</item>
+        <item quantity="many">Eliminare %d zone scaricate?</item>
+        <item quantity="other">Eliminare %d zone scaricate?</item>
+    </plurals>
+    <string name="confirm_delete_regions_text">La mappa e i dati dei sentieri verranno rimossi da questo dispositivo.</string>
+    <string name="confirm_delete_imported_title">Eliminare questo file mappa?</string>
+    <string name="confirm_delete_imported_text">%s verrà rimosso da questo dispositivo.</string>
+    <string name="confirm_delete">Elimina</string>
+    <string name="imported_close">Chiudi</string>
+    <string name="imported_zooms">Zoom %1$d–%2$d · %3$s</string>
+    <string name="import_running">Importazione…</string>
+    <string name="import_vector">I file di mappe vettoriali non sono ancora supportati. Usa un file MBTiles o PMTiles raster.</string>
+    <string name="import_unknown">File non supportato. Usa .mbtiles o .pmtiles.</string>
+    <string name="import_failed">Importazione non riuscita</string>
+    <string name="regions_up_to_date">Già aggiornate, niente da scaricare.</string>
+    <string name="regions_offline">Nessuna rete. Connettiti a internet per scaricare le mappe.</string>
+    <string name="regions_waiting_network">Nessuna rete: i download riprendono quando torni online.</string>
+    <string name="download_channel">Download delle mappe</string>
+    <string name="download_notification_title">Download delle mappe</string>
+    <string name="download_notification_area">%1$d rimaste · mappa %2$d%%</string>
+    <string name="download_notification_trails">Scarico i dettagli dei sentieri: difficoltà, rifugi e sorgenti</string>
+    <string name="download_notification_trails_busy">Server dei sentieri occupato, riprovo a breve</string>
+</resources>

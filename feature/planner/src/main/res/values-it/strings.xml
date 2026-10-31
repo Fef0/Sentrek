@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="plan_start">Pianifica un percorso</string>
+    <string name="plan_hint">Tocca per aggiungere punti. Trascina un punto per spostarlo, trascina un punto intermedio per inserirne uno.</string>
+    <string name="plan_follow_trails">Segui i sentieri</string>
+    <string name="plan_editing">Modifica: %s</string>
+    <string name="plan_busy">Chiudi prima il percorso aperto.</string>
+    <string name="plan_blocked_following">Smetti di seguire il percorso per pianificarne uno nuovo.</string>
+    <string name="plan_blocked_recording">Ferma la registrazione per pianificare un percorso.</string>
+    <string name="plan_blocked_both">Smetti di seguire il percorso e ferma la registrazione per pianificarne uno nuovo.</string>
+    <string name="plan_distance">Distanza</string>
+    <string name="plan_ascent">Salita</string>
+    <string name="plan_descent">Discesa</string>
+    <string name="plan_time">Tempo</string>
+    <string name="plan_no_terrain">Qui non ci sono dati di altitudine. Il tempo è calcolato solo sulla distanza.</string>
+    <string name="plan_undo">Annulla</string>
+    <string name="plan_redo">Ripeti</string>
+    <string name="plan_remove">Rimuovi</string>
+    <string name="plan_save">Salva</string>
+    <string name="plan_close">Chiudi</string>
+    <string name="plan_save_title">Salva percorso</string>
+    <string name="plan_saved">Salvato: %s</string>
+    <string name="plan_discard_title">Scartare questo percorso?</string>
+    <string name="plan_discard_text">Le modifiche non salvate andranno perse.</string>
+    <string name="plan_discard">Scarta</string>
+    <string name="plan_keep">Continua a pianificare</string>
+</resources>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Sentrek</string>
+    <string name="app_name" translatable="false">Sentrek</string>
     <string name="zoom_in">Zoom in</string>
     <string name="zoom_out">Zoom out</string>
     <string name="bar_maps">Maps</string>
@@ -383,4 +383,26 @@
     <string name="trail_card_less">Show less</string>
     <string name="record_line">Recorded %1$s · %2$s · ↑ %3$s</string>
     <string name="record_line_paused">Paused at %1$s · %2$s · ↑ %3$s</string>
+    <string name="kind_path">Path</string>
+    <string name="kind_track">Track</string>
+    <string name="kind_route">Route</string>
+    <string name="kind_river">River</string>
+    <string name="kind_stream">Stream</string>
+    <string name="kind_canal">Canal</string>
+    <string name="kind_ditch">Ditch</string>
+    <string name="kind_drain">Drain</string>
+    <string name="kind_lake">Lake</string>
+    <string name="kind_ford">Ford</string>
+    <string name="sac_hiking">Hiking</string>
+    <string name="sac_mountain_hiking">Mountain hiking</string>
+    <string name="sac_demanding_mountain_hiking">Demanding mountain hiking</string>
+    <string name="sac_alpine_hiking">Alpine hiking</string>
+    <string name="sac_demanding_alpine_hiking">Demanding alpine hiking</string>
+    <string name="sac_difficult_alpine_hiking">Difficult alpine hiking</string>
+    <string name="visibility_excellent">Excellent</string>
+    <string name="visibility_good">Good</string>
+    <string name="visibility_intermediate">Intermediate</string>
+    <string name="visibility_bad">Bad</string>
+    <string name="visibility_horrible">Horrible</string>
+    <string name="visibility_no">No</string>
 </resources>

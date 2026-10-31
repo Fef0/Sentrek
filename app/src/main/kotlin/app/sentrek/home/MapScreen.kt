@@ -1085,7 +1085,7 @@ private fun PressedSheet(
                 val p = info.position
                 onPlaceDraft(Place(
                     id = "",
-                    name = info.name ?: info.kind?.let(::humanize) ?: unnamedPlace,
+                    name = info.name ?: info.kind?.let { kindName(context, it) } ?: unnamedPlace,
                     kind = PlaceKind.guess(info.kind),
                     position = LatLon(p.latitude, p.longitude, info.tags["ele"]?.toDoubleOrNull()),
                 ))
@@ -1093,7 +1093,7 @@ private fun PressedSheet(
             onGoTo = {
                 onClose()
                 val p = info.position
-                val name = info.name ?: info.kind?.let(::humanize) ?: unnamedPlace
+                val name = info.name ?: info.kind?.let { kindName(context, it) } ?: unnamedPlace
                 startGoTo(GoTo(name, LatLon(p.latitude, p.longitude, info.tags["ele"]?.toDoubleOrNull())))
             },
             onDismiss = { onClose() },

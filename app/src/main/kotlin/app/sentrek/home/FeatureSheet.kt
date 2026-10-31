@@ -1,5 +1,7 @@
 package app.sentrek.home
 
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -69,7 +71,8 @@ fun FeatureSheet(
                 .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            val kind = info.kind?.let(::humanize)
+            val context = LocalContext.current
+            val kind = info.kind?.let { kindName(context, it) }
             // A route pressed off any path (on a road, say) is named after the route.
             val routeName = info.routes.firstOrNull()?.name?.takeIf { info.kind == "route" }
             Text(
@@ -90,12 +93,12 @@ fun FeatureSheet(
                         Fact(stringResource(R.string.feature_elevation), ele.toDoubleOrNull()?.let(Format::elevation) ?: "$ele m")
                     }
                     info.sacGrade?.let { grade ->
-                        val name = SacScale.entries.firstOrNull { it.grade == grade }?.osm?.let(::humanize)
+                        val name = SacScale.entries.firstOrNull { it.grade == grade }?.osm?.let { kindName(context, it) }
                         Fact(stringResource(R.string.feature_difficulty), listOfNotNull("T$grade", name).joinToString(" · "))
                     }
                     info.visibility?.takeIf { it > 0 }?.let { level ->
                         TrailVisibility.entries.firstOrNull { it.level == level }?.let {
-                            Fact(stringResource(R.string.feature_visibility), humanize(it.osm))
+                            Fact(stringResource(R.string.feature_visibility), kindName(context, it.osm))
                         }
                     }
                     // Only what the map data says: "intermittent" when tagged so, nothing otherwise
@@ -216,6 +219,36 @@ private fun Fact(label: String, value: String) {
 }
 
 /** "demanding_mountain_hiking" → "Demanding mountain hiking". OSM values aren't translated yet. */
+/** What a map feature is, in the app's language where it has a name of its own, else as OSM writes it. */
+fun kindName(context: Context, osm: String): String =
+    KIND_NAMES[osm]?.let(context::getString) ?: humanize(osm)
+
+/** Values Sentrek names itself in the app's language: paths, water, fords, SAC grades, trail visibility. */
+private val KIND_NAMES = mapOf(
+    "path" to R.string.kind_path,
+    "track" to R.string.kind_track,
+    "route" to R.string.kind_route,
+    "river" to R.string.kind_river,
+    "stream" to R.string.kind_stream,
+    "canal" to R.string.kind_canal,
+    "ditch" to R.string.kind_ditch,
+    "drain" to R.string.kind_drain,
+    "lake" to R.string.kind_lake,
+    "ford" to R.string.kind_ford,
+    "hiking" to R.string.sac_hiking,
+    "mountain_hiking" to R.string.sac_mountain_hiking,
+    "demanding_mountain_hiking" to R.string.sac_demanding_mountain_hiking,
+    "alpine_hiking" to R.string.sac_alpine_hiking,
+    "demanding_alpine_hiking" to R.string.sac_demanding_alpine_hiking,
+    "difficult_alpine_hiking" to R.string.sac_difficult_alpine_hiking,
+    "excellent" to R.string.visibility_excellent,
+    "good" to R.string.visibility_good,
+    "intermediate" to R.string.visibility_intermediate,
+    "bad" to R.string.visibility_bad,
+    "horrible" to R.string.visibility_horrible,
+    "no" to R.string.visibility_no,
+)
+
 fun humanize(osm: String): String =
     osm.replace('_', ' ').replaceFirstChar { it.titlecase(Locale.getDefault()) }
 

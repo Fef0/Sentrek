@@ -16,7 +16,7 @@ Repo: https://github.com/Fef0/Sentrek.git
 Builds:
   - versionName: 0.17.1
     versionCode: 231
-    commit: COMMIT
+    commit: a32f313a22d7ac27952fc807028ef93778e59c81
     subdir: app
     gradle:
       - yes
@@ -25,7 +25,7 @@ Builds:
 
   - versionName: 0.17.1
     versionCode: 232
-    commit: COMMIT
+    commit: a32f313a22d7ac27952fc807028ef93778e59c81
     subdir: app
     gradle:
       - yes
@@ -34,7 +34,7 @@ Builds:
 
   - versionName: 0.17.1
     versionCode: 234
-    commit: COMMIT
+    commit: a32f313a22d7ac27952fc807028ef93778e59c81
     subdir: app
     gradle:
       - yes

@@ -6,8 +6,13 @@ import app.sentrek.home.HomeViewModel
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
+import android.view.View
+import android.view.WindowInsets
+import android.view.WindowInsetsController
+import android.view.inspector.WindowInspector
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
@@ -295,8 +300,30 @@ class MainActivity : ComponentActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        // Dialogs and other apps can bring the bars back.
-        if (hasFocus && hideSystemBars) applySystemBars()
+        if (!hideSystemBars) return
+        // Other apps can bring the bars back; so can a dialog or sheet, which has a window of its own.
+        if (hasFocus) applySystemBars() else window.decorView.post(::hideBarsInDialogs)
+    }
+
+    /**
+     * Hides the bars in the app's other windows: dialogs and sheets would show them again, since
+     * each window has its own. Before Android 10 the app can't list its windows, so they show there.
+     */
+    private fun hideBarsInDialogs() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        for (view in WindowInspector.getGlobalWindowViews()) {
+            if (view === window.decorView || !view.isAttachedToWindow) continue
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                view.windowInsetsController?.run {
+                    systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    hide(WindowInsets.Type.systemBars())
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                view.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            }
+        }
     }
 
     override fun onStop() {

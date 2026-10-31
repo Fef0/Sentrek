@@ -407,7 +407,6 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
         }
     }
     val powerMode by viewModel.powerMode.collectAsStateWithLifecycle()
-    val gloveMode by viewModel.gloveMode.collectAsStateWithLifecycle()
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
@@ -422,7 +421,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 Text(stringResource(R.string.bar_settings), style = MaterialTheme.typography.headlineMedium)
             }
 
-            // First, and right here: out there, the two choices that matter most.
+            // First, and right here: on a long trip, the one choice that matters most.
             ChoiceRow(
                 title = stringResource(R.string.settings_battery),
                 options = listOf(
@@ -441,13 +440,6 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                         seconds(GpsTiming.Stamina.screenMs), seconds(GpsTiming.Stamina.followMs), seconds(GpsTiming.Stamina.recordMs),
                     )
                 },
-            )
-            // Not buried among the controls: with gloves on, nothing else works without it.
-            ToggleRow(
-                title = stringResource(R.string.settings_glove_mode),
-                hint = stringResource(R.string.settings_glove_mode_hint),
-                checked = gloveMode,
-                onChange = viewModel::setGloveMode,
             )
 
             // The rest a page each, a line under each saying what's in it: everything at a glance.
@@ -560,7 +552,14 @@ private fun ControlSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val autoHideControls by viewModel.autoHideControls.collectAsStateWithLifecycle()
     val confirmExit by viewModel.confirmExit.collectAsStateWithLifecycle()
     SettingsPage(stringResource(R.string.settings_controls), onBack) {
-        // Glove mode (on the main page) decides these two: greyed out until it's off.
+        // First: with gloves on, nothing else on this page works without it.
+        ToggleRow(
+            title = stringResource(R.string.settings_glove_mode),
+            hint = stringResource(R.string.settings_glove_mode_hint),
+            checked = gloveMode,
+            onChange = viewModel::setGloveMode,
+        )
+        // Glove mode decides these two: greyed out until it's off.
         ChoiceRow(
             enabled = !gloveMode,
             title = stringResource(R.string.settings_button_size),

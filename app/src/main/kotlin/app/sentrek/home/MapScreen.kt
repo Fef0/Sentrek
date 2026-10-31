@@ -22,6 +22,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
@@ -182,6 +183,9 @@ private const val RECORDING_REDRAW_MS = 5_000L
 /** How often the map tells the app where it is, while it keeps moving. */
 private const val CAMERA_REPORT_MS = 2_000L
 
+/** From here in, trails and their details are on the map: the zoom where a missing download shows. */
+private const val DETAILS_ZOOM = 12.0
+
 /** How long "hold the lock to unlock" stays after a touch on a locked screen. */
 private const val LOCK_HINT_MS = 2_500L
 
@@ -193,6 +197,8 @@ fun MapScreen(
     camera: CameraPosition,
     onCameraChange: (CameraPosition) -> Unit,
     onOpenMaps: () -> Unit,
+    /** Opens Maps with the area around this point selected. */
+    onDownloadArea: (LatLon) -> Unit,
     onOpenTracks: () -> Unit,
     onOpenPlaces: () -> Unit,
     onOpenSearch: () -> Unit,
@@ -528,10 +534,19 @@ fun MapScreen(
                 // Top left, under any panel. It stays when the other controls fade out.
                 if (showScaleBar) ScaleBar(metersPerPx, night = LocalNightMap.current)
                 if (slopeTerrain != null && zoom >= MapSlopes.MIN_ZOOM) SlopeLegend()
-                // A reminder, not a block: the map still moves and answers taps, it just has
-                // nothing to draw here until the area is downloaded or the network is back.
-                if (!online && centreCell?.let { it !in downloadedCells } == true) {
-                    MapNote(stringResource(R.string.offline_area), SentrekIcons.CloudOff)
+                // Not downloaded: offline the map has nothing to draw here; online it draws, but
+                // without trail difficulty, marked routes, springs and hut details, and nothing
+                // else would say so. Only zoomed in to the trails, where those are looked for.
+                // A tap opens Maps with this area selected.
+                centreCell?.takeIf { it !in downloadedCells && (!online || zoom >= DETAILS_ZOOM) }?.let { cell ->
+                    val centre = cell.bbox.let { LatLon((it.south + it.north) / 2, (it.west + it.east) / 2) }
+                    MapNote(
+                        stringResource(if (online) R.string.area_not_downloaded else R.string.offline_area),
+                        if (online) SentrekIcons.Download else SentrekIcons.CloudOff,
+                        Modifier
+                            .heightIn(min = TouchTarget)
+                            .clickable(onClickLabel = stringResource(R.string.area_download)) { onDownloadArea(centre) },
+                    )
                 }
                 // No signal: where the last one was, a tap away from "take me there".
                 lastSignal?.let { spot ->
@@ -910,6 +925,8 @@ fun MapScreen(
                 withLocation(AfterPermission.FollowRoute) { viewModel.followTrack(track); routeToFollow = null }
             },
             onConfirm = { confirm = it },
+            downloaded = RegionGrid.cellAt(LatLon(info.position.latitude, info.position.longitude)) in downloadedCells,
+            onDownloadArea = { pressed = null; onDownloadArea(LatLon(info.position.latitude, info.position.longitude)) },
         )
     }
 
@@ -1041,6 +1058,8 @@ private fun PressedSheet(
     startGoTo: (GoTo) -> Unit,
     followRoute: (SavedTrack) -> Unit,
     onConfirm: (Confirmation) -> Unit,
+    downloaded: Boolean,
+    onDownloadArea: () -> Unit,
 ) {
     val context = LocalContext.current
     val unnamedPlace = stringResource(RecordR.string.places_unnamed)
@@ -1082,6 +1101,8 @@ private fun PressedSheet(
                 val p = info.position
                 viewModel.weatherAt(LatLon(p.latitude, p.longitude, info.tags["ele"]?.toDoubleOrNull()))
             },
+            downloaded = downloaded,
+            onDownload = onDownloadArea,
         )
     } else {
         TrackSheet(

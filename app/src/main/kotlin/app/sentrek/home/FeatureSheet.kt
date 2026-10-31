@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -17,6 +18,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -50,6 +52,9 @@ fun FeatureSheet(
     onGoTo: () -> Unit,
     onDismiss: () -> Unit,
     loadWeather: suspend () -> WeatherResult,
+    /** In a downloaded area; otherwise a note says what's missing, with a way to download it. */
+    downloaded: Boolean = true,
+    onDownload: () -> Unit = {},
 ) {
     val uriHandler = LocalUriHandler.current
     ModalBottomSheet(
@@ -75,6 +80,7 @@ fun FeatureSheet(
             if (info.name != null && kind != null) {
                 Text(kind, style = MaterialTheme.typography.titleMedium)
             }
+            if (!downloaded) NotDownloadedNote(onDownload)
 
             SelectionContainer {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -204,3 +210,16 @@ private fun Fact(label: String, value: String) {
 /** "demanding_mountain_hiking" → "Demanding mountain hiking". OSM values aren't translated yet. */
 fun humanize(osm: String): String =
     osm.replace('_', ' ').replaceFirstChar { it.titlecase(Locale.getDefault()) }
+
+/** Said where the details are looked for: without the area, some of them can't be shown. */
+@Composable
+private fun NotDownloadedNote(onDownload: () -> Unit) {
+    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.feature_not_downloaded), style = MaterialTheme.typography.bodyMedium)
+            OutlinedButton(onClick = onDownload, modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget)) {
+                Text(stringResource(R.string.area_download))
+            }
+        }
+    }
+}

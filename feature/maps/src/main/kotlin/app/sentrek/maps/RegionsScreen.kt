@@ -75,6 +75,8 @@ import kotlin.math.roundToInt
 fun RegionsScreen(
     initialCamera: CameraPosition?,
     onBack: () -> Unit,
+    /** Opened from a "not downloaded" note: the area here comes up selected, ready to download. */
+    select: LatLon? = null,
     viewModel: RegionsViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -117,6 +119,15 @@ fun RegionsScreen(
                 style = s
             },
         )
+
+        LaunchedEffect(map, select) {
+            val m = map ?: return@LaunchedEffect
+            val cell = RegionGrid.cellAt(select ?: return@LaunchedEffect)
+            if (cell !in selection && cell !in regions) viewModel.toggle(cell)
+            val box = cell.bbox
+            m.cameraPosition = CameraUpdateFactory.newLatLngBounds(LatLngBounds.from(box.north, box.east, box.south, box.west), SELECT_PADDING_PX)
+                .getCameraPosition(m) ?: return@LaunchedEffect
+        }
 
         DisposableEffect(map) {
             val m = map ?: return@DisposableEffect onDispose {}
@@ -505,3 +516,6 @@ private fun DownloadProgress(states: Collection<RegionState>) {
         }
     }
 }
+
+/** Room around the area opened from a note, so the squares next to it show too. */
+private const val SELECT_PADDING_PX = 160

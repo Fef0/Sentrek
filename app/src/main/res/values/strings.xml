@@ -100,6 +100,9 @@
     <string name="follow_you_are_here">You are here</string>
     <string name="record_back_to_start">Back to start</string>
     <string name="offline_area">Offline · area not downloaded</string>
+    <string name="area_not_downloaded">Area not downloaded · fewer trail details</string>
+    <string name="area_download">Download this area</string>
+    <string name="feature_not_downloaded">This area isn’t downloaded, so some details are missing here: trail difficulty, marked routes, springs and huts.</string>
     <string name="sun_dark_before_arrival">Sunset %1$s · arrival ≈ %2$s</string>
     <string name="sun_sunset_in">Sunset %1$s · in %2$s</string>
     <string name="sun_sunset">Sunset %s</string>

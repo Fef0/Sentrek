@@ -46,6 +46,9 @@ object MapFeatures {
     /** Base style layers with points worth describing (hiking.json). */
     private val BASE_POINT_LAYERS = setOf("poi-hiking", "poi-landmarks", "poi-detail", "peak")
 
+    /** Base style layers with the paths and tracks (hiking.json). */
+    private val BASE_PATH_LAYERS = listOf("path", "track")
+
     /** Base tile properties that only drive the rendering. */
     private val BASE_HIDDEN = setOf("rank", "class", "subclass", "agg_stop", "level", "indoor", "layer", "ele_ft", "c", "track")
 
@@ -72,7 +75,7 @@ object MapFeatures {
         val trailLayers = layerIds.filter(MapOverlays::isTrailLayer)
         val trail = trailLayers.takeIf { it.isNotEmpty() }
             ?.let { map.queryRenderedFeatures(near, *it.toTypedArray()).firstOrNull() }
-        if (trail == null && routes.isEmpty()) return null
+        if (trail == null && routes.isEmpty()) return basePath(map, near, at, layerIds)
         val props = trail?.let(::properties).orEmpty()
         return MapFeatureInfo(
             name = null,
@@ -83,6 +86,16 @@ object MapFeatures {
             visibility = props["v"]?.toIntOrNull(),
             routes = routes,
         )
+    }
+
+    /**
+     * A path or track of the base map: all there is where the area isn't downloaded. Its card
+     * then says what's missing and how to get it, instead of the press offering a new place.
+     */
+    private fun basePath(map: MapLibreMap, box: RectF, at: LatLng, layerIds: List<String>): MapFeatureInfo? {
+        val layers = BASE_PATH_LAYERS.filter { it in layerIds }.takeIf { it.isNotEmpty() } ?: return null
+        val path = map.queryRenderedFeatures(box, *layers.toTypedArray()).firstOrNull() ?: return null
+        return MapFeatureInfo(name = null, kind = path.getStringProperty("class") ?: "path", position = at, osmId = null)
     }
 
     private fun routes(map: MapLibreMap, box: RectF, layers: List<String>): List<MapRoute> {

@@ -5,8 +5,14 @@ import android.graphics.RectF
 import app.sentrek.geo.overlay.OverpassOverlay
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.style.sources.VectorSource
 import org.maplibre.geojson.Feature
+import org.maplibre.geojson.LineString
+import org.maplibre.geojson.MultiLineString
+import org.maplibre.geojson.MultiPolygon
 import org.maplibre.geojson.Point
+import org.maplibre.geojson.Polygon
+import kotlin.math.hypot
 
 /**
  * What the user long-pressed. [kind] is the OSM value of what it is ("alpine_hut", "peak"…),
@@ -28,7 +34,14 @@ data class MapFeatureInfo(
     val placeId: String? = null,
     /** Waymarked routes running here (hiking overlay only), most important first. */
     val routes: List<MapRoute> = emptyList(),
-)
+    /** Rivers, streams and lakes: whether the map data tags them intermittent. Null for anything else. */
+    val intermittent: Boolean? = null,
+    /** A path or track that crosses water without a bridge here. */
+    val ford: Boolean = false,
+) {
+    /** A river, stream or lake rather than a trail or a point. */
+    val isWater: Boolean get() = intermittent != null
+}
 
 /** A waymarked route under a long press; [facts] are its OSM tags (from, to, distance…). */
 data class MapRoute(
@@ -45,6 +58,21 @@ data class MapRoute(
 object MapFeatures {
     /** Base style layers with points worth describing (hiking.json). */
     private val BASE_POINT_LAYERS = setOf("poi-hiking", "poi-landmarks", "poi-detail", "peak")
+
+    /** Base style layers with the paths and tracks (hiking.json). */
+    private val BASE_PATH_LAYERS = listOf("path", "track")
+    private const val FORD_LAYER = "path-ford"
+
+    /** Base style: rivers and streams, lakes, and the source with the lakes' names (hiking.json). */
+    private const val WATERWAY_LAYER = "waterway"
+    private const val WATER_LAYER = "water"
+    private const val BASE_SOURCE = "openmaptiles"
+    private const val WATER_NAME_LAYER = "water_name"
+    private const val PATH_NAME_LAYER = "transportation_name"
+    private val PATH_KINDS = setOf("path", "track")
+
+    /** How far a path's label line may stray from the path itself (z14 tiles, simplified). */
+    private const val NAME_REACH_M = 15.0
 
     /** Base tile properties that only drive the rendering. */
     private val BASE_HIDDEN = setOf("rank", "class", "subclass", "agg_stop", "level", "indoor", "layer", "ele_ft", "c", "track")
@@ -72,17 +100,172 @@ object MapFeatures {
         val trailLayers = layerIds.filter(MapOverlays::isTrailLayer)
         val trail = trailLayers.takeIf { it.isNotEmpty() }
             ?.let { map.queryRenderedFeatures(near, *it.toTypedArray()).firstOrNull() }
-        if (trail == null && routes.isEmpty()) return null
+        if (trail == null && routes.isEmpty()) {
+            // Squarely on a path or on water first: a stream beside a path, or under it, is
+            // pressed for itself.
+            val found = basePath(map, exact, near, at, layerIds) ?: ford(map, exact, at, layerIds) ?: water(map, exact, near, at, layerIds)
+                ?: basePath(map, near, near, at, layerIds) ?: ford(map, near, at, layerIds) ?: water(map, near, near, at, layerIds)
+            return found?.let { if (it.kind in PATH_KINDS) it.copy(name = pathName(map, screen, radiusPx)) else it }
+        }
         val props = trail?.let(::properties).orEmpty()
         return MapFeatureInfo(
-            name = null,
+            // The hiking overlay has no names: the base map's, as drawn along the path.
+            name = if (trail != null) pathName(map, screen, radiusPx) else null,
             kind = if (trail != null) "path" else "route",
             position = at,
             osmId = props["id"],
             sacGrade = props["s"]?.toIntOrNull(),
             visibility = props["v"]?.toIntOrNull(),
             routes = routes,
+            // Fords come with the base map, not the hiking overlay: looked up underneath.
+            ford = trail != null && baseFord(map, near, layerIds),
         )
+    }
+
+    /**
+     * A path or track of the base map: all there is where the area isn't downloaded. Its card
+     * then says what's missing and how to get it, instead of the press offering a new place.
+     */
+    private fun basePath(map: MapLibreMap, box: RectF, near: RectF, at: LatLng, layerIds: List<String>): MapFeatureInfo? {
+        val layers = BASE_PATH_LAYERS.filter { it in layerIds }.takeIf { it.isNotEmpty() } ?: return null
+        val path = map.queryRenderedFeatures(box, *layers.toTypedArray()).firstOrNull() ?: return null
+        return MapFeatureInfo(
+            name = null,
+            kind = path.getStringProperty("class") ?: "path",
+            position = at,
+            osmId = null,
+            ford = baseFord(map, near, layerIds),
+        )
+    }
+
+    /**
+     * The name of the path or track under [screen], as the base map labels it: names are in
+     * their own tile layer, apart from the lines, and drawn along a simplified copy of them, a
+     * few metres off at close zoom. The nearest named line within [radiusPx], or [NAME_REACH_M].
+     */
+    private fun pathName(map: MapLibreMap, screen: PointF, radiusPx: Float): String? {
+        val source = map.style?.getSourceAs<VectorSource>(BASE_SOURCE) ?: return null
+        val lat = map.projection.fromScreenLocation(screen).latitude
+        val reachPx = (NAME_REACH_M / map.projection.getMetersPerPixelAtLatitude(lat)).toFloat()
+        var best: String? = null
+        var bestPx = maxOf(radiusPx, reachPx)
+        for (line in source.querySourceFeatures(arrayOf(PATH_NAME_LAYER), null)) {
+            val p = properties(line)
+            val name = p["name"] ?: continue
+            if (p["class"] !in PATH_KINDS) continue
+            val parts = when (val g = line.geometry()) {
+                is LineString -> listOf(g.coordinates())
+                is MultiLineString -> g.coordinates()
+                else -> continue
+            }
+            for (part in parts) {
+                val pts = part.map { map.projection.toScreenLocation(LatLng(it.latitude(), it.longitude())) }
+                for (i in 1 until pts.size) {
+                    val d = segmentDistance(screen, pts[i - 1], pts[i])
+                    if (d < bestPx) {
+                        bestPx = d
+                        best = name
+                    }
+                }
+            }
+        }
+        return best
+    }
+
+    private fun segmentDistance(p: PointF, a: PointF, b: PointF): Float {
+        val dx = b.x - a.x
+        val dy = b.y - a.y
+        val len = dx * dx + dy * dy
+        val t = if (len == 0f) 0f else (((p.x - a.x) * dx + (p.y - a.y) * dy) / len).coerceIn(0f, 1f)
+        return hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
+    }
+
+    /** A ford's icon itself, on a road too (roads aren't pressable otherwise). */
+    private fun ford(map: MapLibreMap, box: RectF, at: LatLng, layerIds: List<String>): MapFeatureInfo? =
+        if (baseFord(map, box, layerIds)) MapFeatureInfo(name = null, kind = "ford", position = at, osmId = null, ford = true) else null
+
+    /** A ford's icon within reach: the path crosses water there (the icon marks each ford once). */
+    private fun baseFord(map: MapLibreMap, box: RectF, layerIds: List<String>): Boolean =
+        FORD_LAYER in layerIds && map.queryRenderedFeatures(box, FORD_LAYER).isNotEmpty()
+
+    /**
+     * A river or stream (its line), else a lake (its area). A lake's name isn't on its area
+     * but on a label point of its own: the one that falls inside it.
+     */
+    private fun water(map: MapLibreMap, box: RectF, near: RectF, at: LatLng, layerIds: List<String>): MapFeatureInfo? {
+        if (WATERWAY_LAYER in layerIds) {
+            map.queryRenderedFeatures(box, WATERWAY_LAYER).firstOrNull()?.let { line ->
+                val p = properties(line)
+                return MapFeatureInfo(
+                    name = p["name"],
+                    kind = p["class"] ?: "stream",
+                    position = at,
+                    osmId = null,
+                    intermittent = p["intermittent"] == "1",
+                )
+            }
+        }
+        if (WATER_LAYER !in layerIds) return null
+        val area = map.queryRenderedFeatures(box, WATER_LAYER).firstOrNull() ?: return null
+        val p = properties(area)
+        // The sea is no place to hike to.
+        if (p["class"] == "ocean") return null
+        // A wide river's area has no label of its own: its name is on the line along it.
+        val riverName = if (p["class"] == "river" && WATERWAY_LAYER in layerIds) {
+            map.queryRenderedFeatures(near, WATERWAY_LAYER).firstNotNullOfOrNull { properties(it)["name"] }
+        } else {
+            null
+        }
+        return MapFeatureInfo(
+            name = riverName ?: waterName(map, area),
+            kind = p["class"] ?: "lake",
+            position = at,
+            osmId = null,
+            intermittent = p["intermittent"] == "1",
+        )
+    }
+
+    private fun waterName(map: MapLibreMap, area: Feature): String? {
+        val source = map.style?.getSourceAs<VectorSource>(BASE_SOURCE) ?: return null
+        // A lake is cut along the tile edges: all its pieces on screen, by its OSM id.
+        val id = properties(area)["id"]
+        val region = map.projection.visibleRegion
+        val corner = region.farRight?.let(map.projection::toScreenLocation)
+        val bottom = region.nearLeft?.let(map.projection::toScreenLocation)
+        val pieces = if (id != null && corner != null && bottom != null) {
+            map.queryRenderedFeatures(RectF(0f, 0f, corner.x, bottom.y), WATER_LAYER).filter { properties(it)["id"] == id }
+        } else {
+            emptyList()
+        }.ifEmpty { listOf(area) }
+        return source.querySourceFeatures(arrayOf(WATER_NAME_LAYER), null)
+            .firstOrNull { label -> (label.geometry() as? Point)?.let { p -> pieces.any { inside(p, it) } } == true }
+            ?.let { properties(it)["name"] }
+    }
+
+    private fun inside(p: Point, area: Feature): Boolean = when (val g = area.geometry()) {
+        is Polygon -> inside(p, g.coordinates())
+        is MultiPolygon -> g.coordinates().any { inside(p, it) }
+        else -> false
+    }
+
+    /** In the outer ring and out of the holes (an island in the lake). */
+    private fun inside(p: Point, rings: List<List<Point>>): Boolean =
+        rings.isNotEmpty() && inRing(p, rings[0]) && rings.drop(1).none { inRing(p, it) }
+
+    private fun inRing(p: Point, ring: List<Point>): Boolean {
+        var inside = false
+        var j = ring.lastIndex
+        for (i in ring.indices) {
+            val a = ring[i]
+            val b = ring[j]
+            if ((a.latitude() > p.latitude()) != (b.latitude() > p.latitude()) &&
+                p.longitude() < (b.longitude() - a.longitude()) * (p.latitude() - a.latitude()) / (b.latitude() - a.latitude()) + a.longitude()
+            ) {
+                inside = !inside
+            }
+            j = i
+        }
+        return inside
     }
 
     private fun routes(map: MapLibreMap, box: RectF, layers: List<String>): List<MapRoute> {

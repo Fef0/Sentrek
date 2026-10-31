@@ -595,6 +595,27 @@
    }
   },
   {
+   "id": "path-ford",
+   "type": "symbol",
+   "source": "openmaptiles",
+   "source-layer": "transportation",
+   "filter": [
+    "==",
+    [
+     "get",
+     "brunnel"
+    ],
+    "ford"
+   ],
+   "minzoom": 13,
+   "layout": {
+    "symbol-placement": "line-center",
+    "icon-image": "poi-ford",
+    "icon-rotation-alignment": "viewport",
+    "icon-allow-overlap": true
+   }
+  },
+  {
    "id": "path-name",
    "type": "symbol",
    "source": "openmaptiles",

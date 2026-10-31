@@ -188,6 +188,8 @@ class MainActivity : ComponentActivity() {
                     val planner: PlannerViewModel = hiltViewModel()
                     val scope = rememberCoroutineScope()
                     val toMap = { screen = Screen.Map }
+                    // The area a "not downloaded" note asked for, selected when Maps opens.
+                    var downloadAt by remember { mutableStateOf<LatLon?>(null) }
                     SideEffect { volumeKeysZoom = (gloves || volumeZoom) && screen == Screen.Map }
 
                     val importedBounds by imported.collectAsStateWithLifecycle()
@@ -219,7 +221,8 @@ class MainActivity : ComponentActivity() {
                                         camera = it
                                         cameraToSave.value = it
                                     },
-                                    onOpenMaps = { screen = Screen.Maps },
+                                    onOpenMaps = { downloadAt = null; screen = Screen.Maps },
+                                    onDownloadArea = { downloadAt = it; screen = Screen.Maps },
                                     onOpenTracks = { screen = Screen.Tracks },
                                     onOpenPlaces = { screen = Screen.Places },
                                     onOpenSearch = { screen = Screen.Search },
@@ -239,7 +242,7 @@ class MainActivity : ComponentActivity() {
                             pages.SaveableStateProvider(screen.name) {
                             when (screen) {
                                 Screen.Map -> Unit
-                                Screen.Maps -> RegionsScreen(initialCamera = shownCamera, onBack = toMap)
+                                Screen.Maps -> RegionsScreen(initialCamera = shownCamera, onBack = toMap, select = downloadAt)
                                 Screen.Tracks -> TracksScreen(
                                     onBack = toMap,
                                     onShowOnMap = { box -> focus = box; screen = Screen.Map },

@@ -38,6 +38,7 @@ object MapIcons {
         "spring" to (R.drawable.poi_spring to Group.Water),
         "drinking_water" to (R.drawable.poi_drinking_water to Group.Water),
         "waterfall" to (R.drawable.poi_waterfall to Group.Water),
+        "ford" to (R.drawable.poi_ford to Group.Water),
         "cave" to (R.drawable.poi_cave to Group.Nature),
         "viewpoint" to (R.drawable.poi_viewpoint to Group.Nature),
         "peak" to (R.drawable.poi_peak to Group.Nature),

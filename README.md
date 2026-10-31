@@ -90,7 +90,7 @@ There's no tracking or analytics of any kind.
 
 You need Android 7.0 or newer.
 
-Download the APK from the [Releases](../../releases) page. The `arm64` file is the right one for nearly every phone. If it doesn't install, use the `universal` one, which is bigger but works on any device.
+Download the APK from the [Releases](../../releases) page. The `arm64` file is the right one for nearly every phone, and `armv7` is for older 32-bit phones. If neither installs, use the `universal` one, which is bigger but works on any device.
 
 ## Building
 

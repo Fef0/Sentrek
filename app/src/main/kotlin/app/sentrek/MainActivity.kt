@@ -123,13 +123,14 @@ class MainActivity : ComponentActivity() {
         setContent {
             val textSize by settings.textSize.collectAsStateWithLifecycle(initialValue = TextSize.Default)
             val buttonSize by settings.buttonSize.collectAsStateWithLifecycle(initialValue = ButtonSize.Standard)
+            val gloves by settings.gloveMode.collectAsStateWithLifecycle(initialValue = false)
             val volumeZoom by settings.volumeKeysZoom.collectAsStateWithLifecycle(initialValue = false)
             val theme by settings.theme.collectAsStateWithLifecycle(initialValue = AppTheme.System)
             val fullScreen by settings.fullScreen.collectAsStateWithLifecycle(initialValue = false)
             val mapTheme by settings.mapTheme.collectAsStateWithLifecycle(initialValue = MapTheme.Day)
             val confirmExit by settings.confirmExit.collectAsStateWithLifecycle(initialValue = true)
             val power by settings.powerMode.collectAsStateWithLifecycle(initialValue = PowerMode.Normal)
-            val chosenFps by settings.mapMaxFps.collectAsStateWithLifecycle(initialValue = 60)
+            val chosenFps by settings.mapMaxFps.collectAsStateWithLifecycle(initialValue = 0)
             val mapFps = power.mapFps(chosenFps)
             // Stamina mode: downloaded maps only, so the radio isn't woken for tiles.
             LaunchedEffect(power) {
@@ -162,10 +163,11 @@ class MainActivity : ComponentActivity() {
                 SentrekTheme(
                     darkTheme = dark,
                     black = power.blackScreens || theme == AppTheme.Black,
-                    touch = when (buttonSize) {
-                        ButtonSize.Standard -> Touch.Standard
-                        ButtonSize.Large -> Touch.Large
-                        ButtonSize.Gloves -> Touch.Gloves
+                    touch = when {
+                        gloves -> Touch.Gloves
+                        buttonSize == ButtonSize.Large -> Touch.Large
+                        buttonSize == ButtonSize.Largest -> Touch.Largest
+                        else -> Touch.Standard
                     },
                     textScale = textSize.scale,
                 ) {
@@ -181,7 +183,7 @@ class MainActivity : ComponentActivity() {
                     val planner: PlannerViewModel = hiltViewModel()
                     val scope = rememberCoroutineScope()
                     val toMap = { screen = Screen.Map }
-                    SideEffect { volumeKeysZoom = volumeZoom && screen == Screen.Map }
+                    SideEffect { volumeKeysZoom = (gloves || volumeZoom) && screen == Screen.Map }
 
                     val importedBounds by imported.collectAsStateWithLifecycle()
                     LaunchedEffect(importedBounds) {

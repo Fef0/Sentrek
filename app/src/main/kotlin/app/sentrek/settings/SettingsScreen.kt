@@ -228,6 +228,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setEmergencySms(on) }
     }
 
+    val gloveMode: StateFlow<Boolean> =
+        settings.gloveMode.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setGloveMode(on: Boolean) {
+        viewModelScope.launch { settings.setGloveMode(on) }
+    }
+
     val volumeKeysZoom: StateFlow<Boolean> =
         settings.volumeKeysZoom.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
@@ -316,7 +323,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     val mapMaxFps: StateFlow<Int> =
-        settings.mapMaxFps.stateIn(viewModelScope, SharingStarted.Eagerly, 60)
+        settings.mapMaxFps.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
     fun setMapMaxFps(fps: Int) {
         viewModelScope.launch { settings.setMapMaxFps(fps) }
@@ -400,6 +407,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
         }
     }
     val powerMode by viewModel.powerMode.collectAsStateWithLifecycle()
+    val gloveMode by viewModel.gloveMode.collectAsStateWithLifecycle()
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
@@ -414,7 +422,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 Text(stringResource(R.string.bar_settings), style = MaterialTheme.typography.headlineMedium)
             }
 
-            // First, and right here: on a long trip, the one choice that matters most.
+            // First, and right here: out there, the two choices that matter most.
             ChoiceRow(
                 title = stringResource(R.string.settings_battery),
                 options = listOf(
@@ -433,6 +441,13 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                         seconds(GpsTiming.Stamina.screenMs), seconds(GpsTiming.Stamina.followMs), seconds(GpsTiming.Stamina.recordMs),
                     )
                 },
+            )
+            // Not buried among the controls: with gloves on, nothing else works without it.
+            ToggleRow(
+                title = stringResource(R.string.settings_glove_mode),
+                hint = stringResource(R.string.settings_glove_mode_hint),
+                checked = gloveMode,
+                onChange = viewModel::setGloveMode,
             )
 
             // The rest a page each, a line under each saying what's in it: everything at a glance.
@@ -539,26 +554,30 @@ private fun MapSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
 @Composable
 private fun ControlSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val buttonSize by viewModel.buttonSize.collectAsStateWithLifecycle()
+    val gloveMode by viewModel.gloveMode.collectAsStateWithLifecycle()
     val volumeKeysZoom by viewModel.volumeKeysZoom.collectAsStateWithLifecycle()
     val showLockButton by viewModel.showLockButton.collectAsStateWithLifecycle()
     val autoHideControls by viewModel.autoHideControls.collectAsStateWithLifecycle()
     val confirmExit by viewModel.confirmExit.collectAsStateWithLifecycle()
     SettingsPage(stringResource(R.string.settings_controls), onBack) {
+        // Glove mode (on the main page) decides these two: greyed out until it's off.
         ChoiceRow(
+            enabled = !gloveMode,
             title = stringResource(R.string.settings_button_size),
-            hint = stringResource(if (buttonSize == ButtonSize.Gloves) R.string.settings_button_size_gloves else R.string.settings_button_size_hint),
+            hint = stringResource(if (gloveMode) R.string.settings_button_size_gloves else R.string.settings_button_size_hint),
             options = listOf(
                 ButtonSize.Standard to stringResource(R.string.settings_size_standard),
                 ButtonSize.Large to stringResource(R.string.settings_size_large),
-                ButtonSize.Gloves to stringResource(R.string.settings_size_gloves),
+                ButtonSize.Largest to stringResource(R.string.settings_size_largest),
             ),
             selected = buttonSize,
             onChange = viewModel::setButtonSize,
         )
         ToggleRow(
+            enabled = !gloveMode,
             title = stringResource(R.string.settings_volume_zoom),
-            hint = stringResource(R.string.settings_volume_zoom_hint),
-            checked = volumeKeysZoom,
+            hint = stringResource(if (gloveMode) R.string.settings_volume_zoom_gloves else R.string.settings_volume_zoom_hint),
+            checked = gloveMode || volumeKeysZoom,
             onChange = viewModel::setVolumeKeysZoom,
         )
         ToggleRow(

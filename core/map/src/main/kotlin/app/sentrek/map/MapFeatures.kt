@@ -7,9 +7,12 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.style.sources.VectorSource
 import org.maplibre.geojson.Feature
+import org.maplibre.geojson.LineString
+import org.maplibre.geojson.MultiLineString
 import org.maplibre.geojson.MultiPolygon
 import org.maplibre.geojson.Point
 import org.maplibre.geojson.Polygon
+import kotlin.math.hypot
 
 /**
  * What the user long-pressed. [kind] is the OSM value of what it is ("alpine_hut", "peak"…),
@@ -65,6 +68,11 @@ object MapFeatures {
     private const val WATER_LAYER = "water"
     private const val BASE_SOURCE = "openmaptiles"
     private const val WATER_NAME_LAYER = "water_name"
+    private const val PATH_NAME_LAYER = "transportation_name"
+    private val PATH_KINDS = setOf("path", "track")
+
+    /** How far a path's label line may stray from the path itself (z14 tiles, simplified). */
+    private const val NAME_REACH_M = 15.0
 
     /** Base tile properties that only drive the rendering. */
     private val BASE_HIDDEN = setOf("rank", "class", "subclass", "agg_stop", "level", "indoor", "layer", "ele_ft", "c", "track")
@@ -95,12 +103,14 @@ object MapFeatures {
         if (trail == null && routes.isEmpty()) {
             // Squarely on a path or on water first: a stream beside a path, or under it, is
             // pressed for itself.
-            return basePath(map, exact, near, at, layerIds) ?: ford(map, exact, at, layerIds) ?: water(map, exact, near, at, layerIds)
+            val found = basePath(map, exact, near, at, layerIds) ?: ford(map, exact, at, layerIds) ?: water(map, exact, near, at, layerIds)
                 ?: basePath(map, near, near, at, layerIds) ?: ford(map, near, at, layerIds) ?: water(map, near, near, at, layerIds)
+            return found?.let { if (it.kind in PATH_KINDS) it.copy(name = pathName(map, screen, radiusPx)) else it }
         }
         val props = trail?.let(::properties).orEmpty()
         return MapFeatureInfo(
-            name = null,
+            // The hiking overlay has no names: the base map's, as drawn along the path.
+            name = if (trail != null) pathName(map, screen, radiusPx) else null,
             kind = if (trail != null) "path" else "route",
             position = at,
             osmId = props["id"],
@@ -126,6 +136,48 @@ object MapFeatures {
             osmId = null,
             ford = baseFord(map, near, layerIds),
         )
+    }
+
+    /**
+     * The name of the path or track under [screen], as the base map labels it: names are in
+     * their own tile layer, apart from the lines, and drawn along a simplified copy of them, a
+     * few metres off at close zoom. The nearest named line within [radiusPx], or [NAME_REACH_M].
+     */
+    private fun pathName(map: MapLibreMap, screen: PointF, radiusPx: Float): String? {
+        val source = map.style?.getSourceAs<VectorSource>(BASE_SOURCE) ?: return null
+        val lat = map.projection.fromScreenLocation(screen).latitude
+        val reachPx = (NAME_REACH_M / map.projection.getMetersPerPixelAtLatitude(lat)).toFloat()
+        var best: String? = null
+        var bestPx = maxOf(radiusPx, reachPx)
+        for (line in source.querySourceFeatures(arrayOf(PATH_NAME_LAYER), null)) {
+            val p = properties(line)
+            val name = p["name"] ?: continue
+            if (p["class"] !in PATH_KINDS) continue
+            val parts = when (val g = line.geometry()) {
+                is LineString -> listOf(g.coordinates())
+                is MultiLineString -> g.coordinates()
+                else -> continue
+            }
+            for (part in parts) {
+                val pts = part.map { map.projection.toScreenLocation(LatLng(it.latitude(), it.longitude())) }
+                for (i in 1 until pts.size) {
+                    val d = segmentDistance(screen, pts[i - 1], pts[i])
+                    if (d < bestPx) {
+                        bestPx = d
+                        best = name
+                    }
+                }
+            }
+        }
+        return best
+    }
+
+    private fun segmentDistance(p: PointF, a: PointF, b: PointF): Float {
+        val dx = b.x - a.x
+        val dy = b.y - a.y
+        val len = dx * dx + dy * dy
+        val t = if (len == 0f) 0f else (((p.x - a.x) * dx + (p.y - a.y) * dy) / len).coerceIn(0f, 1f)
+        return hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
     }
 
     /** A ford's icon itself, on a road too (roads aren't pressable otherwise). */

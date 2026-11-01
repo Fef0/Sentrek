@@ -38,7 +38,7 @@ class LocationRepository @Inject constructor(@ApplicationContext private val con
      * requests at once, Android serves them all at the fastest rate asked.
      */
     @SuppressLint("MissingPermission")
-    fun locations(intervalMs: Long = INTERVAL_MS): Flow<Location> = callbackFlow {
+    fun locations(intervalMs: Long = INTERVAL_MS, batchMs: Long = 0): Flow<Location> = callbackFlow {
         if (!hasPermission() || manager == null) {
             close()
             return@callbackFlow
@@ -46,6 +46,9 @@ class LocationRepository @Inject constructor(@ApplicationContext private val con
         val listener = LocationListenerCompat { trySend(it) }
         val request = LocationRequestCompat.Builder(intervalMs)
             .setQuality(LocationRequestCompat.QUALITY_HIGH_ACCURACY)
+            // Fixes may come in batches up to this late (Android 12+, where the GPS can keep
+            // them): the phone sleeps in between instead of waking for each one.
+            .setMaxUpdateDelayMillis(batchMs)
             .build()
         manager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
             ?.takeIf { System.currentTimeMillis() - it.time < STALE_MS }

@@ -1015,7 +1015,7 @@ fun MapScreen(
         )
     }
 
-    MapLayerEffects(viewModel, planner, map, style, planPreview, handleReach, goTo, lastFixForSun?.let { LatLon(it.latitude, it.longitude) })
+    MapLayerEffects(viewModel, planner, map, style, planPreview, handleReach, goTo, lastFixForSun?.let { LatLon(it.latitude, it.longitude) }, visible)
 
     if (askPlanName) {
         TrackNameDialog(
@@ -1178,6 +1178,8 @@ private fun MapLayerEffects(
     goTo: GoTo?,
     /** The last position known. */
     here: LatLon?,
+    /** False under another screen: the recording isn't drawn until the map shows again. */
+    visible: Boolean,
 ) {
     val context = LocalContext.current
     val overlays by viewModel.overlays.collectAsStateWithLifecycle()
@@ -1259,10 +1261,11 @@ private fun MapLayerEffects(
     LaunchedEffect(style, shownTracks, editedId) {
         style?.let { TrackLayers.syncShown(it, shownTracks.filter { t -> t.id != editedId }) }
     }
-    // Each update sends the whole line to the map: a few seconds apart is plenty at walking
-    // pace, and the newest state is always the one drawn.
-    LaunchedEffect(style) {
+    // A few seconds apart is plenty at walking pace, and the newest state is always the one
+    // drawn. Not while another screen covers the map: it catches up when shown.
+    LaunchedEffect(style, visible) {
         val s = style ?: return@LaunchedEffect
+        if (!visible) return@LaunchedEffect
         snapshotFlow { recording?.segments.orEmpty() }.conflate().collect {
             TrackLayers.syncRecording(s, it)
             delay(RECORDING_REDRAW_MS)

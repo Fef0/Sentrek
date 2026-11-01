@@ -72,6 +72,9 @@ fun SentrekMap(
             val density = context.resources.displayMetrics.density
             getMapAsync { map ->
                 smart?.let { map.addOnCameraIdleListener(it::slowDownLater) }
+                // Lower-zoom tiles loaded ahead, to show something while the right ones come:
+                // two levels instead of four, fewer tiles fetched and drawn for little gain.
+                map.prefetchZoomDelta = PREFETCH_ZOOM_DELTA
                 // Route waymarks are drawn as the map meets them: there are thousands of kinds.
                 addOnStyleImageMissingListener { id ->
                     RouteMarks.image(id, density)?.let { map.style?.addImage(id, it) }
@@ -149,3 +152,5 @@ private class SmartFps(private val view: MapView) {
 }
 
 private const val DEFAULT_SCREEN_FPS = 60f
+
+private const val PREFETCH_ZOOM_DELTA = 2

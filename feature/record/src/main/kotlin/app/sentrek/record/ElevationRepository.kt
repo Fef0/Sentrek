@@ -65,7 +65,7 @@ class ElevationRepository @Inject constructor(@ApplicationContext private val co
     }
 
     /**
-     * Downloaded areas first, then the network (the cache revalidates), then the cache alone.
+     * Downloaded areas first, then the cache (terrain tiles never change), then the network.
      * Also says whether the offline database was busy: then the tile is worth asking for again.
      */
     private fun load(key: Terrarium.TileKey): Pair<Terrarium.Tile?, Boolean> {
@@ -77,8 +77,8 @@ class ElevationRepository @Inject constructor(@ApplicationContext private val co
             busy = true
             null
         }
-            ?: fetch(Request.Builder().url(url).build())
             ?: fetch(Request.Builder().url(url).cacheControl(CacheControl.FORCE_CACHE).build())
+            ?: fetch(Request.Builder().url(url).build())
             ?: return null to busy
         return decode(bytes) to false
     }

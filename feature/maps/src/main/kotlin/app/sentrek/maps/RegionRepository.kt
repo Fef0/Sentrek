@@ -333,6 +333,8 @@ class RegionRepository @Inject constructor(
         // The version MapLibre is about to download, for the next update to compare with.
         val version = scope.async { tileVersion() }
         region.setObserver(object : OfflineRegion.OfflineRegionObserver {
+            private var shownPercent = -1
+
             override fun onStatusChanged(status: OfflineRegionStatus) {
                 if (active != cell) return
                 if (status.isComplete) {
@@ -344,7 +346,11 @@ class RegionRepository @Inject constructor(
                     active = null
                     pump()
                 } else {
+                    // Called for every tile: the screens only hear of each whole percent.
                     val required = status.requiredResourceCount.coerceAtLeast(1)
+                    val percent = (status.completedResourceCount * 100 / required).toInt()
+                    if (percent == shownPercent) return
+                    shownPercent = percent
                     updateMap(cell, MapDownload.Downloading(status.completedResourceCount.toFloat() / required, status.completedResourceSize))
                 }
             }

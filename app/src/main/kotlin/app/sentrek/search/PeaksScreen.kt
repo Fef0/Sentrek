@@ -1,5 +1,6 @@
 package app.sentrek.search
 
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -24,7 +25,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -282,9 +282,10 @@ private fun Ready(state: PeaksState.Ready) {
 private fun rememberHeading(): Float? {
     val context = LocalContext.current
     var heading by remember { mutableStateOf<Float?>(null) }
-    DisposableEffect(Unit) {
+    // Only while the app is in front: the screen off or another app, the sensor rests.
+    LifecycleResumeEffect(Unit) {
         val sensors = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        val sensor = sensors.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) ?: return@DisposableEffect onDispose { }
+        val sensor = sensors.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) ?: return@LifecycleResumeEffect onPauseOrDispose { }
         val rotation = FloatArray(9)
         val upright = FloatArray(9)
         val orientation = FloatArray(3)
@@ -305,7 +306,7 @@ private fun rememberHeading(): Float? {
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
         }
         sensors.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
-        onDispose { sensors.unregisterListener(listener) }
+        onPauseOrDispose { sensors.unregisterListener(listener) }
     }
     return heading
 }

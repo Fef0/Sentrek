@@ -186,6 +186,13 @@ fun TracksScreen(
                         },
                         onShare = { sharing.share(track) },
                         onSave = { choosingFormat = track },
+                        onReverse = {
+                            viewModel.saveReversed(track, context.getString(R.string.tracks_reversed_name, track.name)) { copy ->
+                                val text = copy?.let { context.getString(R.string.tracks_reversed_saved, it.name) }
+                                    ?: context.getString(R.string.tracks_reversed_failed)
+                                Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         onEdit = if (track.imported) ({ onEditRoute(track) }) else null,
                         onDelete = { deleting = track },
                         onRename = { renaming = track },
@@ -308,6 +315,8 @@ private fun TrackCard(
     onToggleMap: () -> Unit,
     onShare: () -> Unit,
     onSave: () -> Unit,
+    /** Saves a copy walked the other way. */
+    onReverse: () -> Unit,
     onDelete: () -> Unit,
     onRename: () -> Unit,
     onColor: () -> Unit,
@@ -381,9 +390,14 @@ private fun TrackCard(
                         Text(stringResource(R.string.tracks_edit))
                     }
                 }
+                OutlinedButton(onClick = onReverse, modifier = buttonModifier, contentPadding = padding) {
+                    Text(stringResource(R.string.tracks_reverse), textAlign = TextAlign.Center)
+                }
                 OutlinedButton(onClick = onShare, modifier = buttonModifier, contentPadding = padding) {
                     Text(stringResource(R.string.tracks_share))
                 }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onSave, modifier = buttonModifier, contentPadding = padding) {
                     Text(stringResource(R.string.tracks_save))
                 }

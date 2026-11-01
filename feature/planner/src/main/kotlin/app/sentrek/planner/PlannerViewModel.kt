@@ -234,6 +234,22 @@ class PlannerViewModel @Inject constructor(
         selected
     }
 
+    /**
+     * Turns the route around: the same legs walked from the end to the start, at once (the
+     * paths go both ways, so nothing is routed again). The totals and the profile follow.
+     */
+    fun reverse() = edit {
+        val points = editor.points
+        if (points.size < 2) return@edit _state.value.selected
+        points.zipWithNext().zip(legs.value) { (a, b), leg ->
+            // Legs still being routed (or from before the last edit) are routed again instead.
+            val same = leg.points.firstOrNull() == a.position && leg.points.lastOrNull() == b.position
+            if (b.onTrails && leg.onTrails && same) routes[b.position to a.position] = leg.reversed()
+        }
+        editor.replace(SavedPlan.reversed(points))
+        _state.value.selected?.let { points.lastIndex - it }
+    }
+
     fun undo() = edit {
         editor.undo()
         null

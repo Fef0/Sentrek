@@ -72,6 +72,11 @@ class TracksViewModel @Inject constructor(
         viewModelScope.launch { onDone(repository.importAll(uris)) }
     }
 
+    /** Saves [track] the other way round as [name]; [onDone] gets the copy, or null. */
+    fun saveReversed(track: SavedTrack, name: String, onDone: (SavedTrack?) -> Unit) {
+        viewModelScope.launch { onDone(repository.saveReversed(track, name)) }
+    }
+
     fun setColor(track: SavedTrack, color: Int) {
         viewModelScope.launch { repository.setColor(track, color) }
     }

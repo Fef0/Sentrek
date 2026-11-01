@@ -3,6 +3,7 @@
     <string name="plan_start">Pianifica un percorso</string>
     <string name="plan_hint">Tocca per aggiungere punti. Trascina un punto per spostarlo, trascina un punto intermedio per inserirne uno.</string>
     <string name="plan_follow_trails">Segui i sentieri</string>
+    <string name="plan_reverse">Inverti il percorso</string>
     <string name="plan_editing">Modifica: %s</string>
     <string name="plan_busy">Chiudi prima il percorso aperto.</string>
     <string name="plan_blocked_following">Smetti di seguire il percorso per pianificarne uno nuovo.</string>

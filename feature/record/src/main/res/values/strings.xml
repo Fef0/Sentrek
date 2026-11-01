@@ -46,6 +46,10 @@ Record a hike or import a GPX/KML file.</string>
     <string name="tracks_show">Map</string>
     <string name="tracks_hide">Hide</string>
     <string name="tracks_share">Share</string>
+    <string name="tracks_reverse">Reversed copy</string>
+    <string name="tracks_reversed_name">%1$s (reversed)</string>
+    <string name="tracks_reversed_saved">Saved as %1$s</string>
+    <string name="tracks_reversed_failed">The reversed copy could not be made</string>
     <string name="tracks_save">Save</string>
     <string name="tracks_delete">Delete</string>
     <string name="tracks_cancel">Cancel</string>

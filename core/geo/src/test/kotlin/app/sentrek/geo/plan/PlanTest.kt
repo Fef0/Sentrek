@@ -15,6 +15,39 @@ class PlanTest {
     private val c = LatLon(46.01, 7.01)
 
     @Test
+    fun `a reversed plan walks the same legs the other way`() {
+        val d = LatLon(46.0, 7.01)
+        // a -> b along the paths (leaving a off-path), b -> c straight, c -> d along the paths.
+        val plan = SavedPlan(
+            points = listOf(PlanPoint(a, true), PlanPoint(b, true), PlanPoint(c, false), PlanPoint(d, true)),
+            legs = listOf(
+                PlanLeg(listOf(a, LatLon(46.0, 7.001), b), onTrails = true, offPathStart = true),
+                PlanLeg(listOf(b, c), onTrails = false),
+                PlanLeg(listOf(c, d), onTrails = true),
+            ),
+        )
+        val back = plan.reversed()
+        assertEquals(listOf(d, c, b, a), back.points.map { it.position })
+        // Each point's mode is the one of the leg now arriving at it.
+        assertEquals(listOf(true, true, false, true), back.points.map { it.onTrails })
+        assertEquals(listOf(listOf(d, c), listOf(c, b), listOf(b, LatLon(46.0, 7.001), a)), back.legs.map { it.points })
+        assertTrue(back.legs.last().offPathEnd)
+        assertFalse(back.legs.last().offPathStart)
+        assertEquals(plan, back.reversed())
+    }
+
+    @Test
+    fun `replacing all points is one step to undo`() {
+        val plan = PlanEditor<LatLon>()
+        plan.add(a)
+        plan.add(b)
+        plan.replace(listOf(b, a))
+        assertEquals(listOf(b, a), plan.points)
+        plan.undo()
+        assertEquals(listOf(a, b), plan.points)
+    }
+
+    @Test
     fun `undo and redo walk the history, a new change drops the redo steps`() {
         val plan = PlanEditor<LatLon>()
         assertFalse(plan.canUndo)

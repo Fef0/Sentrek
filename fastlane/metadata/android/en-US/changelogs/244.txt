@@ -1,0 +1,2 @@
+• Uses less battery: the map draws fewer frames when nothing touches it, and the GPS slows down while you only look at the map or take a long break
+• New frame rate setting: Smart (the default) in Settings › Advanced

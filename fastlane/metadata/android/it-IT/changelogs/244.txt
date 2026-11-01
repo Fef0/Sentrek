@@ -1,0 +1,2 @@
+• Consuma meno batteria: la mappa disegna meno fotogrammi quando nessuno la tocca, e il GPS rallenta mentre guardi solo la mappa o fai una lunga pausa
+• Nuova scelta per il frame rate: Automatico (predefinito) in Impostazioni › Avanzate

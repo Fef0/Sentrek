@@ -48,7 +48,7 @@ internal class SteadyCompass(private val source: CompassEngine) : CompassEngine,
 
     companion object {
         /** Less than this is sensor noise, or a hand that isn't quite still. */
-        private const val MIN_TURN_DEGREES = 4f
+        private const val MIN_TURN_DEGREES = 8f
 
         const val NORMAL_INTERVAL_MS = 200L
         const val SAVER_INTERVAL_MS = 1_000L

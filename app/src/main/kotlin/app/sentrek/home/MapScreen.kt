@@ -128,6 +128,7 @@ import app.sentrek.ui.ScaleBar
 import app.sentrek.ui.safeTopPadding
 import app.sentrek.ui.SentrekIcons
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.log10
 import kotlin.math.floor
 import kotlin.math.pow
@@ -179,6 +180,10 @@ private const val HIDE_CONTROLS_MS = 8_000L
 
 /** How often the line being recorded is drawn again as it grows. */
 private const val RECORDING_REDRAW_MS = 5_000L
+
+/** Only browsing the map: the screen's GPS rate this long after it opens, then [BROWSING_GPS_MS]. */
+private const val BROWSING_FAST_MS = 120_000L
+private const val BROWSING_GPS_MS = 5_000L
 
 /** How often the map tells the app where it is, while it keeps moving. */
 private const val CAMERA_REPORT_MS = 2_000L
@@ -850,14 +855,22 @@ fun MapScreen(
         PowerMode.Stamina -> MapLocation.Power.Minimal
     }
     val gpsMs by viewModel.screenGpsMs.collectAsStateWithLifecycle()
-    LaunchedEffect(map, style, hasLocation, visible, markerPower, gpsMs) {
+    // Only looking at the map (not following the position, a route or recording): after a
+    // while the dot doesn't need a fix every second.
+    val browsing = followMode == FollowMode.Off && recording == null && followedRoute == null
+    LaunchedEffect(map, style, hasLocation, visible, markerPower, gpsMs, browsing) {
         val m = map ?: return@LaunchedEffect
         val s = style ?: return@LaunchedEffect
         if (!hasLocation) return@LaunchedEffect
         if (!visible) return@LaunchedEffect MapLocation.hide(m)
         MapLocation.activate(context, m, s, markerPower)
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            viewModel.locations(gpsMs).collect { MapLocation.update(m, it) }
+            if (browsing) {
+                withTimeoutOrNull(BROWSING_FAST_MS) { viewModel.locations(gpsMs).collect { MapLocation.update(m, it) } }
+                viewModel.locations(maxOf(gpsMs, BROWSING_GPS_MS)).collect { MapLocation.update(m, it) }
+            } else {
+                viewModel.locations(gpsMs).collect { MapLocation.update(m, it) }
+            }
         }
     }
 

@@ -171,6 +171,9 @@
     <string name="settings_contours_hint">Lines of equal height, drawn from the terrain.</string>
     <string name="settings_scale_bar_hint">Top left of the map, in your distance units.</string>
     <string name="settings_volume_zoom_hint">Volume up zooms in, volume down zooms out.</string>
+    <string name="settings_zoom_buttons">Zoom buttons</string>
+    <string name="settings_zoom_buttons_hint">The + and − buttons on the map. Without them, pinch, double-tap and drag, or use the volume keys.</string>
+    <string name="settings_zoom_buttons_gloves">Always shown in glove mode.</string>
     <string name="settings_confirm_exit_hint">Press back twice to close the app, so it isn’t closed by mistake.</string>
     <string name="settings_app_theme_hint">Black saves battery on phones with an OLED screen.</string>
     <string name="settings_units_system_hint">Sets distance, height and speed together.</string>

@@ -246,6 +246,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setVolumeKeysZoom(on) }
     }
 
+    val zoomButtons: StateFlow<Boolean> =
+        settings.zoomButtons.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setZoomButtons(show: Boolean) {
+        viewModelScope.launch { settings.setZoomButtons(show) }
+    }
+
     fun setShowTrailDifficulty(show: Boolean) {
         viewModelScope.launch { settings.setShowTrailDifficulty(show) }
     }
@@ -563,6 +570,7 @@ private fun ControlSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val buttonSize by viewModel.buttonSize.collectAsStateWithLifecycle()
     val gloveMode by viewModel.gloveMode.collectAsStateWithLifecycle()
     val volumeKeysZoom by viewModel.volumeKeysZoom.collectAsStateWithLifecycle()
+    val zoomButtons by viewModel.zoomButtons.collectAsStateWithLifecycle()
     val showLockButton by viewModel.showLockButton.collectAsStateWithLifecycle()
     val autoHideControls by viewModel.autoHideControls.collectAsStateWithLifecycle()
     val confirmExit by viewModel.confirmExit.collectAsStateWithLifecycle()
@@ -574,7 +582,7 @@ private fun ControlSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
             checked = gloveMode,
             onChange = viewModel::setGloveMode,
         )
-        // Glove mode decides these two: greyed out until it's off.
+        // Glove mode decides these three: greyed out until it's off.
         ChoiceRow(
             enabled = !gloveMode,
             title = stringResource(R.string.settings_button_size),
@@ -593,6 +601,13 @@ private fun ControlSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
             hint = stringResource(if (gloveMode) R.string.settings_volume_zoom_gloves else R.string.settings_volume_zoom_hint),
             checked = gloveMode || volumeKeysZoom,
             onChange = viewModel::setVolumeKeysZoom,
+        )
+        ToggleRow(
+            enabled = !gloveMode,
+            title = stringResource(R.string.settings_zoom_buttons),
+            hint = stringResource(if (gloveMode) R.string.settings_zoom_buttons_gloves else R.string.settings_zoom_buttons_hint),
+            checked = gloveMode || zoomButtons,
+            onChange = viewModel::setZoomButtons,
         )
         ToggleRow(
             title = stringResource(R.string.settings_lock_button),

@@ -272,6 +272,7 @@ fun MapScreen(
     val controlsAlpha by animateFloatAsState(if (controlsHidden) 0f else 1f, label = "controls")
     val autoHideSetting by viewModel.autoHideControls.collectAsStateWithLifecycle()
     val showScaleBar by viewModel.showScaleBar.collectAsStateWithLifecycle()
+    val showZoomButtons by viewModel.showZoomButtons.collectAsStateWithLifecycle()
     val slopeTerrain by viewModel.slopeTerrain.collectAsStateWithLifecycle()
     val powerMode by viewModel.powerMode.collectAsStateWithLifecycle()
     val online by viewModel.online.collectAsStateWithLifecycle()
@@ -682,16 +683,18 @@ fun MapScreen(
                         active = followMode != FollowMode.Off,
                     )
                 }
-                MapButton(
-                    icon = SentrekIcons.Plus,
-                    contentDescription = stringResource(R.string.zoom_in),
-                    onClick = { map?.animateCamera(CameraUpdateFactory.zoomIn()) },
-                )
-                MapButton(
-                    icon = SentrekIcons.Minus,
-                    contentDescription = stringResource(R.string.zoom_out),
-                    onClick = { map?.animateCamera(CameraUpdateFactory.zoomOut()) },
-                )
+                if (showZoomButtons) {
+                    MapButton(
+                        icon = SentrekIcons.Plus,
+                        contentDescription = stringResource(R.string.zoom_in),
+                        onClick = { map?.animateCamera(CameraUpdateFactory.zoomIn()) },
+                    )
+                    MapButton(
+                        icon = SentrekIcons.Minus,
+                        contentDescription = stringResource(R.string.zoom_out),
+                        onClick = { map?.animateCamera(CameraUpdateFactory.zoomOut()) },
+                    )
+                }
             }
         }
 

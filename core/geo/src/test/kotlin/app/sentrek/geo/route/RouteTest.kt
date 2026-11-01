@@ -61,6 +61,57 @@ class RouteTest {
     }
 
     @Test
+    fun `walking a long winding route finds the same place as searching all of it`() {
+        // 20 km of zigzag north, a point every ~20 m.
+        val route = Route((0..1000).map { LatLon(46.0 + it * 0.00018, 7.0 + (if (it / 25 % 2 == 0) it % 25 else 25 - it % 25) * 0.0002) })
+        val random = java.util.Random(7)
+        var along: Double? = null
+        for (i in 0 until 1000 step 3) {
+            val a = route.points[i]
+            val b = route.points[i + 1]
+            val f = random.nextDouble()
+            val here = LatLon(
+                a.lat + f * (b.lat - a.lat) + (random.nextDouble() - 0.5) * 0.0002,
+                a.lon + f * (b.lon - a.lon) + (random.nextDouble() - 0.5) * 0.0002,
+            )
+            val found = route.locate(here, along)
+            val all = searchAll(route, here, along)
+            assertEquals(all.along, found.along, 0.01)
+            assertEquals(all.offset, found.offset, 0.01)
+            along = found.along
+        }
+    }
+
+    @Test
+    fun `far from the last position, the whole route is searched`() {
+        val route = Route((0..100).map { north(46.0 + it * 0.0005) })
+        // Last seen 100 m from the start, now 4.4 km along: a lift, a lost signal.
+        val pos = route.locate(north(46.04), previousAlong = 100.0)
+        assertEquals(4448.0, pos.along, 5.0)
+        assertEquals(0.0, pos.offset, 0.5)
+    }
+
+    /** The plain search: every segment, nearest within 25 m, then the closest to [previousAlong]. */
+    private fun searchAll(route: Route, p: LatLon, previousAlong: Double?): RoutePosition {
+        val cumulative = route.points.zipWithNext { a, b -> app.sentrek.geo.Geo.distance(a, b) }.runningFold(0.0, Double::plus)
+        val candidates = (0 until route.points.size - 1).map { i ->
+            val a = route.points[i]
+            val b = route.points[i + 1]
+            val kx = app.sentrek.geo.Geo.EARTH_RADIUS_M * Math.toRadians(1.0) * kotlin.math.cos(Math.toRadians(p.lat))
+            val ky = app.sentrek.geo.Geo.EARTH_RADIUS_M * Math.toRadians(1.0)
+            val ax = (a.lon - p.lon) * kx
+            val ay = (a.lat - p.lat) * ky
+            val dx = (b.lon - p.lon) * kx - ax
+            val dy = (b.lat - p.lat) * ky - ay
+            val t = ((-ax * dx - ay * dy) / (dx * dx + dy * dy)).coerceIn(0.0, 1.0)
+            RoutePosition(cumulative[i] + t * (cumulative[i + 1] - cumulative[i]), kotlin.math.hypot(ax + t * dx, ay + t * dy))
+        }
+        val best = candidates.minOf { it.offset }
+        val near = candidates.filter { it.offset <= best + 25.0 }
+        return if (previousAlong == null) near.minBy { it.along } else near.minBy { kotlin.math.abs(it.along - previousAlong) }
+    }
+
+    @Test
     fun `remaining distance, climb and time`() {
         // 2 km north climbing 600 m.
         val route = Route(listOf(north(46.0, 1000.0), north(46.009, 1300.0), north(46.018, 1600.0)))

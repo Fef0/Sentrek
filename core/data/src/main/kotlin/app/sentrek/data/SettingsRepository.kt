@@ -75,6 +75,14 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[VOLUME_KEYS_ZOOM] = on }
     }
 
+    /** The + and - buttons on the map (without them, pinch, double-tap and volume keys zoom). Glove mode shows them anyway. */
+    val zoomButtons: Flow<Boolean> =
+        prefs { it[ZOOM_BUTTONS] ?: true }
+
+    suspend fun setZoomButtons(show: Boolean) {
+        context.settings.edit { it[ZOOM_BUTTONS] = show }
+    }
+
     /** The SOS screen (Library > SOS) and everything on it. */
     val sosEnabled: Flow<Boolean> =
         prefs { it[SOS_ENABLED] ?: true }
@@ -544,6 +552,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val TEXT_SIZE = stringPreferencesKey("text_size")
         val BUTTON_SIZE = stringPreferencesKey("button_size")
         val VOLUME_KEYS_ZOOM = booleanPreferencesKey("volume_keys_zoom")
+        val ZOOM_BUTTONS = booleanPreferencesKey("zoom_buttons")
         val EMERGENCY_SMS = booleanPreferencesKey("emergency_sms")
         val SOS_ENABLED = booleanPreferencesKey("sos_enabled")
         val EMERGENCY_NUMBER = stringPreferencesKey("emergency_number")

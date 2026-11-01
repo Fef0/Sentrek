@@ -253,6 +253,10 @@ class HomeViewModel @Inject constructor(
     val showLockButton: StateFlow<Boolean> =
         settings.showLockButton.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
+    /** The + and - buttons: as chosen, and always in glove mode. */
+    val showZoomButtons: StateFlow<Boolean> = combine(settings.gloveMode, settings.zoomButtons) { gloves, show -> gloves || show }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
     val showScaleBar: StateFlow<Boolean> =
         settings.showScaleBar.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 

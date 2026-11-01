@@ -168,6 +168,9 @@
     <string name="settings_contours_hint">Linee di uguale altitudine, ricavate dal terreno.</string>
     <string name="settings_scale_bar_hint">In alto a sinistra sulla mappa, nelle tue unità di distanza.</string>
     <string name="settings_volume_zoom_hint">Volume su ingrandisce, volume giù riduce.</string>
+    <string name="settings_zoom_buttons">Pulsanti dello zoom</string>
+    <string name="settings_zoom_buttons_hint">I pulsanti + e − sulla mappa. Senza, si zooma con due dita, con doppio tocco e trascinamento, o con i tasti del volume.</string>
+    <string name="settings_zoom_buttons_gloves">Sempre visibili con la modalità guanti.</string>
     <string name="settings_confirm_exit_hint">Premi indietro due volte per chiudere l’app, così non la chiudi per sbaglio.</string>
     <string name="settings_app_theme_hint">Il nero fa risparmiare batteria sui telefoni con schermo OLED.</string>
     <string name="settings_units_system_hint">Imposta insieme distanza, altezza e velocità.</string>

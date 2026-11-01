@@ -325,11 +325,11 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     }
 
     /**
-     * Most frames per second the map draws; 0 for no cap (Settings > Advanced). No cap unless
-     * chosen: as smooth as the screen allows, until the user trades it for battery.
+     * Most frames per second the map draws; 0 for no cap (Settings > Advanced). Smart unless
+     * chosen: as smooth as the screen allows under a finger, capped while nobody touches it.
      */
     val mapMaxFps: Flow<Int> =
-        context.settings.data.map { it[MAP_MAX_FPS] ?: 0 }
+        context.settings.data.map { it[MAP_MAX_FPS] ?: PowerMode.SMART_FPS }
 
     suspend fun setMapMaxFps(fps: Int) {
         context.settings.edit { it[MAP_MAX_FPS] = fps }

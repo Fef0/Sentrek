@@ -274,7 +274,8 @@
     <string name="settings_reset_confirm">Reset</string>
     <string name="settings_map_fps">Frame rate</string>
     <string name="settings_map_fps_no_cap">No cap</string>
-    <string name="settings_map_fps_hint">How smoothly the map moves. Fewer frames per second save battery. Battery saver limits it to 30.</string>
+    <string name="settings_map_fps_smart">Smart</string>
+    <string name="settings_map_fps_hint">How smoothly the map moves. Smart moves it at full speed while you touch it, and at 30 frames per second the rest of the time. Fewer frames per second save battery. Battery saver limits it to 30.</string>
     <string name="settings_stamina">Stamina mode</string>
     <string name="settings_stamina_hint">For emergencies, when the battery has to last as long as possible. The map runs at %1$d frames per second, and the GPS updates every %2$s with the map open, every %3$s while following a route and every %4$s while recording. The compass, relief and contour lines are turned off, only downloaded maps are shown, and screens go black.</string>
     <string name="settings_stamina_overrides">Stamina mode is on. The settings below will apply again once it’s off.</string>

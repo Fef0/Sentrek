@@ -334,7 +334,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     val mapMaxFps: StateFlow<Int> =
-        settings.mapMaxFps.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+        settings.mapMaxFps.stateIn(viewModelScope, SharingStarted.Eagerly, PowerMode.SMART_FPS)
 
     fun setMapMaxFps(fps: Int) {
         viewModelScope.launch { settings.setMapMaxFps(fps) }
@@ -1030,7 +1030,13 @@ private fun AdvancedSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
             ChoiceRow(
                 enabled = !stamina,
                 title = stringResource(R.string.settings_map_fps),
-                options = PowerMode.FPS_CHOICES.map { it to if (it == 0) stringResource(R.string.settings_map_fps_no_cap) else "$it" },
+                options = PowerMode.FPS_CHOICES.map {
+                    it to when (it) {
+                        0 -> stringResource(R.string.settings_map_fps_no_cap)
+                        PowerMode.SMART_FPS -> stringResource(R.string.settings_map_fps_smart)
+                        else -> "$it"
+                    }
+                },
                 selected = fps,
                 onChange = viewModel::setMapMaxFps,
                 hint = stringResource(R.string.settings_map_fps_hint),

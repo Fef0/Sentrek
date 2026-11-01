@@ -1,5 +1,8 @@
 package app.sentrek.home
 
+import android.location.Location
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import app.sentrek.record.Following
 import androidx.compose.ui.unit.Dp
 import app.sentrek.map.SignalLayer
@@ -273,7 +276,12 @@ fun MapScreen(
     val powerMode by viewModel.powerMode.collectAsStateWithLifecycle()
     val online by viewModel.online.collectAsStateWithLifecycle()
     val downloadedCells by viewModel.downloadedCells.collectAsStateWithLifecycle()
-    val lastFixForSun by viewModel.lastFix.collectAsStateWithLifecycle()
+    // A fix comes every second or so: read as it is only where needed (the GoTo panel, the map
+    // layers), so it doesn't redraw this whole screen. The rest gets it rounded, and changes
+    // only when that does: about 10 m for the way back to signal, about 1 km for the sun.
+    val lastFix = viewModel.lastFix.collectAsStateWithLifecycle()
+    val nearHere by remember { derivedStateOf { lastFix.value?.let { LatLon(round(it.latitude, 4), round(it.longitude, 4)) } } }
+    val sunHere by remember { derivedStateOf { lastFix.value?.let { LatLon(round(it.latitude, 2), round(it.longitude, 2)) } } }
     val autoHide = autoHideSetting && !plan.active
     // Touch lock: everything but the lock button ignores touches; the controls step aside.
     var locked by rememberSaveable { mutableStateOf(false) }
@@ -497,12 +505,11 @@ fun MapScreen(
             ) {
                 if (plan.active) PlanPanel(planStats, plan.editing?.name, Modifier.fillMaxWidth())
                 // Where the sun sets for the user: their position, or the map's before a fix.
-                val sunPosition = lastFixForSun?.let { LatLon(it.latitude, it.longitude) }
-                    ?: map?.cameraPosition?.target?.let { LatLon(it.latitude, it.longitude) }
+                val sunPosition = sunHere ?: map?.cameraPosition?.target?.let { LatLon(it.latitude, it.longitude) }
                 goTo?.let { target ->
                     GoToPanel(
                         target = target,
-                        here = lastFixForSun?.let { LatLon(it.latitude, it.longitude, LocationRepository.altitude(it)) },
+                        here = lastFix,
                         heading = heading,
                         mapBearing = bearing,
                         onStop = { viewModel.goTo(null) },
@@ -557,7 +564,7 @@ fun MapScreen(
                 lastSignal?.let { spot ->
                     val signalName = stringResource(R.string.signal_goto_name)
                     if (goTo?.position != spot.position) {
-                        SignalNote(spot, lastFixForSun?.let { LatLon(it.latitude, it.longitude) }) {
+                        SignalNote(spot, nearHere) {
                             viewModel.goTo(GoTo(signalName, spot.position))
                         }
                     }
@@ -1015,7 +1022,7 @@ fun MapScreen(
         )
     }
 
-    MapLayerEffects(viewModel, planner, map, style, planPreview, handleReach, goTo, lastFixForSun?.let { LatLon(it.latitude, it.longitude) }, visible)
+    MapLayerEffects(viewModel, planner, map, style, planPreview, handleReach, goTo, lastFix, visible)
 
     if (askPlanName) {
         TrackNameDialog(
@@ -1176,8 +1183,8 @@ private fun MapLayerEffects(
     planPreview: List<LatLon>?,
     handleReach: Dp,
     goTo: GoTo?,
-    /** The last position known. */
-    here: LatLon?,
+    /** The last fix known. */
+    lastFix: State<Location?>,
     /** False under another screen: the recording isn't drawn until the map shows again. */
     visible: Boolean,
 ) {
@@ -1247,6 +1254,7 @@ private fun MapLayerEffects(
         val s = style ?: return@LaunchedEffect
         SignalLayer.sync(context, s, lastSignal?.position)
     }
+    val here = lastFix.value?.let { LatLon(it.latitude, it.longitude) }
     LaunchedEffect(style, goTo, here) {
         val s = style ?: return@LaunchedEffect
         GoToLayer.sync(s, here?.takeIf { goTo != null }, goTo?.position)
@@ -1318,4 +1326,10 @@ private fun MapReminders(viewModel: HomeViewModel) {
             },
         )
     }
+}
+
+/** [value] rounded to [decimals] places. */
+private fun round(value: Double, decimals: Int): Double {
+    val f = 10.0.pow(decimals)
+    return kotlin.math.round(value * f) / f
 }

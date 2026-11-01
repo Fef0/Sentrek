@@ -15,6 +15,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
@@ -27,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import app.sentrek.R
 import app.sentrek.geo.Geo
 import app.sentrek.geo.LatLon
+import app.sentrek.record.LocationRepository
+import android.location.Location
 import app.sentrek.ui.Format
 import app.sentrek.ui.LocalTouch
 import app.sentrek.ui.SentrekIcons
@@ -40,8 +43,10 @@ data class GoTo(val name: String, val position: LatLon)
  * one, so it points the real way; by the map's turn otherwise), how far, and the climb.
  */
 @Composable
-fun GoToPanel(target: GoTo, here: LatLon?, heading: Float?, mapBearing: Double, onStop: () -> Unit, modifier: Modifier = Modifier) {
-    val distance = here?.let { Geo.distance(it, target.position) }
+fun GoToPanel(target: GoTo, here: State<Location?>, heading: Float?, mapBearing: Double, onStop: () -> Unit, modifier: Modifier = Modifier) {
+    // Read here, not by the caller: each fix redraws only this panel.
+    val position = here.value?.let { LatLon(it.latitude, it.longitude, LocationRepository.altitude(it)) }
+    val distance = position?.let { Geo.distance(it, target.position) }
     val arrived = distance != null && distance < ARRIVED_M
     val haptics = LocalHapticFeedback.current
     LaunchedEffect(arrived) { if (arrived) haptics.performHapticFeedback(HapticFeedbackType.LongPress) }
@@ -58,8 +63,8 @@ fun GoToPanel(target: GoTo, here: LatLon?, heading: Float?, mapBearing: Double, 
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (here != null && !arrived) {
-                val bearing = Geo.bearing(here, target.position)
+            if (position != null && !arrived) {
+                val bearing = Geo.bearing(position, target.position)
                 val turn = bearing - (heading?.toDouble() ?: mapBearing)
                 Icon(
                     SentrekIcons.Heading,
@@ -80,10 +85,10 @@ fun GoToPanel(target: GoTo, here: LatLon?, heading: Float?, mapBearing: Double, 
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                 )
-                val climb = here?.ele?.let { from -> target.position.ele?.let { it - from } }
+                val climb = position?.ele?.let { from -> target.position.ele?.let { it - from } }
                 val details = listOfNotNull(
                     target.name,
-                    here?.takeIf { !arrived }?.let { Format.bearing(Geo.bearing(it, target.position)) },
+                    position?.takeIf { !arrived }?.let { Format.bearing(Geo.bearing(it, target.position)) },
                     climb?.takeIf { !arrived && kotlin.math.abs(it) >= MIN_CLIMB_M }?.let { (if (it > 0) "↑ " else "↓ ") + Format.elevation(kotlin.math.abs(it)) },
                 ).joinToString(" · ")
                 Text(details, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)

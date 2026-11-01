@@ -1,0 +1,3 @@
+• Reversed copy: in the track list, save any route or track the other way round
+• Reverse button in the planner: turns the route around at once, with the totals and profile
+• New setting in Controls to hide the zoom buttons (always shown in glove mode)

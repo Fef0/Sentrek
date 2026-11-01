@@ -1,0 +1,3 @@
+• Copia al contrario: nell'elenco delle tracce, salva un percorso o una traccia nel verso opposto
+• Pulsante per invertire il percorso durante la pianificazione, con totali e profilo aggiornati subito
+• Nuova impostazione in Comandi per nascondere i pulsanti dello zoom (sempre visibili con la modalità guanti)

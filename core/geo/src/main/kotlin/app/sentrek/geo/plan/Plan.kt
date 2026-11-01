@@ -36,6 +36,11 @@ class PlanEditor<T> {
         if (points.isNotEmpty()) push(emptyList())
     }
 
+    /** All the points at once, as one step (e.g. the route turned around). */
+    fun replace(all: List<T>) {
+        if (all != points) push(all)
+    }
+
     /** Starts over from [start] (an existing plan to edit), with nothing to undo. */
     fun reset(start: List<T>) {
         history.clear()
@@ -85,6 +90,9 @@ data class PlanLeg(
 
     /** Where the handle that inserts a point on this leg goes. */
     val middle: LatLon get() = PlanGeometry.halfway(points)
+
+    /** The same leg walked the other way. */
+    fun reversed(): PlanLeg = PlanLeg(points.reversed(), onTrails, offPathStart = offPathEnd, offPathEnd = offPathStart)
 }
 
 /** A planned point. [onTrails]: the leg arriving here follows the paths on the map. */
@@ -92,7 +100,23 @@ data class PlanPoint(val position: LatLon, val onTrails: Boolean)
 
 /** A plan as saved with its route, to edit it again: its points and the legs as drawn. */
 data class SavedPlan(val points: List<PlanPoint>, val legs: List<PlanLeg>) {
+    /** The same route from its end to its start, every leg as it was. */
+    fun reversed(): SavedPlan = SavedPlan(reversed(points), legs.reversed().map(PlanLeg::reversed))
+
     companion object {
+        /**
+         * [points] the other way. Each point says how the leg arriving at it is drawn: turned
+         * around, that leg arrives at the point before it. The first point has no leg to arrive
+         * by and keeps the old start's mode.
+         */
+        fun reversed(points: List<PlanPoint>): List<PlanPoint> {
+            val n = points.lastIndex
+            return points.indices.map { k ->
+                val from = points[n - k]
+                from.copy(onTrails = if (k == 0) points.first().onTrails else points[n - k + 1].onTrails)
+            }
+        }
+
         /**
          * A plan to edit any line (e.g. an imported route): points where it bends by more
          * than [toleranceM], and legs that keep the line's exact shape until they are changed.

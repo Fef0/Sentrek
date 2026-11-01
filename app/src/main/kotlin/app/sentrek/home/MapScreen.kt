@@ -625,6 +625,13 @@ fun MapScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalAlignment = Alignment.End,
             ) {
+                if (plan.active && plan.points.size >= 2) {
+                    MapButton(
+                        icon = SentrekIcons.Reverse,
+                        contentDescription = stringResource(PlannerR.string.plan_reverse),
+                        onClick = planner::reverse,
+                    )
+                }
                 if (plan.active) {
                     MapButton(
                         icon = SentrekIcons.Tracks,

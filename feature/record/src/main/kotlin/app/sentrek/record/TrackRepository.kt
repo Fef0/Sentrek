@@ -289,6 +289,28 @@ class TrackRepository @Inject constructor(
     }
 
     /**
+     * A copy of [track] walked the other way, saved as [name]: the line from its end to its
+     * start, its waypoints, and its plan turned around too. Times go: backwards they'd be
+     * wrong, so the copy is a route with the walking time estimated, like a planned one.
+     * Null when the file can't be read.
+     */
+    suspend fun saveReversed(track: SavedTrack, name: String): SavedTrack? {
+        val file = withContext(Dispatchers.IO) {
+            runCatching { read(track) }.onFailure { Log.w(TAG, "Cannot read ${track.id}", it) }.getOrNull()
+        } ?: return null
+        val segments = file.tracks.flatMap { it.segments }.reversed()
+            .map { segment -> segment.reversed().map { TrackPoint(it.position, 0) } }
+            .filter { it.isNotEmpty() }
+        if (segments.isEmpty()) return null
+        return save(
+            segments, name, file.waypoints, imported = true,
+            // A planned route's heights are the terrain's: its small climbs are real.
+            smoothElevation = track.imported,
+            plan = plan(track)?.reversed(),
+        )
+    }
+
+    /**
      * The route as the planner edits it: the plan saved with it, or one made from its line
      * (points where it bends). Null for recorded tracks and unreadable files.
      */

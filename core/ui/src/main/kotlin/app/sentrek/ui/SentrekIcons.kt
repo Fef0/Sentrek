@@ -74,6 +74,11 @@ object SentrekIcons {
         icon("Sentrek.Delete", "M6,19c0,1.1 0.9,2 2,2h8c1.1,0 2,-0.9 2,-2V7H6v12zM19,4h-3.5l-1,-1h-5l-1,1H5v2h14V4z")
     }
 
+    /** Two arrows, up and down: the route the other way. */
+    val Reverse: ImageVector by lazy {
+        icon("Sentrek.Reverse", "M16,17.01V10h-2v7.01h-3L15,21l4,-3.99h-3zM9,3L5,6.99h3V14h2V6.99h3L9,3z")
+    }
+
     val Check: ImageVector by lazy { icon("Sentrek.Check", "M9,16.17L4.83,12l-1.42,1.41L9,19 21,7l-1.41,-1.41z") }
 
     val Close: ImageVector by lazy {

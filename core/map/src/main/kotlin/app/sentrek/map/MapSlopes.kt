@@ -107,6 +107,9 @@ object MapSlopes {
         }
     }
 
+    /** How long MapLibre keeps a painted slope tile: a day. */
+    private const val KEEP_S = 86_400
+
     /** Answers MapLibre's requests for slope tiles from the terrain, without the network. */
     internal object Tiles : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
@@ -122,8 +125,9 @@ object MapSlopes {
                 .protocol(Protocol.HTTP_1_1)
                 .code(if (png != null) 200 else 404)
                 .message(if (png != null) "OK" else "Not Found")
-                // Painted again each time: the terrain may be there later (online, downloaded).
-                .header("Cache-Control", "no-store")
+                // Kept a day once painted (terrain doesn't change); a missing one is asked for
+                // again each time, since the terrain may be there later (online, downloaded).
+                .header("Cache-Control", if (png != null) "max-age=$KEEP_S" else "no-store")
                 .body((png ?: ByteArray(0)).toResponseBody("image/png".toMediaType()))
                 .build()
         }

@@ -12,6 +12,7 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.os.BatteryManager
 import android.os.Build
+import android.os.SystemClock
 import android.telephony.SmsManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -111,16 +112,34 @@ class Breadcrumbs(private val context: Context) {
         }
     }
 
-    private fun canSend() =
-        ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED &&
-            context.packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY_MESSAGING)
-
-    /** The battery level in percent, null while charging (a power bank) or unknown. */
-    private fun battery(): Int? {
-        val manager = context.getSystemService(BatteryManager::class.java) ?: return null
-        if (manager.isCharging) return null
-        return manager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY).takeIf { it in 0..100 }
+    /** Asked of the system once a minute at most: [check] runs with every fix. */
+    private fun canSend(): Boolean {
+        val now = SystemClock.elapsedRealtime()
+        if (now - canSendAt >= RECHECK_MS) {
+            canSendAt = now
+            canSendNow = ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED &&
+                context.packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY_MESSAGING)
+        }
+        return canSendNow
     }
+
+    private var canSendAt = -RECHECK_MS
+    private var canSendNow = false
+
+    /** The battery level in percent, null while charging (a power bank) or unknown; read once a minute at most. */
+    private fun battery(): Int? {
+        val now = SystemClock.elapsedRealtime()
+        if (now - batteryAt >= RECHECK_MS) {
+            batteryAt = now
+            val manager = context.getSystemService(BatteryManager::class.java)
+            batteryNow = manager?.takeUnless { it.isCharging }
+                ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)?.takeIf { it in 0..100 }
+        }
+        return batteryNow
+    }
+
+    private var batteryAt = -RECHECK_MS
+    private var batteryNow: Int? = null
 
     private fun send(to: String, text: String, session: Long, now: Long, lowBattery: Boolean = false) {
         val sms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -213,6 +232,9 @@ class Breadcrumbs(private val context: Context) {
         private fun time(millis: Long) = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(millis))
 
         private const val TAG = "Breadcrumbs"
+
+        /** The SMS permission and the battery level are read at most this often. */
+        private const val RECHECK_MS = 60_000L
         private const val ACTION_SENT = "app.sentrek.record.BREADCRUMB_SENT"
         private const val CHANNEL_ID = "breadcrumbs"
         private const val NOTIFICATION_ID = 4

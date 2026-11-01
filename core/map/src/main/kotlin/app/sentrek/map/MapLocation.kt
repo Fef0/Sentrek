@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.location.Location
 import org.maplibre.android.location.CompassListener
+import org.maplibre.android.location.LocationComponent
 import org.maplibre.android.location.LocationComponentActivationOptions
 import org.maplibre.android.location.LocationComponentOptions
 import org.maplibre.android.location.OnCameraTrackingChangedListener
@@ -25,6 +26,13 @@ object MapLocation {
     private const val MAX_ANIMATION_FPS = 20
     private const val SAVER_ANIMATION_FPS = 10
 
+    /**
+     * While the camera follows the walk, each step moves the whole map: a few frames per step
+     * are enough at walking speed.
+     */
+    private const val FOLLOW_ANIMATION_FPS = 10
+    private const val SAVER_FOLLOW_ANIMATION_FPS = 5
+
     /** The dot slides to each new fix in a couple of steps instead of gliding. */
     private const val MINIMAL_ANIMATION_FPS = 2
 
@@ -45,7 +53,10 @@ object MapLocation {
                     .useDefaultLocationEngine(false)
                     // No greying out after 30 s without a new fix: standing still, fixes
                     // that change nothing are skipped (see update).
-                    .locationComponentOptions(LocationComponentOptions.builder(context).enableStaleState(false).build())
+                    // The accuracy circle jumps to its new size: animating it redraws the map for nothing.
+                    .locationComponentOptions(
+                        LocationComponentOptions.builder(context).enableStaleState(false).accuracyAnimationEnabled(false).build(),
+                    )
                     .build(),
             )
         }
@@ -54,14 +65,26 @@ object MapLocation {
         compass?.minIntervalMs = if (power == Power.Normal) SteadyCompass.NORMAL_INTERVAL_MS else SteadyCompass.SAVER_INTERVAL_MS
         component.isLocationComponentEnabled = true
         component.renderMode = if (power == Power.Minimal) RenderMode.NORMAL else RenderMode.COMPASS
-        // Each turn of the arrow is animated, and each animation frame redraws the whole map.
-        component.setMaxAnimationFps(
-            when (power) {
-                Power.Normal -> MAX_ANIMATION_FPS
-                Power.Saver -> SAVER_ANIMATION_FPS
-                Power.Minimal -> MINIMAL_ANIMATION_FPS
-            },
-        )
+        this.power = power
+        animationFps = 0
+        setAnimationFps(component)
+    }
+
+    private var power = Power.Normal
+    private var animationFps = 0
+
+    /** Each turn of the arrow and each step of the camera is animated, and each frame redraws the whole map. */
+    private fun setAnimationFps(component: LocationComponent) {
+        val following = component.cameraMode != CameraMode.NONE
+        val fps = when (power) {
+            Power.Normal -> if (following) FOLLOW_ANIMATION_FPS else MAX_ANIMATION_FPS
+            Power.Saver -> if (following) SAVER_FOLLOW_ANIMATION_FPS else SAVER_ANIMATION_FPS
+            Power.Minimal -> MINIMAL_ANIMATION_FPS
+        }
+        if (fps != animationFps) {
+            animationFps = fps
+            component.setMaxAnimationFps(fps)
+        }
     }
 
     /** Hidden under another screen: no arrow, so no compass and no redraws for it. */
@@ -81,16 +104,18 @@ object MapLocation {
         val component = map.locationComponent
         if (!component.isLocationComponentActivated) return
         val last = shown
-        if (last != null && component.lastKnownLocation != null && isSame(last, location)) return
+        val still = maxOf(STILL_M, STILL_PX * map.projection.getMetersPerPixelAtLatitude(location.latitude).toFloat())
+        if (last != null && component.lastKnownLocation != null && isSame(last, location, still)) return
         shown = Location(location)
+        setAnimationFps(component)
         component.forceLocationUpdate(location)
     }
 
     /** The last fix handed to the marker. */
     private var shown: Location? = null
 
-    private fun isSame(a: Location, b: Location): Boolean =
-        a.distanceTo(b) < STILL_M &&
+    private fun isSame(a: Location, b: Location, stillM: Float): Boolean =
+        a.distanceTo(b) < stillM &&
             abs(a.accuracy - b.accuracy) < STILL_M &&
             (!b.hasBearing() || !a.hasBearing() || angle(a.bearing, b.bearing) < STILL_TURN_DEGREES)
 
@@ -101,6 +126,9 @@ object MapLocation {
 
     /** Closer than this, a new fix moves the marker by a pixel or two at hiking zooms. */
     private const val STILL_M = 2f
+
+    /** Zoomed out, a fix that moves the marker less than this many dp is skipped too. */
+    private const val STILL_PX = 2f
     private const val STILL_TURN_DEGREES = 10f
 
     /**
@@ -112,12 +140,14 @@ object MapLocation {
         if (!component.isLocationComponentActivated) return
         if (mode == FollowMode.Off) {
             if (component.cameraMode != CameraMode.NONE) component.cameraMode = CameraMode.NONE
+            setAnimationFps(component)
             return
         }
         // A separate zoomWhileTracking() is cancelled by the mode transition, so zoom in the same move.
         val zoom = FOLLOW_ZOOM.takeIf { map.cameraPosition.zoom < FOLLOW_ZOOM - 2 }
         val camera = if (mode == FollowMode.Heading) CameraMode.TRACKING_GPS else CameraMode.TRACKING_GPS_NORTH
         component.setCameraMode(camera, TRANSITION_MS, zoom, null, null, null)
+        setAnimationFps(component)
     }
 
     /**

@@ -19,7 +19,7 @@ data class RoutePosition(
 
 /**
  * A route to follow: a polyline with distances and climb precomputed, so each GPS fix costs
- * one pass over the segments.
+ * a look at the stretch around the last position.
  */
 class Route(val points: List<LatLon>) {
     init {
@@ -75,34 +75,69 @@ class Route(val points: List<LatLon>) {
     /**
      * Nearest point on the route. Where the route passes near itself (out-and-back, loops), the
      * candidate closest to [previousAlong] wins, so the position doesn't jump to the other leg.
+     * With [previousAlong], only the stretch within [WINDOW_M] of it is searched (a fix every
+     * second on a long route), unless the user is far from that stretch: a shortcut, a new
+     * start.
      */
     fun locate(p: LatLon, previousAlong: Double? = null): RoutePosition {
+        if (previousAlong != null) {
+            val from = indexAt(previousAlong - WINDOW_M)
+            val to = min(indexAt(previousAlong + WINDOW_M) + 1, points.size - 1)
+            val near = nearest(p, previousAlong, from, to)
+            if (near.offset <= FAR_FROM_WINDOW_M) return near
+        }
+        return nearest(p, previousAlong, 0, points.size - 1)
+    }
+
+    /**
+     * Nearest point on segments [from] until [to]; of those about as near ([SAME_PLACE_M]), the
+     * one closest to [previousAlong], or without it the first along the route: where the route
+     * passes twice (a loop's start and end, an out-and-back), the walk is just beginning rather
+     * than over. Two passes and no lists: this runs for every fix.
+     */
+    private fun nearest(p: LatLon, previousAlong: Double?, from: Int, to: Int): RoutePosition {
         // Local flat projection around p: accurate to well under a metre over a few km.
         val kx = Geo.EARTH_RADIUS_M * Math.toRadians(1.0) * cos(Math.toRadians(p.lat))
         val ky = Geo.EARTH_RADIUS_M * Math.toRadians(1.0)
-        val candidates = ArrayList<RoutePosition>(points.size - 1)
         var best = Double.MAX_VALUE
-        for (i in 0 until points.size - 1) {
-            val a = points[i]
-            val b = points[i + 1]
-            val ax = (a.lon - p.lon) * kx
-            val ay = (a.lat - p.lat) * ky
-            val bx = (b.lon - p.lon) * kx
-            val by = (b.lat - p.lat) * ky
-            val dx = bx - ax
-            val dy = by - ay
-            val len2 = dx * dx + dy * dy
-            val t = if (len2 == 0.0) 0.0 else ((-ax * dx - ay * dy) / len2).coerceIn(0.0, 1.0)
-            val offset = hypot(ax + t * dx, ay + t * dy)
-            val along = cumulative[i] + t * (cumulative[i + 1] - cumulative[i])
-            candidates += RoutePosition(along, offset)
-            best = min(best, offset)
+        for (i in from until to) best = min(best, offset(i, p, kx, ky, at(i, p, kx, ky)))
+        var along = 0.0
+        var offset = 0.0
+        var score = Double.MAX_VALUE
+        for (i in from until to) {
+            val t = at(i, p, kx, ky)
+            val o = offset(i, p, kx, ky, t)
+            if (o > best + SAME_PLACE_M) continue
+            val a = cumulative[i] + t * (cumulative[i + 1] - cumulative[i])
+            val s = if (previousAlong == null) a else abs(a - previousAlong)
+            if (s < score) {
+                score = s
+                along = a
+                offset = o
+            }
         }
-        val near = candidates.filter { it.offset <= best + SAME_PLACE_M }
-        // No history: where the route passes twice (a loop's start and end, an out-and-back),
-        // assume the walk is just beginning rather than over.
-        if (previousAlong == null) return near.minBy { it.along }
-        return near.minBy { abs(it.along - previousAlong) }
+        return RoutePosition(along, offset)
+    }
+
+    /** Where along segment [i] (0 to 1) is nearest to [p], in the projection of [nearest]. */
+    private fun at(i: Int, p: LatLon, kx: Double, ky: Double): Double {
+        val a = points[i]
+        val b = points[i + 1]
+        val ax = (a.lon - p.lon) * kx
+        val ay = (a.lat - p.lat) * ky
+        val dx = (b.lon - p.lon) * kx - ax
+        val dy = (b.lat - p.lat) * ky - ay
+        val len2 = dx * dx + dy * dy
+        return if (len2 == 0.0) 0.0 else ((-ax * dx - ay * dy) / len2).coerceIn(0.0, 1.0)
+    }
+
+    /** Metres from [p] to the point [t] along segment [i]. */
+    private fun offset(i: Int, p: LatLon, kx: Double, ky: Double, t: Double): Double {
+        val a = points[i]
+        val b = points[i + 1]
+        val ax = (a.lon - p.lon) * kx
+        val ay = (a.lat - p.lat) * ky
+        return hypot(ax + t * ((b.lon - p.lon) * kx - ax), ay + t * ((b.lat - p.lat) * ky - ay))
     }
 
     /** Distance, climb and walking time left from [along] to the end. */
@@ -139,6 +174,12 @@ class Route(val points: List<LatLon>) {
 
         /** Candidates this much farther than the nearest one still count as "here". */
         const val SAME_PLACE_M = 25.0
+
+        /** With a previous position, the route is searched this far before and after it. */
+        const val WINDOW_M = 500.0
+
+        /** Farther than this from the searched stretch, the whole route is searched. */
+        const val FAR_FROM_WINDOW_M = 2 * OffRouteDetector.OFF_ROUTE_M
     }
 }
 

@@ -39,7 +39,7 @@ enum class PowerMode {
      */
     val blackScreens: Boolean get() = this == Stamina
 
-    /** The most frames per second the maps may draw, given the one chosen (0: no cap). */
+    /** The most frames per second the maps may draw, given the one chosen (0: no cap, [SMART_FPS]: smart). */
     fun mapFps(chosen: Int): Int = when (this) {
         Normal -> chosen
         // Battery saver caps it, unless a lower cap was chosen already.
@@ -57,7 +57,13 @@ enum class PowerMode {
          */
         const val STAMINA_FPS = 10
 
+        /**
+         * As fast as the screen while a finger is on the map, [SAVER_FPS] the rest of the time
+         * (also while the map follows the walk): the default.
+         */
+        const val SMART_FPS = -1
+
         /** The frame caps offered in Settings > Advanced (0: no cap). */
-        val FPS_CHOICES = listOf(STAMINA_FPS, SAVER_FPS, 60, 0)
+        val FPS_CHOICES = listOf(STAMINA_FPS, SAVER_FPS, 60, SMART_FPS, 0)
     }
 }

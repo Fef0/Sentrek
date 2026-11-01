@@ -269,7 +269,8 @@
     <string name="settings_reset_confirm">Ripristina</string>
     <string name="settings_map_fps">Frame rate</string>
     <string name="settings_map_fps_no_cap">Nessun limite</string>
-    <string name="settings_map_fps_hint">Quanto fluida si muove la mappa. Meno fotogrammi al secondo fanno risparmiare batteria. Il risparmio batteria la limita a 30.</string>
+    <string name="settings_map_fps_smart">Automatico</string>
+    <string name="settings_map_fps_hint">Quanto fluida si muove la mappa. Con Automatico va alla massima velocità mentre la tocchi e a 30 fotogrammi al secondo il resto del tempo. Meno fotogrammi al secondo fanno risparmiare batteria. Il risparmio batteria la limita a 30.</string>
     <string name="settings_stamina">Modalità estrema</string>
     <string name="settings_stamina_hint">Per le emergenze, quando la batteria deve durare il più possibile. La mappa va a %1$d fotogrammi al secondo, e il GPS si aggiorna ogni %2$s con la mappa aperta, ogni %3$s mentre segui un percorso e ogni %4$s mentre registri. Bussola, rilievo e curve di livello sono spenti, si vedono solo le mappe scaricate e gli schermi diventano neri.</string>
     <string name="settings_stamina_overrides">La modalità estrema è attiva. Le impostazioni qui sotto torneranno valide quando la spegni.</string>

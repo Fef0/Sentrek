@@ -98,12 +98,17 @@ class TrackingService : Service() {
 
     /** The screen coming on: the notification catches up at once, it's about to be read. */
     private val screenOn = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) = update()
+        override fun onReceive(context: Context, intent: Intent) {
+            screenOff.value = intent.action == Intent.ACTION_SCREEN_OFF
+            if (!screenOff.value) update()
+        }
     }
+    private val screenOff = MutableStateFlow(false)
 
     /**
      * A long stop (a break, a hut, a night out): the GPS slows down to [REST_GPS_MS] until
-     * the user moves again, which the motion sensor says within seconds.
+     * the user moves again, which the motion sensor says within seconds. Without that sensor
+     * only a fix can tell, so they come every [REST_NO_SENSOR_GPS_MS].
      */
     private val rest = RestDetector()
     private val resting = MutableStateFlow(false)
@@ -133,13 +138,18 @@ class TrackingService : Service() {
         }
         // While the screen is on, the map asks for a fix every second and this gets those too;
         // in the pocket, the slower rate here is all the GPS does.
-        val interval = combine(following.state, settings.gpsTiming, settings.powerMode, resting) { f, timing, mode, still ->
+        screenOff.value = !power.isInteractive
+        val request = combine(following.state, settings.gpsTiming, settings.powerMode, resting, screenOff) { f, timing, mode, still, off ->
             val ms = timing.forMode(mode).let { if (f != null) it.followMs else it.recordMs }
-            if (still) maxOf(ms, REST_GPS_MS) else ms
+            val restMs = if (motionSensor != null) REST_GPS_MS else REST_NO_SENSOR_GPS_MS
+            // Only recording, in the pocket: nothing needs the fixes at once (following does,
+            // for the off-route and turn alerts).
+            val batch = if (f == null && off) BATCH_MS else 0L
+            (if (still) maxOf(ms, restMs) else ms) to batch
         }.distinctUntilChanged()
         scope.launch {
-            interval.collectLatest { ms ->
-                location.locations(ms).collect {
+            request.collectLatest { (ms, batch) ->
+                location.locations(ms, batch).collect {
                     at = runCatching { LatLon(it.latitude, it.longitude) }.getOrNull() ?: at
                     fix = it
                     onRestCheck(it)
@@ -152,7 +162,8 @@ class TrackingService : Service() {
         }
         breadcrumbs.start()
         signal.start()
-        ContextCompat.registerReceiver(this, screenOn, IntentFilter(Intent.ACTION_SCREEN_ON), ContextCompat.RECEIVER_NOT_EXPORTED)
+        val screen = IntentFilter(Intent.ACTION_SCREEN_ON).apply { addAction(Intent.ACTION_SCREEN_OFF) }
+        ContextCompat.registerReceiver(this, screenOn, screen, ContextCompat.RECEIVER_NOT_EXPORTED)
         // With the SOS screen off, its settings rest too (greyed out in Settings).
         scope.launch {
             combine(settings.sosEnabled, settings.breadcrumbMinutes) { sos, minutes -> if (sos) minutes else 0 }
@@ -198,13 +209,14 @@ class TrackingService : Service() {
         val f = following.state.value
         val manager = NotificationManagerCompat.from(this)
         if ((r == null && f == null) || !manager.areNotificationsEnabled()) return
-        val summary = live.summary(r, f, at, System.currentTimeMillis())
-        if (!force && summary == shown) return
         // With the screen off nobody reads it: the numbers every half minute are plenty, but
         // what calls for attention (off route, paused, a tap to confirm) goes out at once.
+        // Checked first, so the text isn't even put together in between.
         val alerts = "${r?.isPaused} ${f?.offRoute} ${live.armed}"
         val now = SystemClock.elapsedRealtime()
         if (!force && power?.isInteractive == false && alerts == notifiedAlerts && now - notifiedAt < SCREEN_OFF_NOTIFICATION_MS) return
+        val summary = live.summary(r, f, at, System.currentTimeMillis())
+        if (!force && summary == shown) return
         shown = summary
         notifiedAt = now
         notifiedAlerts = alerts
@@ -269,6 +281,7 @@ class TrackingService : Service() {
         breadcrumbs.check(recording.state.value, fix, breadcrumbMinutes, breadcrumbTo, breadcrumbName, lowBatterySms)
 
     override fun onDestroy() {
+        recording.flush()
         runCatching { unregisterReceiver(screenOn) }
         motionSensor?.let { sensors?.cancelTriggerSensor(motion, it) }
         if (recording.state.value == null) checkBreadcrumbs()
@@ -321,8 +334,12 @@ class TrackingService : Service() {
         private const val NOTIFICATION_INTERVAL_MS = 5_000L
         private const val CLOCK_INTERVAL_MS = 60_000L
 
-        /** The GPS during a long stop: a fix every half minute. */
-        private const val REST_GPS_MS = 30_000L
+        /** The GPS during a long stop, the motion sensor watching: a fix every five minutes. */
+        private const val REST_GPS_MS = 300_000L
+        private const val REST_NO_SENSOR_GPS_MS = 30_000L
+
+        /** Recording in the pocket: fixes may wait this long to be handed over together. */
+        private const val BATCH_MS = 60_000L
 
         /** Notification updates with the screen off, alerts aside. */
         private const val SCREEN_OFF_NOTIFICATION_MS = 30_000L

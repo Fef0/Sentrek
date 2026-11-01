@@ -1,5 +1,8 @@
 package app.sentrek.home
 
+import android.location.Location
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import app.sentrek.record.Following
 import androidx.compose.ui.unit.Dp
 import app.sentrek.map.SignalLayer
@@ -128,6 +131,7 @@ import app.sentrek.ui.ScaleBar
 import app.sentrek.ui.safeTopPadding
 import app.sentrek.ui.SentrekIcons
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.log10
 import kotlin.math.floor
 import kotlin.math.pow
@@ -179,6 +183,10 @@ private const val HIDE_CONTROLS_MS = 8_000L
 
 /** How often the line being recorded is drawn again as it grows. */
 private const val RECORDING_REDRAW_MS = 5_000L
+
+/** Only browsing the map: the screen's GPS rate this long after it opens, then [BROWSING_GPS_MS]. */
+private const val BROWSING_FAST_MS = 120_000L
+private const val BROWSING_GPS_MS = 5_000L
 
 /** How often the map tells the app where it is, while it keeps moving. */
 private const val CAMERA_REPORT_MS = 2_000L
@@ -268,7 +276,12 @@ fun MapScreen(
     val powerMode by viewModel.powerMode.collectAsStateWithLifecycle()
     val online by viewModel.online.collectAsStateWithLifecycle()
     val downloadedCells by viewModel.downloadedCells.collectAsStateWithLifecycle()
-    val lastFixForSun by viewModel.lastFix.collectAsStateWithLifecycle()
+    // A fix comes every second or so: read as it is only where needed (the GoTo panel, the map
+    // layers), so it doesn't redraw this whole screen. The rest gets it rounded, and changes
+    // only when that does: about 10 m for the way back to signal, about 1 km for the sun.
+    val lastFix = viewModel.lastFix.collectAsStateWithLifecycle()
+    val nearHere by remember { derivedStateOf { lastFix.value?.let { LatLon(round(it.latitude, 4), round(it.longitude, 4)) } } }
+    val sunHere by remember { derivedStateOf { lastFix.value?.let { LatLon(round(it.latitude, 2), round(it.longitude, 2)) } } }
     val autoHide = autoHideSetting && !plan.active
     // Touch lock: everything but the lock button ignores touches; the controls step aside.
     var locked by rememberSaveable { mutableStateOf(false) }
@@ -492,12 +505,11 @@ fun MapScreen(
             ) {
                 if (plan.active) PlanPanel(planStats, plan.editing?.name, Modifier.fillMaxWidth())
                 // Where the sun sets for the user: their position, or the map's before a fix.
-                val sunPosition = lastFixForSun?.let { LatLon(it.latitude, it.longitude) }
-                    ?: map?.cameraPosition?.target?.let { LatLon(it.latitude, it.longitude) }
+                val sunPosition = sunHere ?: map?.cameraPosition?.target?.let { LatLon(it.latitude, it.longitude) }
                 goTo?.let { target ->
                     GoToPanel(
                         target = target,
-                        here = lastFixForSun?.let { LatLon(it.latitude, it.longitude, LocationRepository.altitude(it)) },
+                        here = lastFix,
                         heading = heading,
                         mapBearing = bearing,
                         onStop = { viewModel.goTo(null) },
@@ -552,7 +564,7 @@ fun MapScreen(
                 lastSignal?.let { spot ->
                     val signalName = stringResource(R.string.signal_goto_name)
                     if (goTo?.position != spot.position) {
-                        SignalNote(spot, lastFixForSun?.let { LatLon(it.latitude, it.longitude) }) {
+                        SignalNote(spot, nearHere) {
                             viewModel.goTo(GoTo(signalName, spot.position))
                         }
                     }
@@ -850,14 +862,22 @@ fun MapScreen(
         PowerMode.Stamina -> MapLocation.Power.Minimal
     }
     val gpsMs by viewModel.screenGpsMs.collectAsStateWithLifecycle()
-    LaunchedEffect(map, style, hasLocation, visible, markerPower, gpsMs) {
+    // Only looking at the map (not following the position, a route or recording): after a
+    // while the dot doesn't need a fix every second.
+    val browsing = followMode == FollowMode.Off && recording == null && followedRoute == null
+    LaunchedEffect(map, style, hasLocation, visible, markerPower, gpsMs, browsing) {
         val m = map ?: return@LaunchedEffect
         val s = style ?: return@LaunchedEffect
         if (!hasLocation) return@LaunchedEffect
         if (!visible) return@LaunchedEffect MapLocation.hide(m)
         MapLocation.activate(context, m, s, markerPower)
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            viewModel.locations(gpsMs).collect { MapLocation.update(m, it) }
+            if (browsing) {
+                withTimeoutOrNull(BROWSING_FAST_MS) { viewModel.locations(gpsMs).collect { MapLocation.update(m, it) } }
+                viewModel.locations(maxOf(gpsMs, BROWSING_GPS_MS)).collect { MapLocation.update(m, it) }
+            } else {
+                viewModel.locations(gpsMs).collect { MapLocation.update(m, it) }
+            }
         }
     }
 
@@ -1002,7 +1022,7 @@ fun MapScreen(
         )
     }
 
-    MapLayerEffects(viewModel, planner, map, style, planPreview, handleReach, goTo, lastFixForSun?.let { LatLon(it.latitude, it.longitude) })
+    MapLayerEffects(viewModel, planner, map, style, planPreview, handleReach, goTo, lastFix, visible)
 
     if (askPlanName) {
         TrackNameDialog(
@@ -1163,8 +1183,10 @@ private fun MapLayerEffects(
     planPreview: List<LatLon>?,
     handleReach: Dp,
     goTo: GoTo?,
-    /** The last position known. */
-    here: LatLon?,
+    /** The last fix known. */
+    lastFix: State<Location?>,
+    /** False under another screen: the recording isn't drawn until the map shows again. */
+    visible: Boolean,
 ) {
     val context = LocalContext.current
     val overlays by viewModel.overlays.collectAsStateWithLifecycle()
@@ -1232,6 +1254,7 @@ private fun MapLayerEffects(
         val s = style ?: return@LaunchedEffect
         SignalLayer.sync(context, s, lastSignal?.position)
     }
+    val here = lastFix.value?.let { LatLon(it.latitude, it.longitude) }
     LaunchedEffect(style, goTo, here) {
         val s = style ?: return@LaunchedEffect
         GoToLayer.sync(s, here?.takeIf { goTo != null }, goTo?.position)
@@ -1246,10 +1269,11 @@ private fun MapLayerEffects(
     LaunchedEffect(style, shownTracks, editedId) {
         style?.let { TrackLayers.syncShown(it, shownTracks.filter { t -> t.id != editedId }) }
     }
-    // Each update sends the whole line to the map: a few seconds apart is plenty at walking
-    // pace, and the newest state is always the one drawn.
-    LaunchedEffect(style) {
+    // A few seconds apart is plenty at walking pace, and the newest state is always the one
+    // drawn. Not while another screen covers the map: it catches up when shown.
+    LaunchedEffect(style, visible) {
         val s = style ?: return@LaunchedEffect
+        if (!visible) return@LaunchedEffect
         snapshotFlow { recording?.segments.orEmpty() }.conflate().collect {
             TrackLayers.syncRecording(s, it)
             delay(RECORDING_REDRAW_MS)
@@ -1302,4 +1326,10 @@ private fun MapReminders(viewModel: HomeViewModel) {
             },
         )
     }
+}
+
+/** [value] rounded to [decimals] places. */
+private fun round(value: Double, decimals: Int): Double {
+    val f = 10.0.pow(decimals)
+    return kotlin.math.round(value * f) / f
 }

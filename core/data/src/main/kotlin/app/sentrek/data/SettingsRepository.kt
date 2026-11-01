@@ -1,6 +1,7 @@
 package app.sentrek.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -23,8 +24,14 @@ const val DEFAULT_EMERGENCY_NUMBER = "112"
 
 @Singleton
 class SettingsRepository @Inject constructor(@ApplicationContext private val context: Context) {
+    /**
+     * One setting as a flow. Any write sends all of them again: only real changes go on, or
+     * every collector (the tracking service, the map) would redo its work for nothing.
+     */
+    private fun <T> prefs(read: (Preferences) -> T): Flow<T> = context.settings.data.map(read).distinctUntilChanged()
+
     val showTrailDifficulty: Flow<Boolean> =
-        context.settings.data.map { it[SHOW_TRAIL_DIFFICULTY] ?: true }
+        prefs { it[SHOW_TRAIL_DIFFICULTY] ?: true }
 
     suspend fun setShowTrailDifficulty(show: Boolean) {
         context.settings.edit { it[SHOW_TRAIL_DIFFICULTY] = show }
@@ -35,7 +42,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
      * says. On for those who chose "Gloves" as button size in 0.14, when it was one.
      */
     val gloveMode: Flow<Boolean> =
-        context.settings.data.map { it[GLOVE_MODE] ?: (it[BUTTON_SIZE] == GLOVES_SIZE) }
+        prefs { it[GLOVE_MODE] ?: (it[BUTTON_SIZE] == GLOVES_SIZE) }
 
     suspend fun setGloveMode(on: Boolean) {
         context.settings.edit {
@@ -46,7 +53,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** The first-run guide was seen (or skipped); Settings › About can show it again. */
     val guideSeen: Flow<Boolean> =
-        context.settings.data.map { it[GUIDE_SEEN] ?: false }
+        prefs { it[GUIDE_SEEN] ?: false }
 
     suspend fun setGuideSeen(seen: Boolean) {
         context.settings.edit { it[GUIDE_SEEN] = seen }
@@ -54,7 +61,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** A buzz before each junction where a followed route turns. Off unless chosen. */
     val turnBuzz: Flow<Boolean> =
-        context.settings.data.map { it[TURN_BUZZ] ?: false }
+        prefs { it[TURN_BUZZ] ?: false }
 
     suspend fun setTurnBuzz(on: Boolean) {
         context.settings.edit { it[TURN_BUZZ] = on }
@@ -62,7 +69,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** Volume keys zoom the map, without glove mode too. */
     val volumeKeysZoom: Flow<Boolean> =
-        context.settings.data.map { it[VOLUME_KEYS_ZOOM] ?: false }
+        prefs { it[VOLUME_KEYS_ZOOM] ?: false }
 
     suspend fun setVolumeKeysZoom(on: Boolean) {
         context.settings.edit { it[VOLUME_KEYS_ZOOM] = on }
@@ -70,7 +77,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** The SOS screen (Library > SOS) and everything on it. */
     val sosEnabled: Flow<Boolean> =
-        context.settings.data.map { it[SOS_ENABLED] ?: true }
+        prefs { it[SOS_ENABLED] ?: true }
 
     suspend fun setSosEnabled(on: Boolean) {
         context.settings.edit { it[SOS_ENABLED] = on }
@@ -78,7 +85,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** Called from the emergency screen: 112 by default; 911, a mountain rescue, a friend… */
     val emergencyNumber: Flow<String> =
-        context.settings.data.map { it[EMERGENCY_NUMBER]?.takeIf(String::isNotBlank) ?: DEFAULT_EMERGENCY_NUMBER }
+        prefs { it[EMERGENCY_NUMBER]?.takeIf(String::isNotBlank) ?: DEFAULT_EMERGENCY_NUMBER }
 
     suspend fun setEmergencyNumber(number: String) {
         context.settings.edit { if (number.isBlank()) it.remove(EMERGENCY_NUMBER) else it[EMERGENCY_NUMBER] = number.trim() }
@@ -86,7 +93,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** Whom the emergency SMS goes to; empty: chosen each time. */
     val emergencySmsTo: Flow<String> =
-        context.settings.data.map { it[EMERGENCY_SMS_TO].orEmpty() }
+        prefs { it[EMERGENCY_SMS_TO].orEmpty() }
 
     suspend fun setEmergencySmsTo(number: String) {
         context.settings.edit { if (number.isBlank()) it.remove(EMERGENCY_SMS_TO) else it[EMERGENCY_SMS_TO] = number.trim() }
@@ -94,7 +101,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** The name of the contact the SMS goes to, as in the phone's contacts; empty: unknown. */
     val emergencyContactName: Flow<String> =
-        context.settings.data.map { it[EMERGENCY_CONTACT_NAME].orEmpty() }
+        prefs { it[EMERGENCY_CONTACT_NAME].orEmpty() }
 
     /** Picked from the phone's contacts; a blank [number] clears it. */
     suspend fun setEmergencyContact(name: String, number: String) {
@@ -111,7 +118,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** While recording, the position goes by SMS to the emergency contact every so many minutes; 0: never. */
     val breadcrumbMinutes: Flow<Int> =
-        context.settings.data.map { it[BREADCRUMB_MINUTES] ?: 0 }
+        prefs { it[BREADCRUMB_MINUTES] ?: 0 }
 
     suspend fun setBreadcrumbMinutes(minutes: Int) {
         context.settings.edit { it[BREADCRUMB_MINUTES] = minutes }
@@ -119,7 +126,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** With breadcrumbs on: one more text when the battery runs low, before the phone goes off. */
     val lowBatterySms: Flow<Boolean> =
-        context.settings.data.map { it[LOW_BATTERY_SMS] ?: true }
+        prefs { it[LOW_BATTERY_SMS] ?: true }
 
     suspend fun setLowBatterySms(on: Boolean) {
         context.settings.edit { it[LOW_BATTERY_SMS] = on }
@@ -127,7 +134,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** While following a route: the last water before a long dry stretch, on screen and with a buzz. */
     val waterAdvice: Flow<Boolean> =
-        context.settings.data.map { it[WATER_ADVICE] ?: true }
+        prefs { it[WATER_ADVICE] ?: true }
 
     suspend fun setWaterAdvice(on: Boolean) {
         context.settings.edit { it[WATER_ADVICE] = on }
@@ -135,7 +142,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** While walking: rain, snow and storms on the way, from an hourly forecast (needs data). */
     val rainAdvice: Flow<Boolean> =
-        context.settings.data.map { it[RAIN_ADVICE] ?: true }
+        prefs { it[RAIN_ADVICE] ?: true }
 
     suspend fun setRainAdvice(on: Boolean) {
         context.settings.edit { it[RAIN_ADVICE] = on }
@@ -143,7 +150,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** While following a route: the long stretches in the sun ahead, from the terrain. */
     val shadeAdvice: Flow<Boolean> =
-        context.settings.data.map { it[SHADE_ADVICE] ?: true }
+        prefs { it[SHADE_ADVICE] ?: true }
 
     suspend fun setShadeAdvice(on: Boolean) {
         context.settings.edit { it[SHADE_ADVICE] = on }
@@ -151,7 +158,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** The turnaround alarm: off, before dark, or at a set time. */
     val turnaround: Flow<TurnaroundMode> =
-        context.settings.data.map { p -> TurnaroundMode.entries.firstOrNull { it.name == p[TURNAROUND] } ?: TurnaroundMode.Off }
+        prefs { p -> TurnaroundMode.entries.firstOrNull { it.name == p[TURNAROUND] } ?: TurnaroundMode.Off }
 
     suspend fun setTurnaround(mode: TurnaroundMode) {
         context.settings.edit { it[TURNAROUND] = mode.name }
@@ -159,7 +166,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** Before dark: the daylight to spare at the end of the route, in minutes. */
     val turnaroundMarginMinutes: Flow<Int> =
-        context.settings.data.map { it[TURNAROUND_MARGIN] ?: 30 }
+        prefs { it[TURNAROUND_MARGIN] ?: 30 }
 
     suspend fun setTurnaroundMarginMinutes(minutes: Int) {
         context.settings.edit { it[TURNAROUND_MARGIN] = minutes }
@@ -167,7 +174,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** At a time: the time of day, in minutes from midnight. */
     val turnaroundTime: Flow<Int> =
-        context.settings.data.map { it[TURNAROUND_TIME] ?: (14 * 60) }
+        prefs { it[TURNAROUND_TIME] ?: (14 * 60) }
 
     suspend fun setTurnaroundTime(minuteOfDay: Int) {
         context.settings.edit { it[TURNAROUND_TIME] = minuteOfDay }
@@ -175,11 +182,11 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** The user's own servers by name (see the map module's Server); missing: the default. */
     val servers: Flow<Map<String, String>> =
-        context.settings.data.map { p ->
+        prefs { p ->
             p.asMap().mapNotNull { (key, value) ->
                 key.name.removePrefix(SERVER_PREFIX).takeIf { key.name.startsWith(SERVER_PREFIX) }?.let { it to value as String }
             }.toMap()
-        }.distinctUntilChanged()
+        }
 
     /** Blank: back to the default. */
     suspend fun setServer(name: String, address: String) {
@@ -189,14 +196,14 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** The SMS button on the emergency screen. */
     val emergencySms: Flow<Boolean> =
-        context.settings.data.map { it[EMERGENCY_SMS] ?: true }
+        prefs { it[EMERGENCY_SMS] ?: true }
 
     suspend fun setEmergencySms(on: Boolean) {
         context.settings.edit { it[EMERGENCY_SMS] = on }
     }
 
     val textSize: Flow<TextSize> =
-        context.settings.data.map { p -> p[TEXT_SIZE]?.let { runCatching { TextSize.valueOf(it) }.getOrNull() } ?: TextSize.Default }
+        prefs { p -> p[TEXT_SIZE]?.let { runCatching { TextSize.valueOf(it) }.getOrNull() } ?: TextSize.Default }
 
     suspend fun setTextSize(size: TextSize) {
         context.settings.edit { it[TEXT_SIZE] = size.name }
@@ -204,7 +211,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** 0.14's "Gloves" size reads as [ButtonSize.Largest], with [gloveMode] on. */
     val buttonSize: Flow<ButtonSize> =
-        context.settings.data.map { p ->
+        prefs { p ->
             when (val stored = p[BUTTON_SIZE]) {
                 null -> ButtonSize.Standard
                 GLOVES_SIZE -> ButtonSize.Largest
@@ -222,7 +229,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** Vibrate when leaving the followed route and when back on it. */
     val offRouteVibration: Flow<Boolean> =
-        context.settings.data.map { it[OFF_ROUTE_VIBRATION] ?: true }
+        prefs { it[OFF_ROUTE_VIBRATION] ?: true }
 
     suspend fun setOffRouteVibration(on: Boolean) {
         context.settings.edit { it[OFF_ROUTE_VIBRATION] = on }
@@ -233,7 +240,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
      * contour lines. The theme and map stay as the user chose them.
      */
     val batterySaver: Flow<Boolean> =
-        context.settings.data.map { it[BATTERY_SAVER] ?: false }
+        prefs { it[BATTERY_SAVER] ?: false }
 
     suspend fun setBatterySaver(on: Boolean) {
         context.settings.edit { it[BATTERY_SAVER] = on }
@@ -244,7 +251,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
      * it on turns battery saver off, which it replaces.
      */
     val staminaMode: Flow<Boolean> =
-        context.settings.data.map { it[STAMINA_MODE] ?: false }
+        prefs { it[STAMINA_MODE] ?: false }
 
     suspend fun setStaminaMode(on: Boolean) {
         context.settings.edit {
@@ -255,7 +262,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** When the power modes come on by themselves (Settings > Advanced). */
     val autoPower: Flow<AutoPower> =
-        context.settings.data.map {
+        prefs {
             AutoPower(
                 enabled = it[AUTO_POWER] ?: true,
                 saverAt = it[AUTO_SAVER_AT] ?: AutoPower.DEFAULT_SAVER_AT,
@@ -265,7 +272,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
                 phoneSaverSeen = it[PHONE_SAVER_SEEN] ?: false,
                 saverByPhone = it[SAVER_BY_PHONE] ?: false,
             )
-        }.distinctUntilChanged()
+        }
 
     suspend fun setAutoPower(on: Boolean) {
         context.settings.edit { it[AUTO_POWER] = on }
@@ -298,17 +305,17 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** Which of normal, battery saver and stamina mode is on. */
     val powerMode: Flow<PowerMode> =
-        context.settings.data.map {
+        prefs {
             when {
                 it[STAMINA_MODE] == true -> PowerMode.Stamina
                 it[BATTERY_SAVER] == true -> PowerMode.Saver
                 else -> PowerMode.Normal
             }
-        }.distinctUntilChanged()
+        }
 
     /** GPS fix intervals (Settings > Advanced); the power mode is applied by the callers. */
     val gpsTiming: Flow<GpsTiming> =
-        context.settings.data.map { prefs ->
+        prefs { prefs ->
             GpsTiming(
                 screenMs = prefs[GPS_SCREEN_MS] ?: GpsTiming.Default.screenMs,
                 followMs = prefs[GPS_FOLLOW_MS] ?: GpsTiming.Default.followMs,
@@ -325,11 +332,11 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     }
 
     /**
-     * Most frames per second the map draws; 0 for no cap (Settings > Advanced). No cap unless
-     * chosen: as smooth as the screen allows, until the user trades it for battery.
+     * Most frames per second the map draws; 0 for no cap (Settings > Advanced). Smart unless
+     * chosen: as smooth as the screen allows under a finger, capped while nobody touches it.
      */
     val mapMaxFps: Flow<Int> =
-        context.settings.data.map { it[MAP_MAX_FPS] ?: 0 }
+        prefs { it[MAP_MAX_FPS] ?: PowerMode.SMART_FPS }
 
     suspend fun setMapMaxFps(fps: Int) {
         context.settings.edit { it[MAP_MAX_FPS] = fps }
@@ -349,7 +356,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** The trail card open: every note, the places ahead and the profile, not just the numbers. */
     val trailCardExpanded: Flow<Boolean> =
-        context.settings.data.map { it[TRAIL_CARD_EXPANDED] ?: false }
+        prefs { it[TRAIL_CARD_EXPANDED] ?: false }
 
     suspend fun setTrailCardExpanded(expanded: Boolean) {
         context.settings.edit { it[TRAIL_CARD_EXPANDED] = expanded }
@@ -357,7 +364,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** The whole list of places ahead open, rather than just the next one. */
     val followPlacesExpanded: Flow<Boolean> =
-        context.settings.data.map { it[FOLLOW_PLACES_EXPANDED] ?: false }
+        prefs { it[FOLLOW_PLACES_EXPANDED] ?: false }
 
     suspend fun setFollowPlacesExpanded(expanded: Boolean) {
         context.settings.edit { it[FOLLOW_PLACES_EXPANDED] = expanded }
@@ -365,7 +372,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** The walking totals on the Tracks screen: all time, or this year (the default). */
     val tripTotalsAllTime: Flow<Boolean> =
-        context.settings.data.map { it[TRIP_TOTALS_ALL_TIME] ?: false }
+        prefs { it[TRIP_TOTALS_ALL_TIME] ?: false }
 
     suspend fun setTripTotalsAllTime(allTime: Boolean) {
         context.settings.edit { it[TRIP_TOTALS_ALL_TIME] = allTime }
@@ -373,7 +380,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** Light (the default), dark, OLED black, or the phone's own choice. */
     val theme: Flow<AppTheme> =
-        context.settings.data.map { prefs ->
+        prefs { prefs ->
             AppTheme.entries.firstOrNull { it.name == prefs[THEME] } ?: AppTheme.System
         }
 
@@ -383,7 +390,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** Day or night map colours, on their own or following the app theme. */
     val mapTheme: Flow<MapTheme> =
-        context.settings.data.map { prefs ->
+        prefs { prefs ->
             MapTheme.entries.firstOrNull { it.name == prefs[MAP_THEME] } ?: MapTheme.Day
         }
 
@@ -396,7 +403,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
      * into an OLED screen. A swipe from the edge shows them for a moment.
      */
     val fullScreen: Flow<Boolean> =
-        context.settings.data.map { it[FULL_SCREEN] ?: false }
+        prefs { it[FULL_SCREEN] ?: false }
 
     suspend fun setFullScreen(on: Boolean) {
         context.settings.edit { it[FULL_SCREEN] = on }
@@ -404,7 +411,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** Map buttons and bar fade out after a while without touches (OLED burn-in). */
     val autoHideControls: Flow<Boolean> =
-        context.settings.data.map { it[AUTO_HIDE_CONTROLS] ?: false }
+        prefs { it[AUTO_HIDE_CONTROLS] ?: false }
 
     suspend fun setAutoHideControls(on: Boolean) {
         context.settings.edit { it[AUTO_HIDE_CONTROLS] = on }
@@ -412,7 +419,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** The map always points north: no turning with two fingers or in heading-up mode. */
     val rotationLocked: Flow<Boolean> =
-        context.settings.data.map { it[ROTATION_LOCKED] ?: false }
+        prefs { it[ROTATION_LOCKED] ?: false }
 
     suspend fun setRotationLocked(locked: Boolean) {
         context.settings.edit { it[ROTATION_LOCKED] = locked }
@@ -421,14 +428,14 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     /** Scale bar at the top left of the map. */
     /** The touch lock button on the map, against rain drops and pocket touches. */
     val showLockButton: Flow<Boolean> =
-        context.settings.data.map { it[SHOW_LOCK_BUTTON] ?: true }
+        prefs { it[SHOW_LOCK_BUTTON] ?: true }
 
     suspend fun setShowLockButton(show: Boolean) {
         context.settings.edit { it[SHOW_LOCK_BUTTON] = show }
     }
 
     val showScaleBar: Flow<Boolean> =
-        context.settings.data.map { it[SHOW_SCALE_BAR] ?: true }
+        prefs { it[SHOW_SCALE_BAR] ?: true }
 
     suspend fun setShowScaleBar(show: Boolean) {
         context.settings.edit { it[SHOW_SCALE_BAR] = show }
@@ -436,7 +443,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** Contour lines on the map, drawn from the terrain data. */
     val showContours: Flow<Boolean> =
-        context.settings.data.map { it[SHOW_CONTOURS] ?: true }
+        prefs { it[SHOW_CONTOURS] ?: true }
 
     suspend fun setShowContours(show: Boolean) {
         context.settings.edit { it[SHOW_CONTOURS] = show }
@@ -444,7 +451,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** Slopes of 30° and more shaded on the map, as on avalanche maps. */
     val showSlopes: Flow<Boolean> =
-        context.settings.data.map { it[SHOW_SLOPES] ?: false }
+        prefs { it[SHOW_SLOPES] ?: false }
 
     suspend fun setShowSlopes(show: Boolean) {
         context.settings.edit { it[SHOW_SLOPES] = show }
@@ -452,7 +459,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** Downloaded areas updated by themselves at startup, on Wi-Fi only. */
     val autoUpdateMaps: Flow<Boolean> =
-        context.settings.data.map { it[AUTO_UPDATE_MAPS] ?: false }
+        prefs { it[AUTO_UPDATE_MAPS] ?: false }
 
     suspend fun setAutoUpdateMaps(on: Boolean) {
         context.settings.edit { it[AUTO_UPDATE_MAPS] = on }
@@ -460,7 +467,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** A reminder at startup when downloaded maps are a few months old. */
     val mapUpdateReminders: Flow<Boolean> =
-        context.settings.data.map { it[MAP_REMINDERS] ?: true }
+        prefs { it[MAP_REMINDERS] ?: true }
 
     suspend fun setMapUpdateReminders(on: Boolean) {
         context.settings.edit { it[MAP_REMINDERS] = on }
@@ -468,7 +475,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** When the user last put the reminder off (epoch ms); 0 if never. */
     val mapReminderSnoozedAt: Flow<Long> =
-        context.settings.data.map { it[MAP_REMINDER_SNOOZED] ?: 0L }
+        prefs { it[MAP_REMINDER_SNOOZED] ?: 0L }
 
     suspend fun snoozeMapReminder(now: Long) {
         context.settings.edit { it[MAP_REMINDER_SNOOZED] = now }
@@ -476,7 +483,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** Back on the map asks for a second press before leaving the app. */
     val confirmExit: Flow<Boolean> =
-        context.settings.data.map { it[CONFIRM_EXIT] ?: true }
+        prefs { it[CONFIRM_EXIT] ?: true }
 
     suspend fun setConfirmExit(on: Boolean) {
         context.settings.edit { it[CONFIRM_EXIT] = on }
@@ -484,7 +491,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** Units for each quantity; metric until chosen otherwise. */
     val units: Flow<Units> =
-        context.settings.data.map { prefs ->
+        prefs { prefs ->
             val default = Units.Metric
             Units(
                 distance = prefs[DISTANCE_UNIT].toEnum(default.distance),
@@ -509,9 +516,9 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** Where the map was last left, so the app reopens there (also after a crash). */
     val lastCamera: Flow<SavedCamera?> =
-        context.settings.data.map { prefs ->
-            val lat = prefs[CAMERA_LAT] ?: return@map null
-            val lon = prefs[CAMERA_LON] ?: return@map null
+        prefs { prefs ->
+            val lat = prefs[CAMERA_LAT] ?: return@prefs null
+            val lon = prefs[CAMERA_LON] ?: return@prefs null
             SavedCamera(lat, lon, prefs[CAMERA_ZOOM] ?: SavedCamera.DEFAULT_ZOOM, prefs[CAMERA_BEARING] ?: 0.0)
                 .takeIf { it.isValid }
         }

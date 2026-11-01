@@ -209,13 +209,14 @@ class TrackingService : Service() {
         val f = following.state.value
         val manager = NotificationManagerCompat.from(this)
         if ((r == null && f == null) || !manager.areNotificationsEnabled()) return
-        val summary = live.summary(r, f, at, System.currentTimeMillis())
-        if (!force && summary == shown) return
         // With the screen off nobody reads it: the numbers every half minute are plenty, but
         // what calls for attention (off route, paused, a tap to confirm) goes out at once.
+        // Checked first, so the text isn't even put together in between.
         val alerts = "${r?.isPaused} ${f?.offRoute} ${live.armed}"
         val now = SystemClock.elapsedRealtime()
         if (!force && power?.isInteractive == false && alerts == notifiedAlerts && now - notifiedAt < SCREEN_OFF_NOTIFICATION_MS) return
+        val summary = live.summary(r, f, at, System.currentTimeMillis())
+        if (!force && summary == shown) return
         shown = summary
         notifiedAt = now
         notifiedAlerts = alerts
@@ -280,6 +281,7 @@ class TrackingService : Service() {
         breadcrumbs.check(recording.state.value, fix, breadcrumbMinutes, breadcrumbTo, breadcrumbName, lowBatterySms)
 
     override fun onDestroy() {
+        recording.flush()
         runCatching { unregisterReceiver(screenOn) }
         motionSensor?.let { sensors?.cancelTriggerSensor(motion, it) }
         if (recording.state.value == null) checkBreadcrumbs()

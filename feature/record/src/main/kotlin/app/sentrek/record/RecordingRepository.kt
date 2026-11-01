@@ -3,6 +3,7 @@ package app.sentrek.record
 import app.sentrek.geo.track.JumpFilter
 import android.content.Context
 import android.location.Location
+import android.os.SystemClock
 import android.util.Log
 import app.sentrek.geo.Geo
 import app.sentrek.geo.LatLon
@@ -122,7 +123,7 @@ class RecordingRepository @Inject constructor(
         // Standing still, GPS wanders a few metres: don't record that as walking.
         if (!startSegment && last != null && Geo.distance(last.position, position) < MIN_STEP_M) return
 
-        write {
+        write(flush = false) {
             if (startSegment) TrackJournal.appendSegment(it)
             TrackJournal.append(it, point)
         }
@@ -192,12 +193,32 @@ class RecordingRepository @Inject constructor(
         writer = FileWriter(journal, true).buffered()
     }
 
-    private fun write(block: (Writer) -> Unit) {
+    /**
+     * Appends to the journal. Points reach the disk every [FLUSH_POINTS] or [FLUSH_MS] (one
+     * write per few metres walked would keep the storage busy all day); pauses and resumes at
+     * once. Should the app be killed, at most that much of the track is lost.
+     */
+    private fun write(flush: Boolean = true, block: (Writer) -> Unit) {
         val out = writer ?: return
         runCatching {
             block(out)
-            out.flush()
+            unflushed++
+            val now = SystemClock.elapsedRealtime()
+            if (flush || unflushed >= FLUSH_POINTS || now - flushedAt >= FLUSH_MS) {
+                out.flush()
+                unflushed = 0
+                flushedAt = now
+            }
         }.onFailure { Log.e(TAG, "Cannot write journal", it) }
+    }
+
+    private var unflushed = 0
+    private var flushedAt = 0L
+
+    /** Writes what the journal still holds in memory: the service is going away. */
+    fun flush() {
+        runCatching { writer?.flush() }.onFailure { Log.e(TAG, "Cannot write journal", it) }
+        unflushed = 0
     }
 
     /**
@@ -231,6 +252,9 @@ class RecordingRepository @Inject constructor(
         const val MAX_ACCURACY_M = 30f
 
         const val MIN_STEP_M = 5.0
+
+        const val FLUSH_POINTS = 10
+        const val FLUSH_MS = 30_000L
     }
 }
 

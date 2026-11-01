@@ -68,6 +68,7 @@ class SignalWatch @Inject constructor(@ApplicationContext private val context: C
     }
 
     fun stop() {
+        _state.value?.last?.let(::save)
         val manager = telephony
         when (val c = callback) {
             null -> Unit
@@ -83,18 +84,30 @@ class SignalWatch @Inject constructor(@ApplicationContext private val context: C
         if (callback == null || !inService) return
         if (location.hasAccuracy() && location.accuracy > MAX_ACCURACY_M) return
         val spot = Spot(LatLon(location.latitude, location.longitude, LocationRepository.altitude(location)), location.time)
+        _state.value = State(true, spot)
+        // On disk now and then: the signal going away writes the last one anyway.
+        if (spot.time - savedAt >= SAVE_EVERY_MS) save(spot)
+    }
+
+    private fun onService(state: ServiceState) {
+        val was = inService
+        inService = state.state == ServiceState.STATE_IN_SERVICE
+        val last = _state.value?.last
+        if (was && !inService && last != null) save(last)
+        _state.value = State(inService, last ?: load())
+    }
+
+    /** When [save] last wrote, in fix time. */
+    private var savedAt = 0L
+
+    private fun save(spot: Spot) {
+        savedAt = spot.time
         saved.edit()
             .putString(LAT, spot.position.lat.toString())
             .putString(LON, spot.position.lon.toString())
             .putString(ELE, spot.position.ele?.toString())
             .putLong(TIME, spot.time)
             .apply()
-        _state.value = State(true, spot)
-    }
-
-    private fun onService(state: ServiceState) {
-        inService = state.state == ServiceState.STATE_IN_SERVICE
-        _state.value = State(inService, _state.value?.last ?: load())
     }
 
     private fun load(): Spot? {
@@ -114,6 +127,9 @@ class SignalWatch @Inject constructor(@ApplicationContext private val context: C
 
         /** A place to walk back to should be a place, not a guess. */
         const val MAX_ACCURACY_M = 50f
+
+        /** How often the last place with signal is written to disk while it keeps changing. */
+        const val SAVE_EVERY_MS = 60_000L
 
         /** Yesterday's walk is no help today. */
         const val KEEP_MS = 24 * 60 * 60 * 1000L

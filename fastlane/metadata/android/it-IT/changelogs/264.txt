@@ -1,0 +1,5 @@
+• Impostazioni › Mappa: ombreggiatura (spenta di base), curve di livello (ora spente), punti sulla mappa, frecce di direzione
+• Le tracce mostrate segnano partenza e arrivo, con frecce nel verso di marcia
+• Duplica un percorso o una traccia per modificarne una copia
+• Il segui-posizione non si ferma più col risparmio batteria; i punti GPS sbagliati vengono ignorati
+• Gli SMS con la posizione ora partono anche su Android 12 o precedenti e con due SIM

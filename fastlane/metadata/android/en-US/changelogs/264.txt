@@ -1,0 +1,5 @@
+• Settings › Map: hill shading (off by default), contour lines (now off by default), map points on or off, direction arrows
+• Shown tracks mark their start and end, with small arrows the way they go
+• Duplicate a route or track, to change a copy and keep the original
+• Following no longer stops when battery saver turns on; single wrong GPS fixes are ignored
+• Position texts now go out on Android 12 and older, and on two-SIM phones

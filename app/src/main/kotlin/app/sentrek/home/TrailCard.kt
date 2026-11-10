@@ -30,6 +30,7 @@ import app.sentrek.R
 import app.sentrek.record.Breadcrumbs
 import app.sentrek.record.Following
 import app.sentrek.record.Recording
+import app.sentrek.record.TrackNote
 import app.sentrek.ui.ElevationProfile
 import app.sentrek.ui.Format
 import app.sentrek.ui.SentrekIcons
@@ -40,7 +41,8 @@ import app.sentrek.ui.TouchTarget
  * Closed, three big numbers (what's left of the route, else what's been recorded) and the
  * most urgent note: what can be read at a glance, with the rest of the map free. A tap
  * anywhere on it opens the rest ([expanded], remembered): every note, the route's name and
- * Stop, the recording, the places ahead and the profile. Red while off the route.
+ * Stop, the user's own note on the route, the recording, the places ahead and the profile.
+ * Red while off the route.
  */
 @Composable
 fun TrailCard(
@@ -56,6 +58,12 @@ fun TrailCard(
     onOpenRoute: () -> Unit,
     /** Asks first (see FollowConfirmations): a stray tap mustn't end navigation. */
     onStop: (Following) -> Unit,
+    /** The followed route's own note and photos, shown open under its name. */
+    routeNote: String = "",
+    routePhotos: List<String> = emptyList(),
+    /** The note and photos open, or in one line; remembered. */
+    noteExpanded: Boolean = false,
+    onExpandNote: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (recording == null && following == null) return
@@ -84,6 +92,15 @@ fun TrailCard(
             if (following != null && (expanded || off)) RouteTitle(following, onOpenRoute, onStop)
             if (following != null) FollowNumbers(following) else if (recording != null) RecordingNumbers(recording)
             if (expanded) {
+                // Under the numbers, so they stay where they were when the card opens.
+                if (following != null) {
+                    TrackNote(
+                        routeNote, routePhotos, noteExpanded, onExpandNote, photoSize = TouchTarget,
+                        // A few lines at most: the map stays the main thing on screen.
+                        maxHeight = 160.dp,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
                 if (following != null && recording != null) RecordingNumbers(recording, Modifier.align(Alignment.CenterHorizontally), compact = true)
                 if (recording != null) BreadcrumbLine(Modifier.align(Alignment.CenterHorizontally))
                 notes.forEach { TrailNote(it) }

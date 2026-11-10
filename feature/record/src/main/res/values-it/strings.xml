@@ -56,8 +56,13 @@ Registra un’escursione o importa un file GPX/KML.</string>
     <string name="tracks_delete">Elimina</string>
     <string name="tracks_cancel">Annulla</string>
     <string name="tracks_name">Nome</string>
-    <string name="tracks_rename">Rinomina traccia</string>
-    <string name="tracks_rename_confirm">Rinomina</string>
+    <string name="tracks_details">Nome, nota e foto</string>
+    <string name="tracks_note_more">Mostra nota e foto</string>
+    <string name="tracks_note_less">Nota e foto in una riga</string>
+    <plurals name="tracks_photos">
+        <item quantity="one">%d foto</item>
+        <item quantity="other">%d foto</item>
+    </plurals>
     <string name="tracks_follow">Segui</string>
     <string name="tracks_stop_following">Smetti di seguire</string>
     <string name="tracks_import">Importa</string>

@@ -40,7 +40,8 @@ class BackupRepository @Inject constructor(
         runCatching {
             context.contentResolver.openOutputStream(target)?.use { out ->
                 val all = places.places.value
-                write(out, tracks.directory.listFiles().orEmpty().filter { it.isFile }, all, all.flatMap { it.photos })
+                val trackPhotos = tracks.tracks.value.flatMap { it.photos }
+                write(out, tracks.directory.listFiles().orEmpty().filter { it.isFile }, all, all.flatMap { it.photos } + trackPhotos)
             } ?: error("No output stream")
         }.onFailure { Log.w(TAG, "Backup failed", it) }.isSuccess
     }
@@ -50,11 +51,11 @@ class BackupRepository @Inject constructor(
         write(out, emptyList(), listOf(place), place.photos)
     }
 
-    /** One track, with the places saved while it was recorded and their photos. */
+    /** One track with its photos, and the places saved while it was recorded with theirs. */
     suspend fun shareTrack(track: SavedTrack): File? = shareFile(track.name) { out ->
         val files = tracks.directory.listFiles { f -> f.isFile && f.name.substringBeforeLast('.') == track.id }.orEmpty().toList()
         val during = if (track.imported) emptyList() else places.savedBetween(track.startTime, track.endTime)
-        write(out, files, during, during.flatMap { it.photos })
+        write(out, files, during, track.photos + during.flatMap { it.photos })
     }
 
     /** True when [source] is a Sentrek file (a plain KMZ is a zip too). */

@@ -63,6 +63,16 @@ class PhotoStore @Inject constructor(@ApplicationContext private val context: Co
         }.onFailure { Log.w(TAG, "Cannot import photo", it); file(name).delete() }.getOrNull()
     }
 
+    /** Copies of [names] under new names, for a copied route; the missing ones are left out. */
+    suspend fun copy(names: List<String>): List<String> = withContext(Dispatchers.IO) {
+        names.mapNotNull { name ->
+            val copy = newName()
+            runCatching { file(name).copyTo(file(copy)); copy }
+                .onFailure { Log.w(TAG, "Cannot copy photo $name", it); file(copy).delete() }
+                .getOrNull()
+        }
+    }
+
     fun delete(names: Collection<String>) {
         for (n in names) {
             file(n).delete()

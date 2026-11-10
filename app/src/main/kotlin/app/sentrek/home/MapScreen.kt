@@ -262,9 +262,10 @@ fun MapScreen(
     // through Off -> North up -> heading up -> Off, as in Trekarta; panning pauses following,
     // and the next tap resumes the mode it had ([resumeMode]).
     var followMode by remember { mutableStateOf(FollowMode.Off) }
-    var resumeMode by remember { mutableStateOf(FollowMode.North) }
-    // A mode to apply once the position marker exists (right after a permission grant it doesn't yet).
-    var followRequest by remember { mutableStateOf<FollowMode?>(null) }
+    var resumeMode by remember { mutableStateOf(viewModel.resumeMode) }
+    // A mode to apply once the position marker exists (right after a permission grant it doesn't
+    // yet). A map built again (battery saver coming on, a theme change) follows as the last one did.
+    var followRequest by remember { mutableStateOf(viewModel.followMode.takeIf { it != FollowMode.Off }) }
     val rotationLocked by viewModel.rotationLocked.collectAsStateWithLifecycle()
     // Buttons and bar fade out after a while without touches: more map, and nothing static to
     // burn into OLED screens. A touch brings them back. Not while planning: that needs them.
@@ -909,8 +910,10 @@ fun MapScreen(
             // Stopped by a gesture, not by the button: the next tap picks up where it was.
             if (mode == FollowMode.Off && followMode != FollowMode.Off && followRequest != FollowMode.Off) {
                 resumeMode = followMode
+                viewModel.resumeMode = followMode
             }
             followMode = mode
+            viewModel.followMode = mode
         }
         onDispose { stop() }
     }

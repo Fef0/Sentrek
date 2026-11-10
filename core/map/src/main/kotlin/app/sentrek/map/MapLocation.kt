@@ -106,6 +106,13 @@ object MapLocation {
         val last = shown
         val still = maxOf(STILL_M, STILL_PX * map.projection.getMetersPerPixelAtLatitude(location.latitude).toFloat())
         if (last != null && component.lastKnownLocation != null && isSame(last, location, still)) return
+        // A wild fix (rock walls, a gorge) would throw the followed view far off and back: a
+        // few in a row are believed, a real jump (out of a car) shows a few seconds late.
+        if (last != null && isWild(last, location) && wild < WILD_IN_A_ROW) {
+            wild++
+            return
+        }
+        wild = 0
         shown = Location(location)
         setAnimationFps(component)
         component.forceLocationUpdate(location)
@@ -113,6 +120,20 @@ object MapLocation {
 
     /** The last fix handed to the marker. */
     private var shown: Location? = null
+
+    /** Wild fixes skipped in a row (see [isWild]). */
+    private var wild = 0
+
+    /**
+     * Too far for the time since [last] (faster than anyone walks, cycles or rides a lift), or
+     * suddenly much worse than a good fix a moment ago.
+     */
+    private fun isWild(last: Location, next: Location): Boolean {
+        val seconds = maxOf(1.0, abs(next.time - last.time) / 1000.0)
+        if (last.distanceTo(next) / seconds > WILD_SPEED_MPS) return true
+        return next.hasAccuracy() && next.accuracy > POOR_ACCURACY_M &&
+            last.hasAccuracy() && last.accuracy <= GOOD_ACCURACY_M && seconds < RECENT_S
+    }
 
     private fun isSame(a: Location, b: Location, stillM: Float): Boolean =
         a.distanceTo(b) < stillM &&
@@ -123,6 +144,12 @@ object MapLocation {
         val d = abs(a - b) % 360f
         return if (d > 180f) 360f - d else d
     }
+
+    private const val WILD_SPEED_MPS = 70.0
+    private const val WILD_IN_A_ROW = 3
+    private const val POOR_ACCURACY_M = 100f
+    private const val GOOD_ACCURACY_M = 30f
+    private const val RECENT_S = 30.0
 
     /** Closer than this, a new fix moves the marker by a pixel or two at hiking zooms. */
     private const val STILL_M = 2f

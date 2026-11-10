@@ -20,6 +20,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -149,6 +153,9 @@ fun PlaceDialog(title: String, initial: Place, onSave: (Place) -> Unit, onDismis
 
     AlertDialog(
         onDismissRequest = dismiss,
+        // Ends above the keyboard: taller, the window slid up a little with each letter typed in the note.
+        modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 44.dp, vertical = 16.dp),
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
         title = { Text(title) },
         text = {
             Column(

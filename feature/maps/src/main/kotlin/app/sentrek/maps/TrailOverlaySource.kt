@@ -2,7 +2,9 @@ package app.sentrek.maps
 
 import app.sentrek.geo.overlay.OverlayLineSource
 import app.sentrek.geo.BoundingBox
+import app.sentrek.geo.overlay.MapKind
 import app.sentrek.geo.overlay.OverlayPoiSource
+import app.sentrek.geo.overlay.OverpassExtras
 import app.sentrek.geo.overlay.OverpassOverlay
 import app.sentrek.map.MapEngine
 import app.sentrek.map.Server
@@ -22,8 +24,12 @@ import javax.inject.Inject
 
 /** Where the hiking overlay (trail difficulty + points) comes from. Swapped for our own static files before public release. */
 interface TrailOverlaySource {
-    /** Writes the overlay GeoJSON for [box] to [out]. [onBusy] says when it waits for a busy server, and when it asks again. */
-    suspend fun fetch(box: BoundingBox, out: File, onBusy: (Boolean) -> Unit = {})
+    /**
+     * Writes the details of [kind] for [box] to [out] as GeoJSON: the hiking overlay, or a
+     * map's extras ([MapKind.extras]). [onBusy] says when it waits for a busy server, and when
+     * it asks again.
+     */
+    suspend fun fetch(box: BoundingBox, out: File, kind: MapKind = MapKind.Hiking, onBusy: (Boolean) -> Unit = {})
 }
 
 /**
@@ -37,12 +43,12 @@ class OverpassTrailSource @Inject constructor() : TrailOverlaySource {
         MapEngine.httpClient.newBuilder().readTimeout(240, TimeUnit.SECONDS).build()
     }
 
-    override suspend fun fetch(box: BoundingBox, out: File, onBusy: (Boolean) -> Unit) {
+    override suspend fun fetch(box: BoundingBox, out: File, kind: MapKind, onBusy: (Boolean) -> Unit) {
         var lastError: IOException? = null
         repeat(ROUNDS) { round ->
             for (endpoint in ENDPOINTS) {
                 try {
-                    runInterruptible(Dispatchers.IO) { request(endpoint, box, out) }
+                    runInterruptible(Dispatchers.IO) { request(endpoint, box, out, kind) }
                     return
                 } catch (e: IOException) {
                     lastError = e
@@ -57,15 +63,18 @@ class OverpassTrailSource @Inject constructor() : TrailOverlaySource {
         throw lastError ?: IOException("Overpass unavailable")
     }
 
-    private fun request(endpoint: String, box: BoundingBox, out: File) {
+    private fun request(endpoint: String, box: BoundingBox, out: File, kind: MapKind) {
         val request = Request.Builder()
             .url(endpoint)
-            .post(FormBody.Builder().add("data", OverpassOverlay.query(box)).build())
+            .post(FormBody.Builder().add("data", OverpassExtras.query(kind, box)).build())
             .build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw IOException("$endpoint: HTTP ${response.code}")
             val tmp = File(out.path + ".tmp")
-            tmp.bufferedWriter().use { writer -> OverpassOverlay.convert(response.body!!.charStream(), writer) }
+            tmp.bufferedWriter().use { writer ->
+                val input = response.body!!.charStream()
+                if (kind == MapKind.Hiking) OverpassOverlay.convert(input, writer) else OverpassExtras.convert(kind, input, writer)
+            }
             if (!tmp.renameTo(out)) throw IOException("Cannot write ${out.name}")
         }
     }

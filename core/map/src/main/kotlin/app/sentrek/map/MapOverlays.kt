@@ -1,6 +1,7 @@
 package app.sentrek.map
 
 import app.sentrek.geo.RegionCell
+import app.sentrek.geo.overlay.MapKind
 import app.sentrek.geo.overlay.OverpassOverlay
 import app.sentrek.geo.overlay.PoiKind
 import org.maplibre.android.maps.Style
@@ -52,6 +53,7 @@ import org.maplibre.android.style.layers.PropertyFactory.textHaloWidth
 import org.maplibre.android.style.layers.PropertyFactory.textOffset
 import org.maplibre.android.style.layers.PropertyFactory.textOptional
 import org.maplibre.android.style.layers.PropertyFactory.textSize
+import org.maplibre.android.style.layers.PropertyFactory.visibility
 import org.maplibre.android.style.layers.PropertyValue
 import org.maplibre.android.style.layers.RasterLayer
 import org.maplibre.android.style.layers.SymbolLayer
@@ -130,8 +132,14 @@ object MapOverlays {
 
     internal fun isRouteLayer(id: String) = id.startsWith(TRAILS) && id.endsWith(ROUTES)
 
-    /** [overlays]: cell id → overlay file. [showDifficulty] hides only the trail colours, not the points. */
-    fun sync(style: Style, rasters: List<RasterOverlay>, overlays: Map<String, File>, showDifficulty: Boolean) {
+    /**
+     * [overlays]: cell id → overlay file. [showDifficulty] hides only the trail colours, not the
+     * points. On the other maps than [MapKind.Hiking], hiking routes and difficulty colours
+     * are hidden: those maps draw their own routes ([MapExtras]).
+     */
+    fun sync(style: Style, rasters: List<RasterOverlay>, overlays: Map<String, File>, showDifficulty: Boolean, kind: MapKind = MapKind.Hiking) {
+        val hiking = kind == MapKind.Hiking
+        @Suppress("NAME_SHADOWING") val showDifficulty = showDifficulty && hiking
         // Layers are cheap to rebuild and that keeps the order right; sources (parsed
         // GeoJSON, open tile files) are kept whenever possible.
         style.layers.filter { it.id.startsWith(RASTER) || it.id.startsWith(TRAILS) }.forEach { style.removeLayer(it) }
@@ -159,7 +167,7 @@ object MapOverlays {
             loaded[sourceId] = file.lastModified()
             // The base tiles carry paths only from zoom 12; the overlay has every path, so in
             // downloaded areas trails show from further out.
-            style.addLayerBelow(routeLayer(style, sourceId, sourceId + ROUTES), BELOW_LAYER)
+            if (hiking) style.addLayerBelow(routeLayer(style, sourceId, sourceId + ROUTES), BELOW_LAYER)
             style.addLayerBelow(overviewLayer(style, sourceId, sourceId + OVERVIEW, showDifficulty), BELOW_LAYER)
             style.addLayerBelow(plainLayer(style, sourceId, sourceId + PLAIN_TRACK, track = true, showDifficulty), BELOW_LAYER)
             style.addLayerBelow(plainLayer(style, sourceId, sourceId + PLAIN_PATH, track = false, showDifficulty), BELOW_LAYER)
@@ -169,7 +177,7 @@ object MapOverlays {
                 style.addLayerBelow(trailLayer(sourceId, sourceId + FAINT, faint = true), BELOW_LAYER)
             }
             // Below every label: names and points win the space, the marks repeat anyway.
-            style.addLayerBelow(markLayer(sourceId, sourceId + MARKS), BELOW_LAYER)
+            if (hiking) style.addLayerBelow(markLayer(sourceId, sourceId + MARKS), BELOW_LAYER)
             // One layer per zoom tier (filters can't use zoom). Symbols collide with base labels
             // whatever their order, so these can sit on top.
             for ((minZoom, kinds) in PoiKind.entries.filter { it.onMap }.groupBy { it.minZoom }) {
@@ -177,6 +185,9 @@ object MapOverlays {
             }
         }
         for (layer in listOf(BASE_HIKING_POIS, BASE_PATH, BASE_TRACK, BASE_ROUTE, BASE_ROUTE_REF)) hideInDownloaded(style, layer, overlays.keys)
+        for (layer in listOf(BASE_ROUTE, BASE_ROUTE_REF)) {
+            style.getLayer(layer)?.setProperties(visibility(if (hiking) Property.VISIBLE else Property.NONE))
+        }
     }
 
     private fun pointLayer(sourceId: String, layerId: String, minZoom: Int, kinds: List<PoiKind>) =

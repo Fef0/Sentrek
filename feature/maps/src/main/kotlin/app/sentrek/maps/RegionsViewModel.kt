@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import app.sentrek.feature.maps.R
 import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.RegionCell
+import app.sentrek.geo.overlay.MapKind
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,6 +35,18 @@ class RegionsViewModel @Inject constructor(
     private val _selection = MutableStateFlow<Set<RegionCell>>(emptySet())
     val selection: StateFlow<Set<RegionCell>> = _selection.asStateFlow()
 
+    /**
+     * The extra maps for the selected areas: those of the first area picked, already on the
+     * phone, or the last ones downloaded for a new one.
+     */
+    private val _extras = MutableStateFlow(repository.lastExtras)
+    val extras: StateFlow<Set<MapKind>> = _extras.asStateFlow()
+
+    fun toggleExtra(kind: MapKind) {
+        _message.value = null
+        _extras.value = _extras.value.let { if (kind in it) it - kind else it + kind }
+    }
+
     private val _importing = MutableStateFlow(false)
     val importing: StateFlow<Boolean> = _importing.asStateFlow()
 
@@ -50,6 +63,7 @@ class RegionsViewModel @Inject constructor(
 
     fun toggle(cell: RegionCell) {
         _message.value = null
+        if (_selection.value.isEmpty()) _extras.value = regions.value[cell]?.extras?.keys ?: repository.lastExtras
         _selection.value = _selection.value.let { if (cell in it) it - cell else it + cell }
     }
 
@@ -61,7 +75,19 @@ class RegionsViewModel @Inject constructor(
         // Nothing would come: say why, and keep the selection for when the network is back.
         if (!isOnline(context)) return show(R.string.regions_offline)
         _message.value = null
-        repository.download(_selection.value.filter { it !in regions.value })
+        // Areas already there get the extra maps too, none taken away.
+        repository.download(_selection.value, _extras.value)
+        repository.lastExtras = _extras.value
+        clearSelection()
+    }
+
+    /** The selected areas on the phone get the extra maps chosen, and lose the others. */
+    fun saveExtras() {
+        val cells = _selection.value.filter { it in regions.value }
+        val adding = cells.any { (_extras.value - regions.value[it]?.extras?.keys.orEmpty()).isNotEmpty() }
+        if (adding && !isOnline(context)) return show(R.string.regions_offline)
+        _message.value = null
+        repository.setExtras(cells, _extras.value)
         clearSelection()
     }
 

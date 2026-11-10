@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import app.sentrek.geo.overlay.MapKind
 import app.sentrek.geo.units.Units
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -422,6 +423,14 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[MAP_THEME] = theme.name }
     }
 
+    /** Which map is shown: hiking, cycling or winter. */
+    val mapKind: Flow<MapKind> =
+        prefs { prefs -> prefs[MAP_KIND]?.let(MapKind::fromKey) ?: MapKind.Hiking }
+
+    suspend fun setMapKind(kind: MapKind) {
+        context.settings.edit { it[MAP_KIND] = kind.key }
+    }
+
     /**
      * Hides the status and navigation bars: more map, and no clock or battery icon burning
      * into an OLED screen. A swipe from the edge shows them for a moment.
@@ -628,6 +637,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val MAP_MAX_FPS = intPreferencesKey("map_max_fps")
         val THEME = stringPreferencesKey("theme")
         val MAP_THEME = stringPreferencesKey("map_theme")
+        val MAP_KIND = stringPreferencesKey("map_kind")
         val FULL_SCREEN = booleanPreferencesKey("full_screen")
         val AUTO_HIDE_CONTROLS = booleanPreferencesKey("auto_hide_controls")
         val CONFIRM_EXIT = booleanPreferencesKey("confirm_exit")

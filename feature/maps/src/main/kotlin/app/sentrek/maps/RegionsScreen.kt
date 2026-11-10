@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +53,10 @@ import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.LatLon
 import app.sentrek.geo.RegionCell
 import app.sentrek.geo.RegionGrid
+import app.sentrek.geo.overlay.MapKind
+import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import app.sentrek.map.CellLook
 import app.sentrek.map.MapStyle
 import app.sentrek.map.RegionGridLayer
@@ -87,6 +92,7 @@ fun RegionsScreen(
     val message by viewModel.message.collectAsStateWithLifecycle()
     val online by viewModel.online.collectAsStateWithLifecycle()
     val flyTo by viewModel.flyTo.collectAsStateWithLifecycle()
+    val extras by viewModel.extras.collectAsStateWithLifecycle()
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var style by remember { mutableStateOf<Style?>(null) }
     var view by remember { mutableStateOf<BoundingBox?>(null) }
@@ -152,6 +158,8 @@ fun RegionsScreen(
             trailsWaiting = stringResource(R.string.regions_cell_trails_waiting),
             trails = stringResource(R.string.regions_cell_trails),
             busy = stringResource(R.string.regions_cell_busy),
+            pistes = stringResource(R.string.regions_cell_pistes),
+            cycling = stringResource(R.string.regions_cell_cycling),
         )
         LaunchedEffect(style, view, regions, selection) {
             val s = style ?: return@LaunchedEffect
@@ -186,6 +194,9 @@ fun RegionsScreen(
             message = message,
             online = online,
             estimate = viewModel::estimate,
+            extras = extras,
+            onToggleExtra = viewModel::toggleExtra,
+            onSaveExtras = viewModel::saveExtras,
             onDownload = download,
             onDelete = {
                 val count = selection.count { it in regions }
@@ -239,7 +250,15 @@ private fun MapLibreMap.visibleBox(): BoundingBox? {
 }
 
 /** What each area on the grid says while it downloads; [map] takes the percentage. */
-private class CellLabels(val queued: String, val map: String, val trailsWaiting: String, val trails: String, val busy: String)
+private class CellLabels(
+    val queued: String,
+    val map: String,
+    val trailsWaiting: String,
+    val trails: String,
+    val busy: String,
+    val pistes: String,
+    val cycling: String,
+)
 
 private fun cellLooks(
     regions: Map<RegionCell, RegionState>,
@@ -251,13 +270,19 @@ private fun cellLooks(
         looks[cell] = when (val m = state.map) {
             MapDownload.Queued -> CellLook.Queued to labels.queued
             is MapDownload.Downloading -> CellLook.Downloading to String.format(labels.map, (m.fraction * 100).roundToInt())
-            // Green only once the hiking details (trails, huts, springs…) are there too.
-            is MapDownload.Ready -> when (state.trails) {
-                TrailsDownload.Ready -> CellLook.Ready to null
-                TrailsDownload.Failed -> CellLook.Failed to null
-                TrailsDownload.Missing, TrailsDownload.Waiting -> CellLook.Downloading to labels.trailsWaiting
-                TrailsDownload.Downloading -> CellLook.Downloading to labels.trails
-                TrailsDownload.Retrying -> CellLook.Downloading to labels.busy
+            // Green only once the hiking details (trails, huts, springs…) are there too, and
+            // the pistes or cycle routes asked for.
+            is MapDownload.Ready -> {
+                val extra = state.extras.entries.firstOrNull { it.value != TrailsDownload.Ready }
+                when {
+                    state.complete -> CellLook.Ready to null
+                    TrailsDownload.Failed in state.details -> CellLook.Failed to null
+                    state.trails == TrailsDownload.Missing || state.trails == TrailsDownload.Waiting -> CellLook.Downloading to labels.trailsWaiting
+                    state.trails == TrailsDownload.Downloading -> CellLook.Downloading to labels.trails
+                    TrailsDownload.Retrying in state.details -> CellLook.Downloading to labels.busy
+                    extra?.key == MapKind.Winter -> CellLook.Downloading to labels.pistes
+                    else -> CellLook.Downloading to labels.cycling
+                }
             }
         }
     }
@@ -276,6 +301,10 @@ private fun RegionsPanel(
     online: Boolean,
     /** About how many bytes downloading these areas takes, and the space left. */
     estimate: (Collection<RegionCell>) -> Pair<Long, Long>,
+    /** The extra maps chosen for the selected areas. */
+    extras: Set<MapKind>,
+    onToggleExtra: (MapKind) -> Unit,
+    onSaveExtras: () -> Unit,
     onDownload: () -> Unit,
     onDelete: () -> Unit,
     onClear: () -> Unit,
@@ -291,6 +320,9 @@ private fun RegionsPanel(
     val toDelete = selection.count { it in regions }
     val pending = regions.values.count { it.isPending }
     val trailsFailed = regions.values.count { it.trails == TrailsDownload.Failed }
+    val extrasFailed = regions.values.count { TrailsDownload.Failed in it.extras.values }
+    // Selected areas on the phone whose extra maps aren't the ones chosen.
+    val extrasChanged = selection.any { cell -> regions[cell]?.let { it.extras.keys != extras } == true }
     val storedBytes = regions.values.sumOf { (it.map as? MapDownload.Ready)?.bytes ?: 0L }
     val now = System.currentTimeMillis()
     val old = regions.values.count { it.isOld(now) }
@@ -346,10 +378,13 @@ private fun RegionsPanel(
                     val size = Formatter.formatShortFileSize(context, bytes)
                     Text(stringResource(R.string.regions_downloaded_on, size, day), style = MaterialTheme.typography.bodyLarge)
                 }
+                MapKinds(extras, onToggleExtra)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     // Three buttons at most, wide enough for gloves: new areas first.
                     if (toDownload > 0) {
                         PanelButton(stringResource(R.string.regions_download, toDownload), onDownload, Modifier.weight(1f))
+                    } else if (extrasChanged) {
+                        PanelButton(stringResource(R.string.regions_save, toDelete), onSaveExtras, Modifier.weight(1f))
                     } else if (toDelete > 0) {
                         PanelButton(stringResource(R.string.regions_update, toDelete), onUpdate, Modifier.weight(1f))
                     }
@@ -378,10 +413,14 @@ private fun RegionsPanel(
                 }
             }
 
-            if (trailsFailed > 0) {
+            if (trailsFailed > 0 || extrasFailed > 0) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        pluralStringResource(R.plurals.regions_trails_failed, trailsFailed, trailsFailed),
+                        if (trailsFailed > 0) {
+                            pluralStringResource(R.plurals.regions_trails_failed, trailsFailed, trailsFailed)
+                        } else {
+                            pluralStringResource(R.plurals.regions_extras_failed, extrasFailed, extrasFailed)
+                        },
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyLarge,
                     )
@@ -460,6 +499,49 @@ private fun ImportedMapsDialog(
     )
 }
 
+/** Which maps the selected areas get: hiking always, cycling and winter if chosen. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MapKinds(extras: Set<MapKind>, onToggle: (MapKind) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            itemVerticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.regions_maps_label), style = MaterialTheme.typography.titleSmall)
+            for (kind in MapKind.entries) {
+                val extra = kind in MapKind.extras
+                val selected = !extra || kind in extras
+                FilterChip(
+                    selected = selected,
+                    onClick = { if (extra) onToggle(kind) },
+                    enabled = extra,
+                    label = { Text(stringResource(kindName(kind))) },
+                    // A tick: the filled look alone is hard to tell apart in the dark theme.
+                    leadingIcon = if (selected) {
+                        { androidx.compose.material3.Icon(SentrekIcons.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    } else {
+                        null
+                    },
+                    modifier = Modifier.heightIn(min = TouchTarget),
+                )
+            }
+        }
+        Text(
+            stringResource(R.string.regions_kinds_hint),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private fun kindName(kind: MapKind) = when (kind) {
+    MapKind.Hiking -> R.string.regions_kind_hiking
+    MapKind.Cycling -> R.string.regions_kind_cycling
+    MapKind.Winter -> R.string.regions_kind_winter
+}
+
 @Composable
 private fun PanelButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, destructive: Boolean = false) {
     Button(
@@ -498,14 +580,18 @@ private fun DownloadProgress(states: Collection<RegionState>) {
             Text(pluralStringResource(R.plurals.regions_maps_waiting, mapsWaiting, mapsWaiting), style = MaterialTheme.typography.bodyLarge)
         }
 
-        val trails = states.map { it.trails }
+        // Pistes and cycle routes come from the same server, in the same queue.
+        val trails = states.flatMap { it.details }
         val fetching = TrailsDownload.Downloading in trails || TrailsDownload.Retrying in trails
-        val trailsWaiting = states.count {
-            it.trails == TrailsDownload.Waiting || (it.trails == TrailsDownload.Missing && it.map !is MapDownload.Ready)
+        val trailsWaiting = states.sumOf { s ->
+            s.details.count { it == TrailsDownload.Waiting || (it == TrailsDownload.Missing && s.map !is MapDownload.Ready) }
         }
+        val extraFetching = states.firstNotNullOfOrNull { s -> s.extras.entries.firstOrNull { it.value == TrailsDownload.Downloading }?.key }
         val trailsLine = when {
             TrailsDownload.Retrying in trails -> stringResource(R.string.regions_trails_busy)
-            TrailsDownload.Downloading in trails -> stringResource(R.string.regions_trails_progress)
+            states.any { it.trails == TrailsDownload.Downloading } -> stringResource(R.string.regions_trails_progress)
+            extraFetching == MapKind.Winter -> stringResource(R.string.regions_pistes_progress)
+            extraFetching == MapKind.Cycling -> stringResource(R.string.regions_cycling_progress)
             trailsWaiting > 0 -> stringResource(R.string.regions_trails_next)
             else -> null
         }

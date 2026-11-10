@@ -475,4 +475,19 @@
     <string name="guide_walk_title">Pianifica, segui, registra</string>
     <string name="guide_walk_text">Pianifica disegna un percorso lungo i sentieri mentre tocchi. In Raccolta › Tracce, Segui ti guida lungo un percorso e ti dice quanto manca. Registra salva la tua traccia, anche a schermo spento. L’SOS è in Raccolta, con la tua posizione a caratteri grandi.</string>
     <string name="settings_show_guide">Mostra la guida iniziale</string>
+    <string name="map_choose">Mappa e livelli</string>
+    <string name="map_kind_hiking">Escursionismo</string>
+    <string name="map_kind_cycling">Bici</string>
+    <string name="map_kind_winter">Inverno</string>
+    <string name="map_kind_hiking_hint">Sentieri per difficoltà, percorsi escursionistici segnati</string>
+    <string name="map_kind_cycling_hint">Percorsi ciclabili e MTB, piste ciclabili</string>
+    <string name="map_kind_winter_hint">Piste per difficoltà, fondo, scialpinismo, nomi degli impianti</string>
+    <string name="map_layers_title">Sulla mappa</string>
+    <string name="extra_missing_winter">Piste non scaricate qui</string>
+    <string name="extra_missing_cycling">Percorsi bici non scaricati qui</string>
+    <string name="extra_download">Scaricali</string>
+    <string name="extra_getting_winter">Scarico le piste…</string>
+    <string name="extra_getting_cycling">Scarico i percorsi bici…</string>
+    <string name="extra_failed_winter">Piste non scaricate · tocca per riprovare</string>
+    <string name="extra_failed_cycling">Percorsi bici non scaricati · tocca per riprovare</string>
 </resources>

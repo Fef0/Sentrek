@@ -84,4 +84,18 @@
     <string name="download_notification_area">%1$d left · map %2$d%%</string>
     <string name="download_notification_trails">Getting trail details: difficulty, huts and springs</string>
     <string name="download_notification_trails_busy">Trail server busy, trying again shortly</string>
+    <string name="regions_maps_label">Maps</string>
+    <string name="regions_kind_hiking">Hiking</string>
+    <string name="regions_kind_cycling">Cycling</string>
+    <string name="regions_kind_winter">Winter</string>
+    <string name="regions_kinds_hint">Cycling and Winter add cycle routes and pistes to the same map.</string>
+    <string name="regions_save">Save (%d)</string>
+    <string name="regions_cell_pistes">Getting pistes</string>
+    <string name="regions_cell_cycling">Getting cycle routes</string>
+    <string name="regions_pistes_progress">Pistes: getting ski runs and cross-country trails</string>
+    <string name="regions_cycling_progress">Cycling: getting cycle and mountain bike routes</string>
+    <plurals name="regions_extras_failed">
+        <item quantity="one">Pistes or cycle routes didn’t download for %d area</item>
+        <item quantity="other">Pistes or cycle routes didn’t download for %d areas</item>
+    </plurals>
 </resources>

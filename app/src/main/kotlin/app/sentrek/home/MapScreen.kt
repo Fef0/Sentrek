@@ -76,6 +76,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import app.sentrek.R
+import app.sentrek.geo.overlay.MapKind
+import app.sentrek.map.MapExtras
+import app.sentrek.maps.TrailsDownload
 import app.sentrek.feature.planner.R as PlannerR
 import app.sentrek.feature.record.R as RecordR
 import app.sentrek.data.PowerMode
@@ -282,6 +285,9 @@ fun MapScreen(
     val powerMode by viewModel.powerMode.collectAsStateWithLifecycle()
     val online by viewModel.online.collectAsStateWithLifecycle()
     val downloadedCells by viewModel.downloadedCells.collectAsStateWithLifecycle()
+    val mapKind by viewModel.mapKind.collectAsStateWithLifecycle()
+    val regionStates by viewModel.regionStates.collectAsStateWithLifecycle()
+    var layersOpen by remember { mutableStateOf(false) }
     // A fix comes every second or so: read as it is only where needed (the GoTo panel, the map
     // layers), so it doesn't redraw this whole screen. The rest gets it rounded, and changes
     // only when that does: about 10 m for the way back to signal, about 1 km for the sun.
@@ -570,6 +576,35 @@ fun MapScreen(
                             .clickable(onClickLabel = stringResource(R.string.area_download)) { onDownloadArea(centre) },
                     )
                 }
+                // A downloaded area without the shown map's own details (pistes, cycle routes):
+                // a tap gets them, as for the area itself.
+                centreCell?.takeIf { mapKind != MapKind.Hiking && it in downloadedCells && zoom >= DETAILS_ZOOM }?.let { cell ->
+                    val extra = regionStates[cell]?.extras?.get(mapKind)
+                    val winter = mapKind == MapKind.Winter
+                    when {
+                        extra == null -> MapNote(
+                            stringResource(if (winter) R.string.extra_missing_winter else R.string.extra_missing_cycling),
+                            SentrekIcons.Download,
+                            Modifier
+                                .heightIn(min = TouchTarget)
+                                .clickable(enabled = online, onClickLabel = stringResource(R.string.extra_download)) {
+                                    viewModel.downloadExtra(cell, mapKind)
+                                },
+                        )
+                        extra == TrailsDownload.Failed -> MapNote(
+                            stringResource(if (winter) R.string.extra_failed_winter else R.string.extra_failed_cycling),
+                            SentrekIcons.Download,
+                            Modifier
+                                .heightIn(min = TouchTarget)
+                                .clickable(enabled = online) { viewModel.retryExtra(cell) },
+                        )
+                        extra.inProgress -> MapNote(
+                            stringResource(if (winter) R.string.extra_getting_winter else R.string.extra_getting_cycling),
+                            SentrekIcons.Download,
+                        )
+                        else -> Unit
+                    }
+                }
                 // No signal: where the last one was, a tap away from "take me there".
                 lastSignal?.let { spot ->
                     val signalName = stringResource(R.string.signal_goto_name)
@@ -608,6 +643,15 @@ fun MapScreen(
                     contentDescription = stringResource(R.string.compass_north),
                     longClickLabel = stringResource(if (rotationLocked) R.string.compass_unlock else R.string.compass_lock),
                 )
+                if (controlsAlpha > 0f) {
+                    MapButton(
+                        icon = SentrekIcons.Map,
+                        contentDescription = stringResource(R.string.map_choose),
+                        onClick = { layersOpen = true },
+                        modifier = Modifier.alpha(controlsAlpha),
+                        active = mapKind != MapKind.Hiking,
+                    )
+                }
                     // Never forgotten, but small: they change how the whole app behaves. A tap to Settings.
                 PowerBadge(powerMode, onOpenSettings)
             }
@@ -949,6 +993,25 @@ fun MapScreen(
         onFocusDone()
     }
 
+    if (layersOpen) {
+        val showDifficulty by viewModel.showDifficulty.collectAsStateWithLifecycle()
+        val contours by viewModel.showContoursSetting.collectAsStateWithLifecycle()
+        val hillshade by viewModel.showHillshadeSetting.collectAsStateWithLifecycle()
+        val slopes by viewModel.showSlopesSetting.collectAsStateWithLifecycle()
+        val points by viewModel.showMapPoints.collectAsStateWithLifecycle()
+        MapLayersSheet(
+            kind = mapKind,
+            onKind = viewModel::setMapKind,
+            layers = MapLayers(showDifficulty, contours, hillshade, slopes, points),
+            onDifficulty = viewModel::setShowDifficulty,
+            onContours = viewModel::setShowContours,
+            onHillshade = viewModel::setShowHillshade,
+            onSlopes = viewModel::setShowSlopes,
+            onPoints = viewModel::setShowMapPoints,
+            onDismiss = { layersOpen = false },
+        )
+    }
+
     pressed?.let { info ->
         PressedSheet(
             info = info,
@@ -1243,9 +1306,14 @@ private fun MapLayerEffects(
     val recording by viewModel.recording.collectAsStateWithLifecycle()
 
     val showMapPoints by viewModel.showMapPoints.collectAsStateWithLifecycle()
-    LaunchedEffect(style, rasters, overlays, overlaysVersion, showDifficulty, showMapPoints) {
+    val mapKind by viewModel.mapKind.collectAsStateWithLifecycle()
+    val extraFiles by viewModel.extraFiles.collectAsStateWithLifecycle()
+    val night = LocalNightMap.current
+    LaunchedEffect(style, rasters, overlays, overlaysVersion, showDifficulty, showMapPoints, mapKind, extraFiles) {
         style?.let {
-            MapOverlays.sync(it, rasters, overlays, showDifficulty)
+            MapOverlays.sync(it, rasters, overlays, showDifficulty, mapKind)
+            // After the overlays, so pistes are drawn over the trails.
+            MapExtras.sync(it, mapKind, extraFiles.first, night)
             // After the overlays: their point layers are made anew there.
             MapPoints.show(it, showMapPoints)
         }

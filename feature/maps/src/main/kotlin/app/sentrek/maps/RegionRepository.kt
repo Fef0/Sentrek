@@ -9,6 +9,7 @@ import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.DownloadSize
 import app.sentrek.geo.RegionCell
 import app.sentrek.geo.RegionGrid
+import app.sentrek.geo.overlay.MapKind
 import app.sentrek.geo.overlay.OverlayPoi
 import app.sentrek.geo.overlay.OverlayPoiSource
 import app.sentrek.geo.overlay.OverlayPois
@@ -59,6 +60,7 @@ enum class TrailsDownload {
 /**
  * [updatedAt]: when the map was last downloaded (epoch ms), once it's there.
  * [failedUpdates]: updates in a row that didn't make it (map or trails), until one does.
+ * [extras]: the other maps asked for in this area ([MapKind.extras]), and their details.
  */
 data class RegionState(
     val cell: RegionCell,
@@ -66,7 +68,14 @@ data class RegionState(
     val trails: TrailsDownload,
     val updatedAt: Long? = null,
     val failedUpdates: Int = 0,
+    val extras: Map<MapKind, TrailsDownload> = emptyMap(),
 ) {
+    /** The hiking details, then each extra map's. */
+    val details: List<TrailsDownload> get() = listOf(trails) + extras.values
+
+    /** Everything asked for is on the phone. */
+    val complete: Boolean get() = map is MapDownload.Ready && details.all { it == TrailsDownload.Ready }
+
     /** Worth telling the user: the area keeps its old map, but may need a better connection. */
     val updateFailing: Boolean get() = failedUpdates >= FAILURES_TO_WARN
 
@@ -103,7 +112,7 @@ class RegionRepository @Inject constructor(
     private val trailsDir = File(context.filesDir, "trails").apply {
         mkdirs()
         // Older formats are refetched: restore() treats a missing file as "to download".
-        listFiles { f -> !f.name.endsWith(OVERLAY_SUFFIX) }?.forEach { it.delete() }
+        listFiles { f -> !f.name.endsWith(OVERLAY_SUFFIX) && !f.name.endsWith(EXTRA_SUFFIX) }?.forEach { it.delete() }
     }
     private val trailsLock = Mutex()
 
@@ -131,6 +140,15 @@ class RegionRepository @Inject constructor(
 
     fun trailFile(cell: RegionCell): File = File(trailsDir, cell.id + OVERLAY_SUFFIX)
 
+    /** [kind]'s details for [cell]: pistes, cycle routes. */
+    fun extraFile(cell: RegionCell, kind: MapKind): File = File(trailsDir, "${cell.id}.${kind.key}$EXTRA_SUFFIX")
+
+    /** The extra maps last picked for a download, offered again for the next one. */
+    var lastExtras: Set<MapKind>
+        get() = readKinds(lastExtrasFile)
+        set(value) = writeKinds(lastExtrasFile, value)
+    private val lastExtrasFile = File(context.filesDir, "regions-extras")
+
     /** Hiking points of the downloaded areas in [box], e.g. for the places along a route. */
     override suspend fun pois(box: BoundingBox): List<OverlayPoi> = withContext(Dispatchers.IO) {
         // From the files themselves: at startup (a route followed when the app was closed)
@@ -155,10 +173,15 @@ class RegionRepository @Inject constructor(
             }
     }
 
-    fun download(cells: Collection<RegionCell>) {
+    /** Downloads [cells]: the map, the hiking details, and those of [extras]. */
+    fun download(cells: Collection<RegionCell>, extras: Set<MapKind> = emptySet()) {
         for (cell in cells) {
-            if (cell in regions || cell in _state.value) continue
-            put(RegionState(cell, MapDownload.Queued, trailsStateOnDisk(cell), failedUpdates = failures(cell)))
+            if (cell in regions || cell in _state.value) {
+                addExtras(cell, extras)
+                continue
+            }
+            writeKinds(wantedFile(cell), extras)
+            put(RegionState(cell, MapDownload.Queued, trailsStateOnDisk(cell), failedUpdates = failures(cell), extras = extrasOnDisk(cell)))
             val definition = OfflineTilePyramidRegionDefinition(
                 MapStyle.Hiking.offlineUrl,
                 cell.bbox.let { LatLngBounds.from(it.north, it.east, it.south, it.west) },
@@ -179,8 +202,34 @@ class RegionRepository @Inject constructor(
                 }
             })
             if (!trailFile(cell).exists()) fetchTrails(cell)
+            for (kind in extras) if (!extraFile(cell, kind).exists()) fetchExtra(cell, kind)
         }
         ensureService()
+    }
+
+    /**
+     * The extra maps of [cells], already downloaded, become [extras]: the missing ones are
+     * downloaded, the others deleted.
+     */
+    fun setExtras(cells: Collection<RegionCell>, extras: Set<MapKind>) {
+        for (cell in cells) {
+            val state = _state.value[cell] ?: continue
+            for (kind in state.extras.keys - extras) {
+                extraFile(cell, kind).delete()
+                _state.update { all -> all[cell]?.let { all + (cell to it.copy(extras = it.extras - kind)) } ?: all }
+            }
+            writeKinds(wantedFile(cell), extras)
+            addExtras(cell, extras)
+        }
+        ensureService()
+    }
+
+    private fun addExtras(cell: RegionCell, extras: Set<MapKind>) {
+        val state = _state.value[cell] ?: return
+        val missing = extras - state.extras.keys
+        if (missing.isEmpty()) return
+        writeKinds(wantedFile(cell), state.extras.keys + missing)
+        for (kind in missing) fetchExtra(cell, kind)
     }
 
     /**
@@ -205,7 +254,10 @@ class RegionRepository @Inject constructor(
                 val region = regions[cell] ?: continue
                 val mapCurrent = current != null && current == savedVersion(cell)
                 val trailsCurrent = state.trails == TrailsDownload.Ready && now - trailFile(cell).lastModified() < TRAILS_FRESH_MS
-                if (mapCurrent && trailsCurrent) {
+                val oldExtras = state.extras.filter { (kind, s) ->
+                    s != TrailsDownload.Ready || now - extraFile(cell, kind).lastModified() >= TRAILS_FRESH_MS
+                }.keys
+                if (mapCurrent && trailsCurrent && oldExtras.isEmpty()) {
                     // Checked today: counts as updated, for the reminders and automatic updates.
                     updateMap(cell, state.map, stamp(cell))
                     if (state.failedUpdates > 0) forgetFailedUpdates(listOf(cell))
@@ -227,6 +279,7 @@ class RegionRepository @Inject constructor(
                     })
                 }
                 if (!trailsCurrent) fetchTrails(cell)
+                for (kind in oldExtras) fetchExtra(cell, kind)
             }
             if (upToDate == ready.size) onUpToDate() else ensureService()
         }
@@ -236,6 +289,8 @@ class RegionRepository @Inject constructor(
         for (cell in cells) {
             queue.remove(cell)
             trailFile(cell).delete()
+            for (kind in MapKind.extras) extraFile(cell, kind).delete()
+            wantedFile(cell).delete()
             dateFile(cell).delete()
             failuresFile(cell).delete()
             versionFile(cell).delete()
@@ -284,7 +339,11 @@ class RegionRepository @Inject constructor(
     fun freeBytes(): Long = context.filesDir.usableSpace
 
     fun retryTrails(cells: Collection<RegionCell>) {
-        cells.filter { _state.value[it]?.trails == TrailsDownload.Failed }.forEach(::fetchTrails)
+        for (cell in cells) {
+            val state = _state.value[cell] ?: continue
+            if (state.trails == TrailsDownload.Failed) fetchTrails(cell)
+            for ((kind, s) in state.extras) if (s == TrailsDownload.Failed) fetchExtra(cell, kind)
+        }
     }
 
     private fun restore(saved: Array<out OfflineRegion>) {
@@ -298,11 +357,12 @@ class RegionRepository @Inject constructor(
                 continue
             }
             regions[cell] = region
-            put(RegionState(cell, MapDownload.Queued, trailsStateOnDisk(cell), failedUpdates = failures(cell)))
-            if (!trailFile(cell).exists()) {
-                fetchTrails(cell)
-                ensureService()
-            }
+            put(RegionState(cell, MapDownload.Queued, trailsStateOnDisk(cell), failedUpdates = failures(cell), extras = extrasOnDisk(cell)))
+            if (!trailFile(cell).exists()) fetchTrails(cell)
+            // Asked for, not there yet (the app was closed while they downloaded).
+            val missing = readKinds(wantedFile(cell)).filter { !extraFile(cell, it).exists() }
+            missing.forEach { fetchExtra(cell, it) }
+            if (!trailFile(cell).exists() || missing.isNotEmpty()) ensureService()
             region.getStatus(object : OfflineRegion.OfflineRegionStatusCallback {
                 override fun onStatus(status: OfflineRegionStatus?) {
                     if (status?.isComplete == true) {
@@ -390,6 +450,31 @@ class RegionRepository @Inject constructor(
         }
     }
 
+    /** As [fetchTrails], for [kind]'s details: the same queue, one area at a time. */
+    private fun fetchExtra(cell: RegionCell, kind: MapKind) {
+        updateExtra(cell, kind, TrailsDownload.Waiting)
+        scope.launch {
+            trailsLock.withLock {
+                // Deleted, or no longer wanted, while waiting.
+                if (_state.value[cell]?.extras?.containsKey(kind) != true) return@withLock
+                updateExtra(cell, kind, TrailsDownload.Downloading)
+                val file = extraFile(cell, kind)
+                val result = runCatching {
+                    trailSource.fetch(cell.bbox, file, kind) { busy ->
+                        updateExtra(cell, kind, if (busy) TrailsDownload.Retrying else TrailsDownload.Downloading)
+                    }
+                }
+                result.exceptionOrNull()?.let { Log.w(TAG, "${kind.key} for ${cell.id} failed", it) }
+                if (_state.value[cell]?.extras?.containsKey(kind) != true) {
+                    file.delete()
+                } else {
+                    updateExtra(cell, kind, if (result.isSuccess) TrailsDownload.Ready else TrailsDownload.Failed)
+                    if (result.isSuccess) settleUpdate(cell) else failUpdate(cell)
+                }
+            }
+        }
+    }
+
     /**
      * Called only right after user actions or app launch: Android forbids starting a
      * foreground service from the background. The service stops itself when idle.
@@ -401,6 +486,25 @@ class RegionRepository @Inject constructor(
 
     private fun trailsStateOnDisk(cell: RegionCell) =
         if (trailFile(cell).exists()) TrailsDownload.Ready else TrailsDownload.Missing
+
+    private fun extrasOnDisk(cell: RegionCell): Map<MapKind, TrailsDownload> =
+        readKinds(wantedFile(cell)).associateWith { if (extraFile(cell, it).exists()) TrailsDownload.Ready else TrailsDownload.Missing }
+
+    /** The extra maps asked for in [cell], by key, one line. */
+    private fun wantedFile(cell: RegionCell) = File(datesDir, cell.id + ".maps")
+
+    private fun readKinds(file: File): Set<MapKind> =
+        runCatching { file.readText() }.getOrDefault("").split(',').mapNotNull { MapKind.fromKey(it.trim()) }
+            .filter { it in MapKind.extras }.toSet()
+
+    private fun writeKinds(file: File, kinds: Set<MapKind>) {
+        runCatching {
+            if (kinds.isEmpty()) file.delete() else file.writeText(MapKind.extras.filter { it in kinds }.joinToString(",") { it.key })
+        }.onFailure { Log.w(TAG, "Cannot save ${file.name}", it) }
+    }
+
+    private fun updateExtra(cell: RegionCell, kind: MapKind, download: TrailsDownload) =
+        _state.update { all -> all[cell]?.let { all + (cell to it.copy(extras = it.extras + (kind to download))) } ?: all }
 
     private fun put(state: RegionState) = _state.update { it + (state.cell to state) }
 
@@ -460,7 +564,7 @@ class RegionRepository @Inject constructor(
     /** Map and trails both new: whatever failed before is over. */
     private fun settleUpdate(cell: RegionCell) {
         val state = _state.value[cell] ?: return
-        if (state.map !is MapDownload.Ready || state.trails != TrailsDownload.Ready) return
+        if (!state.complete) return
         updating -= cell
         if (state.failedUpdates > 0 || failuresFile(cell).exists()) forgetFailedUpdates(listOf(cell))
     }
@@ -473,6 +577,9 @@ class RegionRepository @Inject constructor(
 
         /** Bump when the overlay file format changes (v2: points, v3: huts, v4: all hiking points, v5: all tags, v6: all paths and tracks, v9: waymarked routes, v10: route details). */
         const val OVERLAY_SUFFIX = ".v10.geojson"
+
+        /** The same, for the extra maps' files ("<cell>.ski.x1.geojson"). */
+        const val EXTRA_SUFFIX = ".x1.geojson"
 
         /** The vector source of the hiking style (assets/styles/hiking.json). */
         const val TILEJSON_URL = "https://tiles.openfreemap.org/planet"

@@ -1283,9 +1283,11 @@ private fun MapLayerEffects(
 
     // A route open in the planner is drawn by the planner: its saved line would show twice.
     val editedId = plan.editing?.id?.takeIf { plan.active }
-    LaunchedEffect(style, shownTracks, editedId) {
+    val showTrackArrows by viewModel.showTrackArrows.collectAsStateWithLifecycle()
+    LaunchedEffect(style, shownTracks, editedId, showTrackArrows) {
         style?.let {
-            TrackLayers.syncShown(it, shownTracks.filter { t -> t.id != editedId }, context.getString(R.string.track_start), context.getString(R.string.track_end))
+            val shown = shownTracks.filter { t -> t.id != editedId }
+            TrackLayers.syncShown(it, shown, context.getString(R.string.track_start), context.getString(R.string.track_end), showTrackArrows)
         }
     }
     // A few seconds apart is plenty at walking pace, and the newest state is always the one

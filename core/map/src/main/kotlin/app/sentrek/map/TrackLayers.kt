@@ -26,6 +26,7 @@ import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
 import org.maplibre.android.style.layers.PropertyFactory.iconImage
 import org.maplibre.android.style.layers.PropertyFactory.symbolPlacement
 import org.maplibre.android.style.layers.PropertyFactory.symbolSpacing
+import org.maplibre.android.style.layers.PropertyFactory.visibility
 import org.maplibre.android.style.layers.PropertyFactory.lineCap
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
 import org.maplibre.android.style.layers.PropertyFactory.lineJoin
@@ -98,11 +99,12 @@ object TrackLayers {
     /**
      * The tracks shown on the map, their waypoints, and where each starts and ends ([start],
      * [end]: the words for the markers, so the direction can be told): changes only when the
-     * user changes them.
+     * user changes them. [arrows]: small arrows along the lines, the way they go.
      */
-    fun syncShown(style: Style, shown: List<MapTrack>, start: String = "", end: String = "") {
+    fun syncShown(style: Style, shown: List<MapTrack>, start: String = "", end: String = "", arrows: Boolean = true) {
         setLines(style, SHOWN, shown.map { track -> lineFeature(track.segments, track.color).apply { addStringProperty("id", track.id) } })
         if (style.getLayer(ARROWS) == null) addArrows(style)
+        style.getLayer(ARROWS)?.setProperties(visibility(if (arrows) Property.VISIBLE else Property.NONE))
         setEnds(style, shown.flatMap { ends(it, start, end) })
         setWaypoints(
             style,

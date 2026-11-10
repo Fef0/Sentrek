@@ -257,6 +257,9 @@ class HomeViewModel @Inject constructor(
     val showHillshade: StateFlow<Boolean> = combine(settings.showHillshade, settings.powerMode) { show, mode -> show && mode != PowerMode.Stamina }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    val showTrackArrows: StateFlow<Boolean> =
+        settings.showTrackArrows.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
     val showMapPoints: StateFlow<Boolean> =
         settings.showMapPoints.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 

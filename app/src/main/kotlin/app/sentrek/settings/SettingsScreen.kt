@@ -372,6 +372,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setShowMapPoints(show) }
     }
 
+    val showTrackArrows: StateFlow<Boolean> =
+        settings.showTrackArrows.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setShowTrackArrows(show: Boolean) {
+        viewModelScope.launch { settings.setShowTrackArrows(show) }
+    }
+
     val showSlopes: StateFlow<Boolean> =
         settings.showSlopes.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
@@ -521,6 +528,7 @@ private fun MapSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val showSlopes by viewModel.showSlopes.collectAsStateWithLifecycle()
     val showHillshade by viewModel.showHillshade.collectAsStateWithLifecycle()
     val showMapPoints by viewModel.showMapPoints.collectAsStateWithLifecycle()
+    val showTrackArrows by viewModel.showTrackArrows.collectAsStateWithLifecycle()
     val stamina = viewModel.powerMode.collectAsStateWithLifecycle().value == PowerMode.Stamina
     val showTrailDifficulty by viewModel.showTrailDifficulty.collectAsStateWithLifecycle()
     val showScaleBar by viewModel.showScaleBar.collectAsStateWithLifecycle()
@@ -562,6 +570,12 @@ private fun MapSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
             hint = stringResource(R.string.settings_trail_difficulty_hint),
             checked = showTrailDifficulty,
             onChange = viewModel::setShowTrailDifficulty,
+        )
+        ToggleRow(
+            title = stringResource(R.string.settings_track_arrows),
+            hint = stringResource(R.string.settings_track_arrows_hint),
+            checked = showTrackArrows,
+            onChange = viewModel::setShowTrackArrows,
         )
         ToggleRow(
             title = stringResource(R.string.settings_scale_bar),

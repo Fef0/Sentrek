@@ -473,6 +473,14 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[SHOW_MAP_POINTS] = show }
     }
 
+    /** Small arrows along the shown tracks, the way they go. */
+    val showTrackArrows: Flow<Boolean> =
+        prefs { it[SHOW_TRACK_ARROWS] ?: true }
+
+    suspend fun setShowTrackArrows(show: Boolean) {
+        context.settings.edit { it[SHOW_TRACK_ARROWS] = show }
+    }
+
     /** Slopes of 30° and more shaded on the map, as on avalanche maps. */
     val showSlopes: Flow<Boolean> =
         prefs { it[SHOW_SLOPES] ?: false }
@@ -611,6 +619,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val SHOW_SLOPES = booleanPreferencesKey("show_slopes")
         val SHOW_HILLSHADE = booleanPreferencesKey("show_hillshade")
         val SHOW_MAP_POINTS = booleanPreferencesKey("show_map_points")
+        val SHOW_TRACK_ARROWS = booleanPreferencesKey("show_track_arrows")
         val MAP_REMINDERS = booleanPreferencesKey("map_reminders")
         val AUTO_UPDATE_MAPS = booleanPreferencesKey("auto_update_maps")
         val MAP_REMINDER_SNOOZED = longPreferencesKey("map_reminder_snoozed")

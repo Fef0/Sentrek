@@ -24,7 +24,7 @@ The name comes from *sentiero*, Italian for trail, and *trek*.
 ## Features
 
 ### Maps
-- The map shows trails, marked routes with their signs, huts, springs, peaks and viewpoints, with contour lines and hill shading.
+- The map shows trails, marked routes with their signs, huts, springs, peaks and viewpoints. Contour lines and hill shading can be turned on in Settings › Map, and the map points turned off.
 - To use it offline, download squares from a grid. A square is about 55 × 55 km and takes around 30 MB.
 - You can colour steep slopes like an avalanche map, and colour trails by difficulty (SAC scale).
 - Long-press a trail to see its difficulty and the marked routes that use it, with length, climb, walking time and who looks after them. From there you can get the weather forecast for that spot, day by day or hour by hour.
@@ -33,13 +33,19 @@ The name comes from *sentiero*, Italian for trail, and *trek*.
 ### Planning
 - Tap the map to add points and the route follows the paths between them. This works offline too, in downloaded areas.
 - You see distance, climb, descent, walking time and the elevation profile while you plan.
-- Drag a point to move it, or drag the middle of a segment to add one. Undo and redo are there.
+- Drag a point to move it, or drag the middle of a segment to add one. Undo and redo are there. One button turns the route around.
 - Save the route, or export it as GPX or KML.
+
+### Routes and tracks
+- Add a note and photos to any route or track, as for places: water on the way, the last bus, a photo of a timetable or a junction. The note goes in the GPX file when you export it, and imported GPX files bring theirs.
+- Duplicate a route to change a copy and keep the original, or make a reversed copy to walk it the other way.
+- Routes shown on the map mark where they start and end, with small arrows the way they go. Where two overlap, only the top one has arrows.
 
 ### Following a route
 - A card at the top shows distance left, climb left and time left. After a while the time is based on how fast you actually walk.
-- Tap the card for the places coming up (huts, springs, peaks) and the elevation profile with your position on it.
+- Tap the card for the places coming up (huts, springs, peaks), your note on the route and the elevation profile with your position on it.
 - The phone vibrates when you go off the route, and again when you're back on it.
+- You can switch to walking the route the other way without stopping.
 - You can import GPX, KML and KMZ files, or open them from another app.
 
 ### Recording
@@ -63,10 +69,11 @@ You can also set a turnaround alarm.
 - The lock button stops rain or your pocket from pressing things.
 - There's large text, dark and black themes, a night map and a full screen mode.
 - Battery saver and stamina mode make the battery last longer on long days. Stamina mode can turn itself on at a battery level you pick.
+- Even without them, the map only draws at full speed while you touch it, and the GPS slows down while you're only looking at the map.
 
 ### Safety
-- The SOS screen shows your position in big text (coordinates, UTM and Plus Code), with buttons to call or text for help.
-- It can send your position by SMS to someone every few minutes while you walk. SMS works without mobile data.
+- The SOS screen shows your position in big text (coordinates, UTM and Plus Code), with buttons to call for help and to send your position by SMS to your emergency contact. It asks first, then sends the text itself.
+- It can send your position by SMS to someone every 30 or 60 minutes while you record. SMS works without mobile data.
 - "Peaks around" tells you the names of the mountains you can see.
 
 ### Your own servers

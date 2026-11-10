@@ -1,0 +1,4 @@
+• Nuove mappe bici e inverno: il pulsante sotto la bussola cambia mappa e accende o spegne i livelli
+• Inverno mostra le piste per difficoltà, fondo e scialpinismo e i nomi degli impianti, con colori invernali
+• Bici mostra i percorsi ciclabili e MTB segnati e le piste ciclabili
+• Scaricando le zone scegli quali mappe avranno; per una zona già scaricata basta un tocco sulla mappa

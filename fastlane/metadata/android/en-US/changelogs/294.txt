@@ -1,0 +1,4 @@
+• New cycling and winter maps: the button under the compass switches map and turns layers on and off
+• Winter shows pistes by difficulty, cross-country and ski touring runs and lift names, in white winter colours
+• Cycling shows waymarked cycle and mountain bike routes and cycleways
+• When downloading areas, choose which maps they get; for an area you have, a tap on the map adds them

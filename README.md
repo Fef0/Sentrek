@@ -29,6 +29,7 @@ The name comes from *sentiero*, Italian for trail, and *trek*.
 - You can colour steep slopes like an avalanche map, and colour trails by difficulty (SAC scale).
 - Long-press a trail to see its difficulty and the marked routes that use it, with length, climb, walking time and who looks after them. From there you can get the weather forecast for that spot, day by day or hour by hour.
 - You can also open your own `.mbtiles` and `.pmtiles` files.
+- Besides hiking, there's a cycling map (waymarked cycle and mountain bike routes, cycleways) and a winter map (pistes by difficulty, cross-country and ski touring runs, lift names, in winter colours). The button under the compass switches between them and turns the map layers on and off. When you download an area you choose which of these maps it gets.
 
 ### Planning
 - Tap the map to add points and the route follows the paths between them. This works offline too, in downloaded areas.
@@ -88,7 +89,7 @@ Everything you save (tracks, routes, places, photos) stays on your phone. You ca
 
 The app only goes online to:
 - load map and terrain tiles
-- get trail details for the areas you download
+- get trail details (and pistes or cycle routes, if you pick those maps) for the areas you download
 - get the weather forecast, if you turn it on
 
 There's no tracking or analytics of any kind.

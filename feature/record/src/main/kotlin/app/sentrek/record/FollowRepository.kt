@@ -117,6 +117,9 @@ class FollowRepository @Inject constructor(
     private val _state = MutableStateFlow<Following?>(null)
     val state: StateFlow<Following?> = _state.asStateFlow()
 
+    /** Set by [start] and [stop], so the route from the last session doesn't replace a newer choice. */
+    private var chosen = false
+
     init {
         // "<track id>\n<reversed>"
         val lines = runCatching { saved.readLines() }.getOrNull()
@@ -125,12 +128,15 @@ class FollowRepository @Inject constructor(
             scope.launch {
                 // The track list loads asynchronously.
                 val track = tracks.tracks.first { it.isNotEmpty() }.firstOrNull { it.id == id }
+                // The user started or stopped a route meanwhile: theirs stands.
+                if (chosen) return@launch
                 if (track != null) start(track, reversed = lines.getOrNull(1) == "true") else stop()
             }
         }
     }
 
     suspend fun start(track: SavedTrack, reversed: Boolean = false): Boolean {
+        chosen = true
         val loaded = tracks.route(track) ?: return false
         route = if (reversed) loaded.reversed() else loaded
         along = null
@@ -223,6 +229,7 @@ class FollowRepository @Inject constructor(
     }
 
     fun stop() {
+        chosen = true
         placesJob?.cancel()
         turnsJob?.cancel()
         turns = emptyList()

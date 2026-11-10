@@ -106,7 +106,7 @@ object OverpassOverlay {
         return count
     }
 
-    private class Element(
+    internal class Element(
         val type: String?,
         val id: Long?,
         val tags: Map<String, String>,
@@ -126,7 +126,7 @@ object OverpassOverlay {
         val facts: Map<String, String>,
     )
 
-    private fun readElement(json: JsonReader): Element {
+    internal fun readElement(json: JsonReader): Element {
         var type: String? = null
         var id: Long? = null
         val tags = HashMap<String, String>()
@@ -190,10 +190,21 @@ object OverpassOverlay {
         return if (type != null && ref != null) type to ref else null
     }
 
-    /** Reads a Point (`[x, y]`) or LineString (`[[x, y], …]`) coordinate array. */
-    private fun readCoordinates(json: JsonReader): Pair<DoubleArray, DoubleArray> {
+    /** Reads a Point (`[x, y]`), LineString (`[[x, y], …]`) or Polygon's outer ring. [nested]: the array is already open. */
+    private fun readCoordinates(json: JsonReader, nested: Boolean = false): Pair<DoubleArray, DoubleArray> {
         val lons = ArrayList<Double>()
         val lats = ArrayList<Double>()
+        if (nested) {
+            // Inside a Polygon: this is the ring, a list of [x, y].
+            while (json.hasNext()) {
+                json.beginArray()
+                lons += json.nextDouble()
+                lats += json.nextDouble()
+                while (json.hasNext()) json.skipValue()
+                json.endArray()
+            }
+            return lons.toDoubleArray() to lats.toDoubleArray()
+        }
         json.beginArray()
         if (json.peek() == JsonToken.NUMBER) {
             lons += json.nextDouble()
@@ -203,6 +214,13 @@ object OverpassOverlay {
             while (json.hasNext()) {
                 if (json.peek() != JsonToken.BEGIN_ARRAY) { json.skipValue(); continue }
                 json.beginArray()
+                // A Polygon (a closed way mapped as an area): its outer ring, as a line.
+                if (json.peek() == JsonToken.BEGIN_ARRAY) {
+                    if (lons.isEmpty()) readCoordinates(json, nested = true).let { (x, y) -> lons += x.toList(); lats += y.toList() }
+                    while (json.hasNext()) json.skipValue()
+                    json.endArray()
+                    continue
+                }
                 lons += json.nextDouble()
                 lats += json.nextDouble()
                 while (json.hasNext()) json.skipValue()
@@ -269,7 +287,7 @@ object OverpassOverlay {
     }
 
     /** Many stages have no name, only a description ("Sentiero Italia - Tappa V23B"). */
-    private fun displayName(tags: Map<String, String>): String? =
+    internal fun displayName(tags: Map<String, String>): String? =
         (tags["name"] ?: tags["description"]?.takeIf { it.length <= MAX_NAME })?.trim()?.takeIf { it.isNotEmpty() }
 
     private fun routeFeatures(e: Element, routes: List<Route>, toleranceM: Double): List<String> {
@@ -348,5 +366,5 @@ object OverpassOverlay {
     }
 
     /** Five decimals ≈ 1 m. */
-    private fun round5(v: Double): String = ((v * 1e5).roundToLong() / 1e5).toString()
+    internal fun round5(v: Double): String = ((v * 1e5).roundToLong() / 1e5).toString()
 }

@@ -80,7 +80,7 @@ class DownloadService : Service() {
                 .setProgress(100, percent, false)
                 .build()
         } else {
-            val busy = all.any { it.trails == TrailsDownload.Retrying }
+            val busy = all.any { TrailsDownload.Retrying in it.details }
             builder.setContentText(getString(if (busy) R.string.download_notification_trails_busy else R.string.download_notification_trails))
                 .setProgress(0, 0, true)
                 .build()
@@ -107,4 +107,4 @@ class DownloadService : Service() {
 
 /** Map tiles or trail details still to download. */
 internal val RegionState.isPending: Boolean
-    get() = map !is MapDownload.Ready || trails.inProgress
+    get() = map !is MapDownload.Ready || details.any { it.inProgress }

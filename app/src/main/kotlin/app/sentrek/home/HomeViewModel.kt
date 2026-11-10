@@ -19,6 +19,7 @@ import app.sentrek.data.PowerMode
 import app.sentrek.data.SettingsRepository
 import app.sentrek.geo.LatLon
 import app.sentrek.geo.RegionCell
+import app.sentrek.geo.overlay.MapKind
 import app.sentrek.geo.dem.TerrainTiles
 import app.sentrek.geo.units.Units
 import app.sentrek.geo.Barometric
@@ -192,6 +193,68 @@ class HomeViewModel @Inject constructor(
 
     val showDifficulty: StateFlow<Boolean> =
         settings.showTrailDifficulty.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    /** Which map is shown: hiking, cycling or winter. */
+    val mapKind: StateFlow<MapKind> =
+        settings.mapKind.stateIn(viewModelScope, SharingStarted.Eagerly, MapKind.Hiking)
+
+    fun setMapKind(kind: MapKind) {
+        viewModelScope.launch { settings.setMapKind(kind) }
+    }
+
+    /**
+     * The shown map's own details (pistes, cycle routes) by cell id, and a number that changes
+     * when one of them is replaced by a newer download, so the map loads it again.
+     */
+    val extraFiles: StateFlow<Pair<Map<String, File>, Long>> = combine(regions.state, mapKind) { all, kind ->
+        if (kind == MapKind.Hiking) return@combine emptyMap<String, File>() to 0L
+        // While an area's details update, the file it has stays on the map.
+        val files = all.values.filter { kind in it.extras.keys && regions.extraFile(it.cell, kind).exists() }
+            .associate { it.cell.id to regions.extraFile(it.cell, kind) }
+        files to files.values.sumOf { it.lastModified() }
+    }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap<String, File>() to 0L)
+
+    /** The downloaded areas, for what the shown map is missing where the user looks. */
+    val regionStates: StateFlow<Map<RegionCell, RegionState>> get() = regions.state
+
+    /** Downloads the shown map's details for [cell], already on the phone. */
+    fun downloadExtra(cell: RegionCell, kind: MapKind) {
+        regions.download(listOf(cell), setOf(kind))
+    }
+
+    fun retryExtra(cell: RegionCell) {
+        regions.retryTrails(listOf(cell))
+    }
+
+    // As in Settings › Map, for the map's layers sheet.
+    val showContoursSetting: StateFlow<Boolean> =
+        settings.showContours.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val showHillshadeSetting: StateFlow<Boolean> =
+        settings.showHillshade.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val showSlopesSetting: StateFlow<Boolean> =
+        settings.showSlopes.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setShowContours(show: Boolean) {
+        viewModelScope.launch { settings.setShowContours(show) }
+    }
+
+    fun setShowHillshade(show: Boolean) {
+        viewModelScope.launch { settings.setShowHillshade(show) }
+    }
+
+    fun setShowSlopes(show: Boolean) {
+        viewModelScope.launch { settings.setShowSlopes(show) }
+    }
+
+    fun setShowMapPoints(show: Boolean) {
+        viewModelScope.launch { settings.setShowMapPoints(show) }
+    }
+
+    fun setShowDifficulty(show: Boolean) {
+        viewModelScope.launch { settings.setShowTrailDifficulty(show) }
+    }
 
     val rasters: StateFlow<List<RasterOverlay>> = importedMaps.maps
         .map { maps -> maps.map(ImportedMap::overlay) }

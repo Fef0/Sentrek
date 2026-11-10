@@ -89,4 +89,19 @@
     <string name="download_notification_area">%1$d rimaste · mappa %2$d%%</string>
     <string name="download_notification_trails">Scarico i dettagli dei sentieri: difficoltà, rifugi e sorgenti</string>
     <string name="download_notification_trails_busy">Server dei sentieri occupato, riprovo a breve</string>
+    <string name="regions_maps_label">Mappe</string>
+    <string name="regions_kind_hiking">Escursionismo</string>
+    <string name="regions_kind_cycling">Bici</string>
+    <string name="regions_kind_winter">Inverno</string>
+    <string name="regions_kinds_hint">Bici e Inverno aggiungono percorsi ciclabili e piste alla stessa mappa.</string>
+    <string name="regions_save">Salva (%d)</string>
+    <string name="regions_cell_pistes">Piste…</string>
+    <string name="regions_cell_cycling">Percorsi bici…</string>
+    <string name="regions_pistes_progress">Piste: scarico piste da sci e da fondo</string>
+    <string name="regions_cycling_progress">Bici: scarico percorsi ciclabili e MTB</string>
+    <plurals name="regions_extras_failed">
+        <item quantity="one">Piste o percorsi bici non scaricati per %d zona</item>
+        <item quantity="many">Piste o percorsi bici non scaricati per %d zone</item>
+        <item quantity="other">Piste o percorsi bici non scaricati per %d zone</item>
+    </plurals>
 </resources>

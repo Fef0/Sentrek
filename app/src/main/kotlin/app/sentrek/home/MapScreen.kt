@@ -1284,7 +1284,9 @@ private fun MapLayerEffects(
     // A route open in the planner is drawn by the planner: its saved line would show twice.
     val editedId = plan.editing?.id?.takeIf { plan.active }
     LaunchedEffect(style, shownTracks, editedId) {
-        style?.let { TrackLayers.syncShown(it, shownTracks.filter { t -> t.id != editedId }) }
+        style?.let {
+            TrackLayers.syncShown(it, shownTracks.filter { t -> t.id != editedId }, context.getString(R.string.track_start), context.getString(R.string.track_end))
+        }
     }
     // A few seconds apart is plenty at walking pace, and the newest state is always the one
     // drawn. Not while another screen covers the map: it catches up when shown.

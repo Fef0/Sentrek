@@ -89,6 +89,8 @@
     <string name="track_hide">Hide from map</string>
     <string name="track_edit">Edit route</string>
     <string name="track_reverse">Reverse direction</string>
+    <string name="track_start">Start</string>
+    <string name="track_end">End</string>
     <string name="follow_route_options">Route options</string>
     <string name="follow_off_route">Off route: %s</string>
     <string name="follow_stop">Stop</string>

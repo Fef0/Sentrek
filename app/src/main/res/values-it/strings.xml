@@ -88,6 +88,8 @@
     <string name="track_hide">Nascondi dalla mappa</string>
     <string name="track_edit">Modifica percorso</string>
     <string name="track_reverse">Inverti direzione</string>
+    <string name="track_start">Partenza</string>
+    <string name="track_end">Arrivo</string>
     <string name="follow_route_options">Opzioni del percorso</string>
     <string name="follow_off_route">Fuori percorso: %s</string>
     <string name="follow_stop">Ferma</string>

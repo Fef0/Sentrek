@@ -119,7 +119,15 @@ object TrackLayers {
         }
         if (style.getLayer(ARROWS) == null) addArrows(style)
         style.getLayer(ARROWS)?.setProperties(visibility(if (arrows) Property.VISIBLE else Property.NONE))
-        setEnds(style, shown.flatMap { ends(it, start, end) })
+        // A marker where one of a track above already is (a copy, the way back) would only
+        // cover its label with the opposite word: the top one's stays.
+        val kept = ArrayList<Pair<LatLon, Feature>>()
+        for (track in shown.asReversed()) {
+            for (marker in ends(track, start, end)) {
+                if (kept.none { Geo.distance(it.first, marker.first) < SAME_PLACE_M }) kept += marker
+            }
+        }
+        setEnds(style, kept.asReversed().map { it.second })
         setWaypoints(
             style,
             shown.flatMap { track ->
@@ -260,10 +268,10 @@ object TrackLayers {
         return bitmap
     }
 
-    private fun ends(track: MapTrack, start: String, end: String): List<Feature> {
+    private fun ends(track: MapTrack, start: String, end: String): List<Pair<LatLon, Feature>> {
         val first = track.segments.firstOrNull { it.isNotEmpty() }?.first() ?: return emptyList()
         val last = track.segments.lastOrNull { it.isNotEmpty() }?.last() ?: return emptyList()
-        fun marker(p: LatLon, role: String, label: String) = Feature.fromGeometry(Point.fromLngLat(p.lon, p.lat)).apply {
+        fun marker(p: LatLon, role: String, label: String) = p to Feature.fromGeometry(Point.fromLngLat(p.lon, p.lat)).apply {
             addStringProperty("r", role)
             addStringProperty("label", label)
         }

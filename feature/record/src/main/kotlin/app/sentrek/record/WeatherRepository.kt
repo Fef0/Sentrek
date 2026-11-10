@@ -67,7 +67,10 @@ class WeatherRepository @Inject constructor(@ApplicationContext private val cont
         val forecast = Forecast.parse(body.reader()) ?: return null
         val tmp = File(dir, file.name + ".tmp")
         tmp.writeText(body)
-        tmp.renameTo(file)
+        if (!tmp.renameTo(file)) {
+            file.delete()
+            tmp.renameTo(file)
+        }
         forgetOld()
         return Weather(forecast, file.lastModified())
     }

@@ -485,7 +485,11 @@ class TrackRepository @Inject constructor(
         // Write to a temp file first: a half-written GPX must never replace a good one.
         val gpxTmp = File(dir, "${track.id}$GPX.tmp")
         gpxTmp.bufferedWriter().use { Gpx.write(it, track.name, segments, CREATOR, waypoints) }
-        gpxTmp.renameTo(File(dir, track.id + GPX))
+        val gpx = File(dir, track.id + GPX)
+        if (!gpxTmp.renameTo(gpx) && !(gpx.delete() && gpxTmp.renameTo(gpx))) {
+            // No summary for a GPX that isn't there: the caller keeps what it had.
+            throw java.io.IOException("Cannot write ${gpx.name}")
+        }
         File(dir, track.id + SUMMARY).writeText(summaryJson(track))
     }
 

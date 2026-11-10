@@ -1228,10 +1228,11 @@ private fun MapLayerEffects(
     val contourTerrain by viewModel.contourTerrain.collectAsStateWithLifecycle()
     val elevationUnit = viewModel.units.collectAsStateWithLifecycle().value.elevation
     val nightMap = LocalNightMap.current
-    LaunchedEffect(style, contourTerrain, elevationUnit) {
+    val terrainRetries by viewModel.terrainRetries.collectAsStateWithLifecycle()
+    LaunchedEffect(style, contourTerrain, elevationUnit, terrainRetries) {
         style?.let { MapContours.sync(it, contourTerrain, elevationUnit, nightMap) }
     }
-    LaunchedEffect(style, slopeTerrain) {
+    LaunchedEffect(style, slopeTerrain, terrainRetries) {
         style?.let { MapSlopes.sync(it, slopeTerrain, nightMap) }
     }
     LaunchedEffect(style, elevationUnit) {

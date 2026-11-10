@@ -52,6 +52,7 @@ internal object ArrowParts {
         val parts = ArrayList<List<Xy>>()
         var run = ArrayList<Xy>()
         var runM = 0.0
+        var shared = false
         fun close() {
             if (run.size >= 2 && runM >= MIN_FREE_M) parts += run
             run = ArrayList()
@@ -65,6 +66,7 @@ internal object ArrowParts {
                 val t = i.toDouble() / steps
                 val p = Xy(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
                 if (above.near(p, sharedM)) {
+                    shared = true
                     close()
                 } else {
                     run.lastOrNull()?.let { runM += hypot(p.x - it.x, p.y - it.y) }
@@ -73,7 +75,8 @@ internal object ArrowParts {
             }
         }
         close()
-        return parts
+        // Nothing above it here: the line as it is, not the samples along it.
+        return if (shared) parts else listOf(line)
     }
 
     private data class Xy(val x: Double, val y: Double)

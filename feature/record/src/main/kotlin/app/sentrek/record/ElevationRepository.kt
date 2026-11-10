@@ -1,6 +1,8 @@
 package app.sentrek.record
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteDatabaseLockedException
 import android.database.sqlite.SQLiteException
@@ -14,6 +16,10 @@ import app.sentrek.geo.dem.Terrarium
 import app.sentrek.map.MapEngine
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -41,8 +47,40 @@ class ElevationRepository @Inject constructor(@ApplicationContext private val co
             .build()
     }
     private val tiles = LruCache<Terrarium.TileKey, Terrarium.Tile>(MEMORY_TILES)
-    private val missing = mutableSetOf<Terrarium.TileKey>()
-    private val lock = Mutex()
+    private val missing: MutableSet<Terrarium.TileKey> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+    /**
+     * One tile is loaded once even when asked for twice at the same time; others go on: a
+     * download stuck on a weak signal would otherwise hold up the contours of downloaded areas.
+     */
+    private val locks = Array(LOCKS) { Mutex() }
+
+    private fun lockFor(key: Terrarium.TileKey) = locks[(key.hashCode() and Int.MAX_VALUE) % LOCKS]
+
+    init {
+        // Tiles missed offline are worth asking for again once a network is back.
+        runCatching {
+            context.getSystemService(ConnectivityManager::class.java)?.registerDefaultNetworkCallback(
+                object : ConnectivityManager.NetworkCallback() {
+                    override fun onAvailable(network: Network) = retryMissing()
+                },
+            )
+        }.onFailure { Log.w(TAG, "Cannot watch the network", it) }
+    }
+
+    /** MapLibre's offline database, opened once; closed again when a read goes wrong. */
+    @Volatile private var offlineDb: SQLiteDatabase? = null
+
+    @Synchronized
+    private fun offlineDb(file: File): SQLiteDatabase =
+        offlineDb?.takeIf { it.isOpen } ?: SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY)
+            .also { offlineDb = it }
+
+    @Synchronized
+    private fun closeOfflineDb() {
+        runCatching { offlineDb?.close() }
+        offlineDb = null
+    }
 
     /** [points] with their terrain height; a point keeps no height where the tile can't be had. */
     suspend fun withElevation(points: List<LatLon>): List<LatLon> = withContext(Dispatchers.IO) {
@@ -56,12 +94,17 @@ class ElevationRepository @Inject constructor(@ApplicationContext private val co
     /** For the map's contour lines, on MapLibre's worker threads. */
     override fun tile(key: Terrarium.TileKey): Terrarium.Tile? = runBlocking { cachedTile(key) }
 
-    private suspend fun cachedTile(key: Terrarium.TileKey): Terrarium.Tile? = lock.withLock {
+    private suspend fun cachedTile(key: Terrarium.TileKey): Terrarium.Tile? {
+        tiles.get(key)?.let { return it }
+        return lockFor(key).withLock { loadOnce(key) }
+    }
+
+    private fun loadOnce(key: Terrarium.TileKey): Terrarium.Tile? {
         tiles.get(key)?.let { return it }
         if (key in missing) return null
         val (tile, busy) = load(key)
         if (tile != null) tiles.put(key, tile) else if (!busy) missing += key
-        tile
+        return tile
     }
 
     /**
@@ -99,7 +142,7 @@ class ElevationRepository @Inject constructor(@ApplicationContext private val co
      */
     private fun downloaded(key: Terrarium.TileKey): ByteArray? {
         val file = File(context.filesDir, OFFLINE_DB)
-        if (!file.exists()) return null
+        if (!file.exists()) return null.also { closeOfflineDb() }
         repeat(DB_ATTEMPTS) {
             try {
                 return query(file, key)
@@ -117,23 +160,22 @@ class ElevationRepository @Inject constructor(@ApplicationContext private val co
 
     private fun query(file: File, key: Terrarium.TileKey): ByteArray? {
         return try {
-            SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
-                db.rawQuery(
-                    "SELECT data, compressed FROM tiles WHERE url_template = ? AND z = ? AND x = ? AND y = ? LIMIT 1",
-                    arrayOf(URL_TEMPLATE, "${key.zoom}", "${key.x}", "${key.y}"),
-                ).use { c ->
-                    if (!c.moveToFirst()) return null
-                    val data = c.getBlob(0) ?: return null
-                    if (c.getInt(1) != 0) InflaterInputStream(data.inputStream()).use { it.readBytes() } else data
-                }
+            offlineDb(file).rawQuery(
+                "SELECT data, compressed FROM tiles WHERE url_template = ? AND z = ? AND x = ? AND y = ? LIMIT 1",
+                arrayOf(URL_TEMPLATE, "${key.zoom}", "${key.x}", "${key.y}"),
+            ).use { c ->
+                if (!c.moveToFirst()) return null
+                val data = c.getBlob(0) ?: return null
+                if (c.getInt(1) != 0) InflaterInputStream(data.inputStream()).use { it.readBytes() } else data
             }
         } catch (e: SQLiteReadOnlyDatabaseException) {
             throw e
         } catch (e: SQLiteDatabaseLockedException) {
             throw e
         } catch (e: Exception) {
-            // A schema we don't know: the network may still have it.
+            // A schema we don't know, or a file MapLibre replaced: opened afresh next time.
             Log.d(TAG, "No downloaded terrain tile $key: ${e.message}")
+            closeOfflineDb()
             null
         }
     }
@@ -147,8 +189,21 @@ class ElevationRepository @Inject constructor(@ApplicationContext private val co
         null
     }
 
+    private val _retries = MutableStateFlow(0)
+
+    /**
+     * Goes up each time tiles that failed are let through again. The map keeps the empty
+     * contours it drew for them until told to draw them again.
+     */
+    val retries: StateFlow<Int> = _retries.asStateFlow()
+
     /** Lets a tile that failed (e.g. offline) be tried again. */
-    suspend fun retryMissing() = lock.withLock { missing.clear() }
+    fun retryMissing() {
+        if (missing.isEmpty()) return
+        Log.d(TAG, "Trying ${missing.size} terrain tiles again")
+        missing.clear()
+        _retries.update { it + 1 }
+    }
 
     companion object {
         private const val TAG = "ElevationRepository"
@@ -163,5 +218,6 @@ class ElevationRepository @Inject constructor(@ApplicationContext private val co
         private const val CACHE_BYTES = 100L * 1024 * 1024
         // 256 KB each. Contours need the tiles around the ones on screen too.
         private const val MEMORY_TILES = 48
+        private const val LOCKS = 16
     }
 }

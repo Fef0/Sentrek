@@ -150,7 +150,10 @@ class TrackingService : Service() {
         scope.launch {
             request.collectLatest { (ms, batch) ->
                 location.locations(ms, batch).collect {
-                    at = runCatching { LatLon(it.latitude, it.longitude) }.getOrNull() ?: at
+                    // Each new request hands over the last known fix again (the screen going
+                    // off, a rest): one already had, or older, would step the track back.
+                    if (fix?.let { last -> it.time <= last.time } == true) return@collect
+                    at =runCatching { LatLon(it.latitude, it.longitude) }.getOrNull() ?: at
                     fix = it
                     onRestCheck(it)
                     signal.onLocation(it)

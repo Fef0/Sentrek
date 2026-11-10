@@ -156,6 +156,9 @@ class HomeViewModel @Inject constructor(
     }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    /** Goes up when terrain tiles missed offline can be had again: contours and slopes are drawn anew. */
+    val terrainRetries: StateFlow<Int> get() = elevation.retries
+
     /** Terrain for the steep slope shading, or null with it switched off (or saving power). */
     val slopeTerrain: StateFlow<TerrainTiles?> = combine(settings.showSlopes, settings.powerMode) { show, mode ->
         elevation.takeIf { show && mode == PowerMode.Normal }

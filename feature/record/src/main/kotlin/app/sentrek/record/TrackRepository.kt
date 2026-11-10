@@ -289,6 +289,19 @@ class TrackRepository @Inject constructor(
     }
 
     /**
+     * A copy of [track] as it is, saved as [name]: to change a route and keep the original.
+     * Its line with the times, its waypoints and its plan. Null when the file can't be read.
+     */
+    suspend fun saveCopy(track: SavedTrack, name: String): SavedTrack? {
+        val file = withContext(Dispatchers.IO) {
+            runCatching { read(track) }.onFailure { Log.w(TAG, "Cannot read ${track.id}", it) }.getOrNull()
+        } ?: return null
+        val segments = file.tracks.flatMap { it.segments }.filter { it.isNotEmpty() }
+        if (segments.isEmpty()) return null
+        return save(segments, name, file.waypoints, imported = track.imported, smoothElevation = track.imported, plan = plan(track))
+    }
+
+    /**
      * A copy of [track] walked the other way, saved as [name]: the line from its end to its
      * start, its waypoints, and its plan turned around too. Times go: backwards they'd be
      * wrong, so the copy is a route with the walking time estimated, like a planned one.

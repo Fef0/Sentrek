@@ -1,0 +1,5 @@
+• La schermata SOS invia da sola la tua posizione al contatto di emergenza, dopo una conferma
+• Dove le tracce mostrate si sovrappongono, solo quella in cima ha le frecce
+• I segni di partenza e arrivo non si accavallano più dove le tracce iniziano nello stesso punto
+• Le curve di livello mancate offline compaiono quando torna la rete
+• Un download lento del rilievo non blocca più le curve di livello

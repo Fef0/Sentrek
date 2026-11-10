@@ -1,0 +1,5 @@
+• The SOS screen sends your position to your emergency contact itself, after asking
+• Where shown tracks overlap, only the top one has direction arrows
+• Start and end markers no longer pile up where tracks begin in the same place
+• Contour lines missed offline appear when the network is back
+• A slow terrain download no longer holds up the contour lines

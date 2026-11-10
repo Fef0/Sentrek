@@ -11,11 +11,15 @@ import java.util.Locale
 import java.util.TimeZone
 import javax.xml.parsers.SAXParserFactory
 
-/** Contents of a GPX file. Routes (`rte`) are read as one-segment tracks. */
+/**
+ * Contents of a GPX file. Routes (`rte`) are read as one-segment tracks. [description]: the
+ * file's `<desc>`, else its first track's: notes on the route as a whole.
+ */
 data class GpxFile(
     val name: String?,
     val tracks: List<GpxTrack>,
     val waypoints: List<GpxWaypoint>,
+    val description: String? = null,
 )
 
 data class GpxTrack(val name: String?, val segments: List<List<TrackPoint>>)
@@ -40,12 +44,15 @@ object Gpx {
         segments: List<List<TrackPoint>>,
         creator: String,
         waypoints: List<GpxWaypoint> = emptyList(),
+        /** Notes on the whole route; in the file's and the track's `<desc>`, where other apps look. */
+        description: String? = null,
     ) {
+        val desc = description?.takeIf { it.isNotBlank() }?.let { "<desc>${escape(it)}</desc>" }.orEmpty()
         out.write("""<?xml version="1.0" encoding="UTF-8"?>""")
         out.write("\n")
         out.write("""<gpx version="1.1" creator="${escape(creator)}" xmlns="http://www.topografix.com/GPX/1/1">""")
         out.write("\n")
-        out.write("  <metadata><name>${escape(name)}</name></metadata>\n")
+        out.write("  <metadata><name>${escape(name)}</name>$desc</metadata>\n")
         for (w in waypoints) {
             val p = w.position
             out.write("""  <wpt lat="${coordinate(p.lat)}" lon="${coordinate(p.lon)}">""")
@@ -63,6 +70,7 @@ object Gpx {
             return
         }
         out.write("  <trk>\n    <name>${escape(name)}</name>\n")
+        if (desc.isNotEmpty()) out.write("    $desc\n")
         for (segment in segments) {
             out.write("    <trkseg>\n")
             for (point in segment) {
@@ -81,11 +89,13 @@ object Gpx {
     fun read(input: InputStream): GpxFile {
         val handler = Handler()
         SAXParserFactory.newInstance().apply { isNamespaceAware = true }.newSAXParser().parse(input, handler)
-        return GpxFile(handler.fileName, handler.tracks, handler.waypoints)
+        return GpxFile(handler.fileName, handler.tracks, handler.waypoints, handler.fileNote ?: handler.trackNote)
     }
 
     private class Handler : DefaultHandler() {
         var fileName: String? = null
+        var fileNote: String? = null
+        var trackNote: String? = null
         val tracks = mutableListOf<GpxTrack>()
         val waypoints = mutableListOf<GpxWaypoint>()
 
@@ -142,7 +152,11 @@ object Gpx {
                 }
                 "trkpt", "rtept" -> point()?.let { segment += it }
                 // Most apps put the note in <desc>, some in <cmt>.
-                "desc" -> if (parent == "wpt") pointNote = value.ifEmpty { pointNote }
+                "desc" -> when (parent) {
+                    "wpt" -> pointNote = value.ifEmpty { pointNote }
+                    "metadata" -> if (fileNote == null) fileNote = value.ifEmpty { null }
+                    "trk", "rte" -> if (trackNote == null) trackNote = value.ifEmpty { null }
+                }
                 "cmt" -> if (parent == "wpt" && pointNote == null) pointNote = value.ifEmpty { null }
                 "type" -> if (parent == "wpt") pointType = value.ifEmpty { null }
                 "sym" -> if (parent == "wpt") pointSymbol = value.ifEmpty { null }

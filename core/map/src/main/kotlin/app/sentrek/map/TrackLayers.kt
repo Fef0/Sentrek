@@ -103,6 +103,20 @@ object TrackLayers {
      */
     fun syncShown(style: Style, shown: List<MapTrack>, start: String = "", end: String = "", arrows: Boolean = true) {
         setLines(style, SHOWN, shown.map { track -> lineFeature(track.segments, track.color).apply { addStringProperty("id", track.id) } })
+        // Where tracks share a trail, only the top one's arrows: the others' would point every way.
+        val arrowLines = if (arrows) {
+            ArrowParts.free(shown.map { it.segments }).filter { it.isNotEmpty() }.map { lines ->
+                Feature.fromGeometry(MultiLineString.fromLngLats(lines.map { l -> l.map { Point.fromLngLat(it.lon, it.lat) } }))
+            }
+        } else {
+            emptyList()
+        }
+        val arrowSource = style.getSourceAs<GeoJsonSource>(ARROWS)
+        if (arrowSource != null) {
+            arrowSource.setGeoJson(FeatureCollection.fromFeatures(arrowLines))
+        } else {
+            style.addSource(GeoJsonSource(ARROWS, FeatureCollection.fromFeatures(arrowLines), lineOptions()))
+        }
         if (style.getLayer(ARROWS) == null) addArrows(style)
         style.getLayer(ARROWS)?.setProperties(visibility(if (arrows) Property.VISIBLE else Property.NONE))
         setEnds(style, shown.flatMap { ends(it, start, end) })
@@ -209,7 +223,7 @@ object TrackLayers {
         if (style.getImage(ARROW_IMAGE) == null) style.addImage(ARROW_IMAGE, arrow())
         PlaceLayers.addBelow(
             style,
-            SymbolLayer(ARROWS, SHOWN).withProperties(
+            SymbolLayer(ARROWS, ARROWS).withProperties(
                 symbolPlacement(Property.SYMBOL_PLACEMENT_LINE),
                 symbolSpacing(ARROW_SPACING),
                 iconImage(ARROW_IMAGE),

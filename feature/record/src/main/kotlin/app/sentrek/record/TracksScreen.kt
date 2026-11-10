@@ -60,7 +60,7 @@ import app.sentrek.ui.MapButton
 import app.sentrek.ui.SentrekIcons
 import app.sentrek.ui.safeTopPadding
 
-/** Saved and imported tracks: follow, show on the map, share, save as GPX, rename, delete; import files. */
+/** Saved and imported tracks: follow, show on the map, share, save as GPX, name and notes, delete; import files. */
 @Composable
 fun TracksScreen(
     onBack: () -> Unit,
@@ -74,6 +74,7 @@ fun TracksScreen(
     val shown by viewModel.shown.collectAsStateWithLifecycle()
     val following by viewModel.following.collectAsStateWithLifecycle()
     val totalsAllTime by viewModel.totalsAllTime.collectAsStateWithLifecycle()
+    val notesExpanded by viewModel.notesExpanded.collectAsStateWithLifecycle()
     var exporting by remember { mutableStateOf<SavedTrack?>(null) }
     var choosingFormat by remember { mutableStateOf<SavedTrack?>(null) }
     var confirm by remember { mutableStateOf<Confirmation?>(null) }
@@ -205,6 +206,8 @@ fun TracksScreen(
                         onRename = { renaming = track },
                         onColor = { coloring = track },
                         loadProfile = viewModel::profile,
+                        notesExpanded = notesExpanded,
+                        onExpandNotes = viewModel::setNotesExpanded,
                     )
                 }
                 item { Box(Modifier.navigationBarsPadding()) }
@@ -256,11 +259,13 @@ fun TracksScreen(
     }
 
     renaming?.let { track ->
-        TrackNameDialog(
-            title = stringResource(R.string.tracks_rename),
-            confirmLabel = stringResource(R.string.tracks_rename_confirm),
-            initial = track.name,
-            onConfirm = { viewModel.rename(track, it); renaming = null },
+        TrackDetailsDialog(
+            title = stringResource(R.string.tracks_details),
+            confirmLabel = stringResource(R.string.places_save),
+            initialName = track.name,
+            initialNote = track.note,
+            initialPhotos = track.photos,
+            onConfirm = { name, note, photos -> viewModel.edit(track, name, note, photos); renaming = null },
             onDismiss = { renaming = null },
         )
     }
@@ -332,6 +337,8 @@ private fun TrackCard(
     /** Null for recorded tracks, which can't be edited. */
     onEdit: (() -> Unit)?,
     loadProfile: suspend (SavedTrack) -> List<Pair<Double, Double>>,
+    notesExpanded: Boolean,
+    onExpandNotes: (Boolean) -> Unit,
 ) {
     // Keyed on the climb too: it changes when heights are added to an imported track.
     val profile by produceState(emptyList<Pair<Double, Double>>(), track.id, track.ascent) { value = loadProfile(track) }
@@ -341,7 +348,7 @@ private fun TrackCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = TouchTarget)
-                    .clickable(onClickLabel = stringResource(R.string.tracks_rename), onClick = onRename),
+                    .clickable(onClickLabel = stringResource(R.string.tracks_details), onClick = onRename),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -352,7 +359,7 @@ private fun TrackCard(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                 )
-                Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.tracks_rename))
+                Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.tracks_details))
             }
             // Planned routes have no times: show the signpost estimate instead.
             val time = if (track.duration > 0) {
@@ -371,6 +378,7 @@ private fun TrackCard(
                 style = MaterialTheme.typography.bodyLarge,
             )
             ElevationProfile(profile, Modifier.fillMaxWidth().height(56.dp))
+            TrackNote(track.note, track.photos, notesExpanded, onExpandNotes, photoSize = TouchTarget * 1.2f)
             val buttonModifier = Modifier.weight(1f).heightIn(min = TouchTarget)
             val padding = PaddingValues(horizontal = 4.dp)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

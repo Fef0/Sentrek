@@ -263,9 +263,8 @@ class PlannerViewModel @Inject constructor(
     /** The leg from [a] to [b] as it is known now, for drawing while a point is dragged. */
     fun knownLeg(a: LatLon, b: LatLon, onTrails: Boolean): PlanLeg = knownLeg(PlanPoint(a, false), PlanPoint(b, onTrails))
 
-    /** Saves the plan as a route in the track list and leaves the planner. */
     /** Saves the plan as a route (or over the route being edited) and leaves the planner. */
-    fun save(name: String, onSaved: (SavedTrack) -> Unit) {
+    fun save(name: String, note: String, photos: List<String>, onSaved: (SavedTrack) -> Unit) {
         viewModelScope.launch {
             val legs = legs.value
             if (legs.isEmpty()) return@launch
@@ -275,10 +274,10 @@ class PlannerViewModel @Inject constructor(
             val editing = _state.value.editing
             val track = if (editing != null) {
                 val replaced = tracks.replace(editing, segments, plan) ?: return@launch
-                if (name.isNotBlank() && name.trim() != replaced.name) tracks.rename(replaced, name)
-                tracks.find(replaced.id) ?: replaced
+                tracks.edit(replaced, name, note, photos) ?: replaced
             } else {
-                tracks.save(segments, name, imported = true, smoothElevation = true, plan = plan).also { tracks.show(it) }
+                tracks.save(segments, name, imported = true, smoothElevation = true, plan = plan, note = note, photos = photos)
+                    .also { tracks.show(it) }
             }
             discard()
             onSaved(track)
@@ -287,7 +286,10 @@ class PlannerViewModel @Inject constructor(
 
     /** The name the save dialog starts with: the edited route's, or today's date. */
     fun defaultName(): String =
-        _state.value.editing?.name ?: DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date())
+        editedTrack()?.name ?: DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date())
+
+    /** The route being edited as it is saved now (its note may have changed since it was opened). */
+    fun editedTrack(): SavedTrack? = _state.value.editing?.let { tracks.find(it.id) ?: it }
 
     /** Runs [change] after earlier edits; it returns the point to select afterwards. */
     private fun edit(change: suspend () -> Int?) {

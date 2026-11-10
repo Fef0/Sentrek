@@ -29,6 +29,14 @@ class TracksViewModel @Inject constructor(
         viewModelScope.launch { settings.setTripTotalsAllTime(allTime) }
     }
 
+    /** Notes and photos open, or in one line; remembered, for all the tracks at once. */
+    val notesExpanded: StateFlow<Boolean> =
+        settings.trackNotesExpanded.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setNotesExpanded(expanded: Boolean) {
+        viewModelScope.launch { settings.setTrackNotesExpanded(expanded) }
+    }
+
     val shown: StateFlow<Set<String>> = repository.shown
         .map { it.keys }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
@@ -55,8 +63,8 @@ class TracksViewModel @Inject constructor(
 
     fun stopFollowing() = follow.stop()
 
-    fun rename(track: SavedTrack, name: String) {
-        viewModelScope.launch { repository.rename(track, name) }
+    fun edit(track: SavedTrack, name: String, note: String, photos: List<String>) {
+        viewModelScope.launch { repository.edit(track, name, note, photos) }
     }
 
     fun delete(track: SavedTrack) {

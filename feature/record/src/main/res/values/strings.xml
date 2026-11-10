@@ -57,8 +57,13 @@ Record a hike or import a GPX/KML file.</string>
     <string name="tracks_delete">Delete</string>
     <string name="tracks_cancel">Cancel</string>
     <string name="tracks_name">Name</string>
-    <string name="tracks_rename">Rename track</string>
-    <string name="tracks_rename_confirm">Rename</string>
+    <string name="tracks_details">Name, note and photos</string>
+    <string name="tracks_note_more">Show note and photos</string>
+    <string name="tracks_note_less">Note and photos in one line</string>
+    <plurals name="tracks_photos">
+        <item quantity="one">%d photo</item>
+        <item quantity="other">%d photos</item>
+    </plurals>
     <string name="tracks_follow">Follow</string>
     <string name="tracks_stop_following">Stop following</string>
     <string name="tracks_import">Import</string>

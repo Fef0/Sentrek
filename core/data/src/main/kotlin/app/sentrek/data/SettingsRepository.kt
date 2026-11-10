@@ -378,6 +378,22 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[FOLLOW_PLACES_EXPANDED] = expanded }
     }
 
+    /** The followed route's own note and photos open on the trail card, rather than in one line. */
+    val followNoteExpanded: Flow<Boolean> =
+        prefs { it[FOLLOW_NOTE_EXPANDED] ?: false }
+
+    suspend fun setFollowNoteExpanded(expanded: Boolean) {
+        context.settings.edit { it[FOLLOW_NOTE_EXPANDED] = expanded }
+    }
+
+    /** Notes and photos open on the Tracks screen, rather than in one line. */
+    val trackNotesExpanded: Flow<Boolean> =
+        prefs { it[TRACK_NOTES_EXPANDED] ?: false }
+
+    suspend fun setTrackNotesExpanded(expanded: Boolean) {
+        context.settings.edit { it[TRACK_NOTES_EXPANDED] = expanded }
+    }
+
     /** The walking totals on the Tracks screen: all time, or this year (the default). */
     val tripTotalsAllTime: Flow<Boolean> =
         prefs { it[TRIP_TOTALS_ALL_TIME] ?: false }
@@ -594,6 +610,8 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val OFF_ROUTE_VIBRATION = booleanPreferencesKey("off_route_vibration")
         val TRAIL_CARD_EXPANDED = booleanPreferencesKey("trail_card_expanded")
         val FOLLOW_PLACES_EXPANDED = booleanPreferencesKey("follow_places_expanded")
+        val FOLLOW_NOTE_EXPANDED = booleanPreferencesKey("follow_note_expanded")
+        val TRACK_NOTES_EXPANDED = booleanPreferencesKey("track_notes_expanded")
         val TRIP_TOTALS_ALL_TIME = booleanPreferencesKey("trip_totals_all_time")
         val BATTERY_SAVER = booleanPreferencesKey("battery_saver")
         val STAMINA_MODE = booleanPreferencesKey("stamina_mode")

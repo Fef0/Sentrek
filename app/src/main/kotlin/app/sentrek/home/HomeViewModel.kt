@@ -248,6 +248,13 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch { settings.setFollowPlacesExpanded(expanded) }
     }
 
+    val followNoteExpanded: StateFlow<Boolean> =
+        settings.followNoteExpanded.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setFollowNoteExpanded(expanded: Boolean) {
+        viewModelScope.launch { settings.setFollowNoteExpanded(expanded) }
+    }
+
     val autoHideControls: StateFlow<Boolean> =
         settings.autoHideControls.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
@@ -309,6 +316,13 @@ class HomeViewModel @Inject constructor(
     fun deletePlace(place: Place) = placeRepository.delete(place)
 
     fun track(id: String): SavedTrack? = tracks.find(id)
+
+    /** All saved tracks, as they change: a sheet or card open on one shows its edits. */
+    val allTracks: StateFlow<List<SavedTrack>> get() = tracks.tracks
+
+    fun editTrack(track: SavedTrack, name: String, note: String, photos: List<String>) {
+        viewModelScope.launch { tracks.edit(track, name, note, photos) }
+    }
 
     suspend fun trackProfile(track: SavedTrack) = tracks.profile(track)
 
@@ -390,8 +404,8 @@ class HomeViewModel @Inject constructor(
 
     fun resumeRecording() = recorder.resume()
 
-    fun saveRecording(name: String, onSaved: (SavedTrack?) -> Unit) {
-        viewModelScope.launch { onSaved(recorder.save(name)) }
+    fun saveRecording(name: String, note: String, photos: List<String>, onSaved: (SavedTrack?) -> Unit) {
+        viewModelScope.launch { onSaved(recorder.save(name, note, photos)) }
     }
 
     fun discardRecording() = recorder.discard()

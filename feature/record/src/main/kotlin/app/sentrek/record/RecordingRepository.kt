@@ -140,10 +140,10 @@ class RecordingRepository @Inject constructor(
     }
 
     /** Ends the recording and saves it as [name]; returns the saved track, or null when empty. */
-    suspend fun save(name: String?): SavedTrack? {
+    suspend fun save(name: String?, note: String = "", photos: List<String> = emptyList()): SavedTrack? {
         if (_state.value == null) return null
         val kept = segments.map { it.toList() }.filter { it.isNotEmpty() }
-        val saved = if (kept.isNotEmpty()) tracks.save(kept, name, waypointsSoFar()) else null
+        val saved = if (kept.isNotEmpty()) tracks.save(kept, name, waypointsSoFar(), note = note, photos = photos) else null
         end()
         return saved
     }

@@ -31,6 +31,12 @@ import app.sentrek.R
 import app.sentrek.geo.route.HikingTime
 import app.sentrek.record.ColorSwatch
 import app.sentrek.record.SavedTrack
+import app.sentrek.record.TrackNote
+import app.sentrek.feature.record.R as RecordR
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.Icon
 import app.sentrek.record.TrackColorDialog
 import app.sentrek.record.WeatherResult
 import app.sentrek.record.WeatherSection
@@ -52,6 +58,8 @@ fun TrackSheet(
     onHide: () -> Unit,
     /** Null for recorded tracks, which can't be edited. */
     onEdit: (() -> Unit)?,
+    /** Name, note and photos. */
+    onDetails: () -> Unit,
     onDismiss: () -> Unit,
     /** Elevation profile of the track (see TrackRepository.profile). */
     loadProfile: suspend (SavedTrack) -> List<Pair<Double, Double>>,
@@ -66,9 +74,17 @@ fun TrackSheet(
             modifier = Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = TouchTarget)
+                    .clickable(onClickLabel = stringResource(RecordR.string.tracks_details), onClick = onDetails),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 ColorSwatch(track.color, selected = false, size = TouchTarget * 0.6f, onClick = { choosingColor = true })
-                Text(track.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(track.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Icon(Icons.Filled.Edit, contentDescription = stringResource(RecordR.string.tracks_details))
             }
             val time = if (track.duration > 0) {
                 Format.duration(track.duration)
@@ -80,6 +96,7 @@ fun TrackSheet(
                 style = MaterialTheme.typography.bodyLarge,
             )
             ElevationProfile(profile, Modifier.fillMaxWidth().height(72.dp))
+            TrackNote(track.note, track.photos, expanded = true, onExpand = null, photoSize = TouchTarget * 1.5f)
             WeatherSection(loadWeather, highest = true)
             if (isFollowed) {
                 Button(onClick = onStopFollowing, modifier = wide) { Text(stringResource(R.string.track_stop_following)) }

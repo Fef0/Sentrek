@@ -55,6 +55,10 @@ data class SavedTrack(
     val imported: Boolean = false,
     /** Line colour on the map (ARGB), one of [TrackColors.palette]. */
     val color: Int = TrackColors.palette.first(),
+    /** The user's notes on the route: what to know before and on the way. */
+    val note: String = "",
+    /** Photo names in [PhotoStore], as for places. */
+    val photos: List<String> = emptyList(),
 )
 
 /** Track colours: dark and saturated, so they read on the light map and next to the trail colours. */
@@ -99,6 +103,7 @@ class TrackRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val places: PlaceRepository,
     private val elevation: ElevationRepository,
+    private val photoStore: PhotoStore,
     // Lazy: Sentrek files hold tracks, and this opens them on import.
     private val backups: dagger.Lazy<BackupRepository>,
 ) {
@@ -145,7 +150,7 @@ class TrackRepository @Inject constructor(
     /**
      * [name]: blank or null uses [defaultName]. [smoothElevation]: heights come from the terrain
      * model (a planned route), not GPS, so small climbs are real. [plan]: the planner's points
-     * and legs, kept to edit the route again.
+     * and legs, kept to edit the route again. [note] and [photos]: see [SavedTrack].
      */
     suspend fun save(
         segments: List<List<TrackPoint>>,
@@ -154,6 +159,8 @@ class TrackRepository @Inject constructor(
         imported: Boolean = false,
         smoothElevation: Boolean = false,
         plan: SavedPlan? = null,
+        note: String = "",
+        photos: List<String> = emptyList(),
     ): SavedTrack = withContext(Dispatchers.IO) {
         val threshold = if (smoothElevation) TrackStats.SMOOTH_CLIMB_THRESHOLD_M else TrackStats.CLIMB_THRESHOLD_M
         val stats = TrackStats.of(segments, threshold)
@@ -164,7 +171,7 @@ class TrackRepository @Inject constructor(
         val color = TrackColors.palette[_tracks.value.size % TrackColors.palette.size]
         val track = SavedTrack(
             id, title, start, stats.endTime.coerceAtLeast(start), stats.distance, stats.ascent, stats.descent,
-            stats.activeMillis, imported, color,
+            stats.activeMillis, imported, color, note.trim(), photos,
         )
         write(track, segments, waypoints)
         plan?.let { writePlan(track, it) }
@@ -213,7 +220,10 @@ class TrackRepository @Inject constructor(
                 }
                 // Files from some planners have no heights: take them from the terrain while we can.
                 val filled = if (segments.flatten().none { it.position.ele != null }) withTerrain(segments) else null
-                val track = save(filled ?: segments, name, file.waypoints, imported = true, smoothElevation = filled != null)
+                val track = save(
+                    filled ?: segments, name, file.waypoints, imported = true, smoothElevation = filled != null,
+                    note = file.description.orEmpty(),
+                )
                 ImportResult.Imported(track, bounds(segments.flatten().map(TrackPoint::position)))
             }.getOrElse {
                 Log.w(TAG, "Import of $uri failed", it)
@@ -233,17 +243,23 @@ class TrackRepository @Inject constructor(
         return ImportResult.ImportedMany(restored.tracks, restored.places.size, 0, bounds(corners))
     }
 
-    /** Renames the track, in the list and inside its GPX file. */
-    suspend fun rename(track: SavedTrack, name: String) {
-        val title = name.trim().takeIf { it.isNotEmpty() && it != track.name } ?: return
-        val renamed = track.copy(name = title)
+    /**
+     * New name (blank keeps it), note and photos, in the list and in the GPX file (the note
+     * travels with it). Photos taken off are deleted. Returns the track as saved, or null.
+     */
+    suspend fun edit(track: SavedTrack, name: String, note: String, photos: List<String>): SavedTrack? {
+        val edited = track.copy(name = name.trim().ifEmpty { track.name }, note = note.trim(), photos = photos)
+        if (edited == track) return track
         val ok = withContext(Dispatchers.IO) {
             runCatching {
                 val gpx = read(track)
-                write(renamed, gpx.tracks.flatMap { it.segments }, gpx.waypoints)
-            }.onFailure { Log.w(TAG, "Cannot rename ${track.id}", it) }.isSuccess
+                write(edited, gpx.tracks.flatMap { it.segments }, gpx.waypoints)
+            }.onFailure { Log.w(TAG, "Cannot save ${track.id}", it) }.isSuccess
         }
-        if (ok) _tracks.update { all -> all.map { if (it.id == track.id) renamed else it } }
+        if (!ok) return null
+        photoStore.delete(track.photos - photos.toSet())
+        _tracks.update { all -> all.map { if (it.id == track.id) edited else it } }
+        return edited
     }
 
     suspend fun setColor(track: SavedTrack, color: Int) {
@@ -263,8 +279,9 @@ class TrackRepository @Inject constructor(
             gpxFile(track).delete()
             File(dir, track.id + SUMMARY).delete()
             File(dir, track.id + PLAN).delete()
+            photoStore.delete((find(track.id) ?: track).photos)
         }
-        _tracks.update { it - track }
+        _tracks.update { all -> all.filterNot { it.id == track.id } }
     }
 
     /**
@@ -298,7 +315,10 @@ class TrackRepository @Inject constructor(
         } ?: return null
         val segments = file.tracks.flatMap { it.segments }.filter { it.isNotEmpty() }
         if (segments.isEmpty()) return null
-        return save(segments, name, file.waypoints, imported = track.imported, smoothElevation = track.imported, plan = plan(track))
+        return save(
+            segments, name, file.waypoints, imported = track.imported, smoothElevation = track.imported, plan = plan(track),
+            note = track.note, photos = photoStore.copy(track.photos),
+        )
     }
 
     /**
@@ -320,6 +340,8 @@ class TrackRepository @Inject constructor(
             // A planned route's heights are the terrain's: its small climbs are real.
             smoothElevation = track.imported,
             plan = plan(track)?.reversed(),
+            note = track.note,
+            photos = photoStore.copy(track.photos),
         )
     }
 
@@ -484,7 +506,7 @@ class TrackRepository @Inject constructor(
     private fun write(track: SavedTrack, segments: List<List<TrackPoint>>, waypoints: List<GpxWaypoint>) {
         // Write to a temp file first: a half-written GPX must never replace a good one.
         val gpxTmp = File(dir, "${track.id}$GPX.tmp")
-        gpxTmp.bufferedWriter().use { Gpx.write(it, track.name, segments, CREATOR, waypoints) }
+        gpxTmp.bufferedWriter().use { Gpx.write(it, track.name, segments, CREATOR, waypoints, track.note) }
         val gpx = File(dir, track.id + GPX)
         if (!gpxTmp.renameTo(gpx) && !(gpx.delete() && gpxTmp.renameTo(gpx))) {
             // No summary for a GPX that isn't there: the caller keeps what it had.
@@ -518,6 +540,8 @@ class TrackRepository @Inject constructor(
         .put("descent", t.descent)
         .put("imported", t.imported)
         .put("color", t.color)
+        .apply { if (t.note.isNotEmpty()) put("note", t.note) }
+        .apply { if (t.photos.isNotEmpty()) put("photos", JSONArray(t.photos)) }
         .toString()
 
     private fun readSummary(file: File): SavedTrack {
@@ -536,6 +560,8 @@ class TrackRepository @Inject constructor(
             duration = json.optLong("duration", (end - start).coerceAtLeast(0)),
             imported = json.optBoolean("imported", false),
             color = json.optInt("color", TrackColors.palette.first()),
+            note = json.optString("note"),
+            photos = json.optJSONArray("photos")?.let { a -> (0 until a.length()).map(a::getString) }.orEmpty(),
         )
     }
 

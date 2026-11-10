@@ -111,4 +111,30 @@ class TrackTest {
         assertEquals(Gpx.parseTime("2026-10-27T10:00:00.5Z"), route.segments.single()[0].time)
         assertEquals("2026-10-27T10:00:00Z", Gpx.isoTime(route.segments.single()[0].time))
     }
+
+    @Test
+    fun `route note is written and read back`() {
+        val segments = listOf(listOf(pt(45.97, 7.65, 2000.0, 0), pt(45.98, 7.66, 2100.0, 0)))
+        val out = StringWriter()
+        Gpx.write(out, "Loop", segments, "Sentrek test", description = "Water at the hut & <bus> 18:10\nAsk about snow")
+        assertEquals("Water at the hut & <bus> 18:10\nAsk about snow", Gpx.read(out.toString().byteInputStream()).description)
+
+        val none = StringWriter()
+        Gpx.write(none, "Loop", segments, "Sentrek test", description = " ")
+        assertNull(Gpx.read(none.toString().byteInputStream()).description)
+    }
+
+    @Test
+    fun `route note comes from the track when the file has none`() {
+        val xml = """<?xml version="1.0"?>
+            <gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1">
+              <wpt lat="46.0" lon="7.0"><name>Spring</name><desc>Cold water</desc></wpt>
+              <trk><name>Ridge</name><desc>Exposed after the pass</desc>
+                <trkseg><trkpt lat="46.0" lon="7.0"/><trkpt lat="46.01" lon="7.01"/></trkseg>
+              </trk>
+            </gpx>"""
+        val gpx = Gpx.read(xml.byteInputStream())
+        assertEquals("Exposed after the pass", gpx.description)
+        assertEquals("Cold water", gpx.waypoints.single().note)
+    }
 }

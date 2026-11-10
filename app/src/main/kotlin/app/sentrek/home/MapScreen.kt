@@ -120,7 +120,7 @@ import app.sentrek.record.PlaceSheet
 import app.sentrek.record.SavedTrack
 import app.sentrek.record.ShareDialog
 import app.sentrek.record.rememberSharing
-import app.sentrek.record.TrackNameDialog
+import app.sentrek.record.TrackDetailsDialog
 import app.sentrek.ui.BarItem
 import app.sentrek.ui.BottomBar
 import app.sentrek.ui.LocalTouch
@@ -227,8 +227,11 @@ fun MapScreen(
     val recording by viewModel.recording.collectAsStateWithLifecycle()
     val breadcrumbs by viewModel.breadcrumbs.collectAsStateWithLifecycle()
     val followedRoute by viewModel.following.collectAsStateWithLifecycle()
+    val allTracks by viewModel.allTracks.collectAsStateWithLifecycle()
+    val followedTrack = followedRoute?.let { f -> allTracks.firstOrNull { it.id == f.trackId } }
     val trailCardExpanded by viewModel.trailCardExpanded.collectAsStateWithLifecycle()
     val followPlacesExpanded by viewModel.followPlacesExpanded.collectAsStateWithLifecycle()
+    val followNoteExpanded by viewModel.followNoteExpanded.collectAsStateWithLifecycle()
     val plan by planner.state.collectAsStateWithLifecycle()
     val planBlock by planner.blockedBy.collectAsStateWithLifecycle()
     val planStats by planner.stats.collectAsStateWithLifecycle()
@@ -543,6 +546,10 @@ fun MapScreen(
                             }
                         },
                         onStop = { confirm = FollowConfirmations.stop(context, it.name, viewModel::stopFollowing) },
+                        routeNote = followedTrack?.note.orEmpty(),
+                        routePhotos = followedTrack?.photos.orEmpty(),
+                        noteExpanded = followNoteExpanded,
+                        onExpandNote = viewModel::setFollowNoteExpanded,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -1006,13 +1013,15 @@ fun MapScreen(
         )
     }
     if (askName && current != null) {
-        TrackNameDialog(
+        TrackDetailsDialog(
             title = stringResource(R.string.record_save),
             confirmLabel = stringResource(R.string.record_save_confirm),
-            initial = viewModel.defaultTrackName(current),
-            onConfirm = { name ->
+            initialName = viewModel.defaultTrackName(current),
+            initialNote = "",
+            initialPhotos = emptyList(),
+            onConfirm = { name, note, photos ->
                 askName = false
-                viewModel.saveRecording(name) { saved ->
+                viewModel.saveRecording(name, note, photos) { saved ->
                     if (saved != null) Toast.makeText(context, context.getString(R.string.record_saved, saved.name), Toast.LENGTH_LONG).show()
                 }
             },
@@ -1039,13 +1048,16 @@ fun MapScreen(
     MapLayerEffects(viewModel, planner, map, style, planPreview, handleReach, goTo, lastFix, visible)
 
     if (askPlanName) {
-        TrackNameDialog(
+        val edited = remember { planner.editedTrack() }
+        TrackDetailsDialog(
             title = stringResource(PlannerR.string.plan_save_title),
             confirmLabel = stringResource(PlannerR.string.plan_save),
-            initial = planner.defaultName(),
-            onConfirm = { name ->
+            initialName = planner.defaultName(),
+            initialNote = edited?.note.orEmpty(),
+            initialPhotos = edited?.photos.orEmpty(),
+            onConfirm = { name, note, photos ->
                 askPlanName = false
-                planner.save(name) { saved ->
+                planner.save(name, note, photos) { saved ->
                     Toast.makeText(context, context.getString(PlannerR.string.plan_saved, saved.name), Toast.LENGTH_LONG).show()
                 }
             },
@@ -1097,7 +1109,9 @@ private fun PressedSheet(
 ) {
     val context = LocalContext.current
     val unnamedPlace = stringResource(RecordR.string.places_unnamed)
-    val track = info.trackId?.takeIf { info.kind == "track" }?.let(viewModel::track)
+    val allTracks by viewModel.allTracks.collectAsStateWithLifecycle()
+    val track = info.trackId?.takeIf { info.kind == "track" }?.let { id -> allTracks.firstOrNull { it.id == id } }
+    var editingDetails by remember { mutableStateOf(false) }
     val place = info.placeId?.let(viewModel::place)
     if (place != null) {
         val here = map?.let(MapLocation::lastLocation)
@@ -1176,10 +1190,22 @@ private fun PressedSheet(
             } else {
                 null
             },
+            onDetails = { editingDetails = true },
             onDismiss = { onClose() },
             loadProfile = viewModel::trackProfile,
             loadWeather = { viewModel.trackWeather(track) },
         )
+        if (editingDetails) {
+            TrackDetailsDialog(
+                title = stringResource(RecordR.string.tracks_details),
+                confirmLabel = stringResource(RecordR.string.places_save),
+                initialName = track.name,
+                initialNote = track.note,
+                initialPhotos = track.photos,
+                onConfirm = { name, note, photos -> viewModel.editTrack(track, name, note, photos); editingDetails = false },
+                onDismiss = { editingDetails = false },
+            )
+        }
     }
 }
 

@@ -14,27 +14,27 @@ RepoType: git
 Repo: https://github.com/Fef0/Sentrek.git
 
 Builds:
-  - versionName: 0.20.0
-    versionCode: 261
-    commit: 7f8d65c7422b376579490a01955324638951d1c8
+  - versionName: 0.21.0
+    versionCode: 271
+    commit: 2f30e2adaf05db37e696de81e6cd0b23509d2616
     subdir: app
     gradle:
       - yes
     output: build/outputs/apk/release/app-armeabi-v7a-release-unsigned.apk
     binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-armv7.apk
 
-  - versionName: 0.20.0
-    versionCode: 262
-    commit: 7f8d65c7422b376579490a01955324638951d1c8
+  - versionName: 0.21.0
+    versionCode: 272
+    commit: 2f30e2adaf05db37e696de81e6cd0b23509d2616
     subdir: app
     gradle:
       - yes
     output: build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk
     binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-arm64.apk
 
-  - versionName: 0.20.0
-    versionCode: 264
-    commit: 7f8d65c7422b376579490a01955324638951d1c8
+  - versionName: 0.21.0
+    versionCode: 274
+    commit: 2f30e2adaf05db37e696de81e6cd0b23509d2616
     subdir: app
     gradle:
       - yes
@@ -49,5 +49,5 @@ VercodeOperation:
   - 10*%c+1
   - 10*%c+2
   - 10*%c+4
-CurrentVersion: 0.20.0
-CurrentVersionCode: 264
+CurrentVersion: 0.21.0
+CurrentVersionCode: 274

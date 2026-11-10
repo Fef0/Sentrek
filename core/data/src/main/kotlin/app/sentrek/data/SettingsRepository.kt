@@ -451,10 +451,34 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
 
     /** Contour lines on the map, drawn from the terrain data. */
     val showContours: Flow<Boolean> =
-        prefs { it[SHOW_CONTOURS] ?: true }
+        prefs { it[SHOW_CONTOURS] ?: false }
 
     suspend fun setShowContours(show: Boolean) {
         context.settings.edit { it[SHOW_CONTOURS] = show }
+    }
+
+    /** The terrain's light and shadow on the map (stamina mode hides it anyway). */
+    val showHillshade: Flow<Boolean> =
+        prefs { it[SHOW_HILLSHADE] ?: false }
+
+    suspend fun setShowHillshade(show: Boolean) {
+        context.settings.edit { it[SHOW_HILLSHADE] = show }
+    }
+
+    /** Huts, springs, peaks and the other points of the map data; off, only the map itself. */
+    val showMapPoints: Flow<Boolean> =
+        prefs { it[SHOW_MAP_POINTS] ?: true }
+
+    suspend fun setShowMapPoints(show: Boolean) {
+        context.settings.edit { it[SHOW_MAP_POINTS] = show }
+    }
+
+    /** Small arrows along the shown tracks, the way they go. */
+    val showTrackArrows: Flow<Boolean> =
+        prefs { it[SHOW_TRACK_ARROWS] ?: true }
+
+    suspend fun setShowTrackArrows(show: Boolean) {
+        context.settings.edit { it[SHOW_TRACK_ARROWS] = show }
     }
 
     /** Slopes of 30° and more shaded on the map, as on avalanche maps. */
@@ -593,6 +617,9 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val SHOW_LOCK_BUTTON = booleanPreferencesKey("show_lock_button")
         val SHOW_CONTOURS = booleanPreferencesKey("show_contours")
         val SHOW_SLOPES = booleanPreferencesKey("show_slopes")
+        val SHOW_HILLSHADE = booleanPreferencesKey("show_hillshade")
+        val SHOW_MAP_POINTS = booleanPreferencesKey("show_map_points")
+        val SHOW_TRACK_ARROWS = booleanPreferencesKey("show_track_arrows")
         val MAP_REMINDERS = booleanPreferencesKey("map_reminders")
         val AUTO_UPDATE_MAPS = booleanPreferencesKey("auto_update_maps")
         val MAP_REMINDER_SNOOZED = longPreferencesKey("map_reminder_snoozed")

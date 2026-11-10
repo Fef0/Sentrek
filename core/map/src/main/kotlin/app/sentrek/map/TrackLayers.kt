@@ -1,11 +1,19 @@
 package app.sentrek.map
 
+import android.content.res.Resources
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
+import app.sentrek.geo.Geo
 import app.sentrek.geo.LatLon
 import app.sentrek.geo.gpx.GpxWaypoint
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression.coalesce
 import org.maplibre.android.style.expressions.Expression.get
 import org.maplibre.android.style.expressions.Expression.literal
+import org.maplibre.android.style.expressions.Expression.match
+import org.maplibre.android.style.expressions.Expression.stop
 import org.maplibre.android.style.expressions.Expression.rgb
 import org.maplibre.android.style.expressions.Expression.toColor
 import org.maplibre.android.style.layers.CircleLayer
@@ -15,6 +23,10 @@ import org.maplibre.android.style.layers.PropertyFactory.circleColor
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
+import org.maplibre.android.style.layers.PropertyFactory.iconImage
+import org.maplibre.android.style.layers.PropertyFactory.symbolPlacement
+import org.maplibre.android.style.layers.PropertyFactory.symbolSpacing
+import org.maplibre.android.style.layers.PropertyFactory.visibility
 import org.maplibre.android.style.layers.PropertyFactory.lineCap
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
 import org.maplibre.android.style.layers.PropertyFactory.lineJoin
@@ -56,6 +68,22 @@ object TrackLayers {
     /** Layer with the shown tracks' waypoints; features carry "name" and the track id as "track". */
     internal const val WAYPOINTS = "track-waypoints"
 
+    /** Layer with where each shown track starts and ends; features carry "r" (start, end, both) and "label". */
+    private const val ENDS = "track-ends"
+
+    /** Small arrows along the shown tracks, the way they go: on a loop, the start doesn't say. */
+    private const val ARROWS = "track-arrows"
+    private const val ARROW_IMAGE = "track-arrow"
+
+    /** Closer out, a track is a few pixels long and the arrows would only be noise. */
+    private const val ARROWS_MIN_ZOOM = 12f
+
+    /** Screen pixels between arrows: a few on screen at any zoom. */
+    private const val ARROW_SPACING = 180f
+
+    /** Start and end closer than this (a loop): one marker for both, or the labels would collide. */
+    private const val SAME_PLACE_M = 30.0
+
     private const val RECORDING = "track-recording"
 
     /** The newest stretch of the recording: the only part sent again as it grows. */
@@ -68,9 +96,16 @@ object TrackLayers {
     private const val COLOR = "c"
     private const val RECORDING_COLOR = 0xFFE85D04.toInt()
 
-    /** The tracks shown on the map and their waypoints: changes only when the user changes them. */
-    fun syncShown(style: Style, shown: List<MapTrack>) {
+    /**
+     * The tracks shown on the map, their waypoints, and where each starts and ends ([start],
+     * [end]: the words for the markers, so the direction can be told): changes only when the
+     * user changes them. [arrows]: small arrows along the lines, the way they go.
+     */
+    fun syncShown(style: Style, shown: List<MapTrack>, start: String = "", end: String = "", arrows: Boolean = true) {
         setLines(style, SHOWN, shown.map { track -> lineFeature(track.segments, track.color).apply { addStringProperty("id", track.id) } })
+        if (style.getLayer(ARROWS) == null) addArrows(style)
+        style.getLayer(ARROWS)?.setProperties(visibility(if (arrows) Property.VISIBLE else Property.NONE))
+        setEnds(style, shown.flatMap { ends(it, start, end) })
         setWaypoints(
             style,
             shown.flatMap { track ->
@@ -165,6 +200,97 @@ object TrackLayers {
         lineCap(Property.LINE_CAP_ROUND),
         lineJoin(Property.LINE_JOIN_ROUND),
     )
+
+    /**
+     * White arrows inside the lines, turned with them. Below the labels and icons, which win
+     * the space: an arrow that would cover one is left out, the next one shows.
+     */
+    private fun addArrows(style: Style) {
+        if (style.getImage(ARROW_IMAGE) == null) style.addImage(ARROW_IMAGE, arrow())
+        PlaceLayers.addBelow(
+            style,
+            SymbolLayer(ARROWS, SHOWN).withProperties(
+                symbolPlacement(Property.SYMBOL_PLACEMENT_LINE),
+                symbolSpacing(ARROW_SPACING),
+                iconImage(ARROW_IMAGE),
+            ).apply { minZoom = ARROWS_MIN_ZOOM },
+        )
+    }
+
+    /**
+     * A chevron pointing along the line (right, as MapLibre lays icons on lines): white with a
+     * dark edge, a little wider than the line, so it reads on any track colour and on its casing.
+     */
+    private fun arrow(): Bitmap {
+        val density = Resources.getSystem().displayMetrics.density
+        val size = (14 * density).toInt().coerceAtLeast(14)
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val path = Path().apply {
+            moveTo(size * 0.32f, size * 0.22f)
+            lineTo(size * 0.68f, size * 0.5f)
+            lineTo(size * 0.32f, size * 0.78f)
+        }
+        val canvas = Canvas(bitmap)
+        for ((color, width) in listOf(0x99000000.toInt() to 4.4f, android.graphics.Color.WHITE to 2.4f)) {
+            canvas.drawPath(
+                path,
+                Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    this.color = color
+                    style = Paint.Style.STROKE
+                    strokeWidth = width * density
+                    strokeCap = Paint.Cap.ROUND
+                    strokeJoin = Paint.Join.ROUND
+                },
+            )
+        }
+        return bitmap
+    }
+
+    private fun ends(track: MapTrack, start: String, end: String): List<Feature> {
+        val first = track.segments.firstOrNull { it.isNotEmpty() }?.first() ?: return emptyList()
+        val last = track.segments.lastOrNull { it.isNotEmpty() }?.last() ?: return emptyList()
+        fun marker(p: LatLon, role: String, label: String) = Feature.fromGeometry(Point.fromLngLat(p.lon, p.lat)).apply {
+            addStringProperty("r", role)
+            addStringProperty("label", label)
+        }
+        if (Geo.distance(first, last) < SAME_PLACE_M) return listOf(marker(first, "both", "$start · $end"))
+        return listOf(marker(first, "start", start), marker(last, "end", end))
+    }
+
+    private fun setEnds(style: Style, features: List<Feature>) {
+        val collection = FeatureCollection.fromFeatures(features)
+        val source = style.getSourceAs<GeoJsonSource>(ENDS)
+        if (source != null) {
+            source.setGeoJson(collection)
+            return
+        }
+        style.addSource(GeoJsonSource(ENDS, collection))
+        // The planner's colours: green where it starts, red where it ends.
+        val color = match(get("r"), rgb(198, 40, 40), stop("start", rgb(46, 125, 50)), stop("both", rgb(46, 125, 50)))
+        PlaceLayers.addBelow(
+            style,
+            CircleLayer(ENDS, ENDS).withProperties(
+                circleRadius(7f),
+                circleColor(color),
+                circleStrokeColor(rgb(255, 255, 255)),
+                circleStrokeWidth(2.5f),
+            ),
+        )
+        PlaceLayers.addBelow(
+            style,
+            SymbolLayer(ENDS + LABELS, ENDS).withProperties(
+                textField(get("label")),
+                textFont(arrayOf("Noto Sans Bold")),
+                textSize(12f),
+                textAnchor(Property.TEXT_ANCHOR_TOP),
+                textOffset(arrayOf(0f, 0.9f)),
+                textOptional(true),
+                textColor(color),
+                textHaloColor(rgb(255, 255, 255)),
+                textHaloWidth(1.8f),
+            ),
+        )
+    }
 
     private fun setWaypoints(style: Style, features: List<Feature>) {
         val collection = FeatureCollection.fromFeatures(features)

@@ -47,8 +47,11 @@ Registra un’escursione o importa un file GPX/KML.</string>
     <string name="tracks_share">Condividi</string>
     <string name="tracks_reverse">Copia al contrario</string>
     <string name="tracks_reversed_name">%1$s (al contrario)</string>
-    <string name="tracks_reversed_saved">Salvato come %1$s</string>
+    <string name="tracks_saved_as">Salvato come %1$s</string>
     <string name="tracks_reversed_failed">Impossibile creare la copia al contrario</string>
+    <string name="tracks_duplicate">Duplica</string>
+    <string name="tracks_copy_name">%1$s (copia)</string>
+    <string name="tracks_copy_failed">Impossibile creare la copia</string>
     <string name="tracks_save">Salva</string>
     <string name="tracks_delete">Elimina</string>
     <string name="tracks_cancel">Annulla</string>

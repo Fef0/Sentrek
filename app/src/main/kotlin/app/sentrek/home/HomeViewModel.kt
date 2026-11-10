@@ -1,5 +1,6 @@
 package app.sentrek.home
 
+import app.sentrek.map.FollowMode
 import app.sentrek.geo.route.Shade
 import app.sentrek.record.ShadeWatch
 import app.sentrek.geo.weather.WetAhead
@@ -252,6 +253,23 @@ class HomeViewModel @Inject constructor(
 
     val showLockButton: StateFlow<Boolean> =
         settings.showLockButton.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    /**
+     * How the map follows the user, kept here so a map built again (battery saver coming on,
+     * a theme change) goes on following the same way instead of stopping where it was.
+     */
+    var followMode: FollowMode = FollowMode.Off
+    var resumeMode: FollowMode = FollowMode.North
+
+    /** The relief shading: as chosen, never in stamina mode. */
+    val showHillshade: StateFlow<Boolean> = combine(settings.showHillshade, settings.powerMode) { show, mode -> show && mode != PowerMode.Stamina }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    val showTrackArrows: StateFlow<Boolean> =
+        settings.showTrackArrows.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    val showMapPoints: StateFlow<Boolean> =
+        settings.showMapPoints.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     /** The + and - buttons: as chosen, and always in glove mode. */
     val showZoomButtons: StateFlow<Boolean> = combine(settings.gloveMode, settings.zoomButtons) { gloves, show -> gloves || show }

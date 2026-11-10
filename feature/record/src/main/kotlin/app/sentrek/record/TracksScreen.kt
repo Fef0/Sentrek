@@ -186,9 +186,16 @@ fun TracksScreen(
                         },
                         onShare = { sharing.share(track) },
                         onSave = { choosingFormat = track },
+                        onDuplicate = {
+                            viewModel.saveCopy(track, context.getString(R.string.tracks_copy_name, track.name)) { copy ->
+                                val text = copy?.let { context.getString(R.string.tracks_saved_as, it.name) }
+                                    ?: context.getString(R.string.tracks_copy_failed)
+                                Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         onReverse = {
                             viewModel.saveReversed(track, context.getString(R.string.tracks_reversed_name, track.name)) { copy ->
-                                val text = copy?.let { context.getString(R.string.tracks_reversed_saved, it.name) }
+                                val text = copy?.let { context.getString(R.string.tracks_saved_as, it.name) }
                                     ?: context.getString(R.string.tracks_reversed_failed)
                                 Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
                             }
@@ -315,6 +322,8 @@ private fun TrackCard(
     onToggleMap: () -> Unit,
     onShare: () -> Unit,
     onSave: () -> Unit,
+    /** Saves a copy as it is, to change it and keep the original. */
+    onDuplicate: () -> Unit,
     /** Saves a copy walked the other way. */
     onReverse: () -> Unit,
     onDelete: () -> Unit,
@@ -398,6 +407,9 @@ private fun TrackCard(
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onDuplicate, modifier = buttonModifier, contentPadding = padding) {
+                    Text(stringResource(R.string.tracks_duplicate))
+                }
                 OutlinedButton(onClick = onSave, modifier = buttonModifier, contentPadding = padding) {
                     Text(stringResource(R.string.tracks_save))
                 }

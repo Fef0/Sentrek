@@ -89,6 +89,8 @@
     <string name="track_hide">Hide from map</string>
     <string name="track_edit">Edit route</string>
     <string name="track_reverse">Reverse direction</string>
+    <string name="track_start">Start</string>
+    <string name="track_end">End</string>
     <string name="follow_route_options">Route options</string>
     <string name="follow_off_route">Off route: %s</string>
     <string name="follow_stop">Stop</string>
@@ -179,8 +181,8 @@
     <string name="settings_units_system_hint">Sets distance, height and speed together.</string>
     <string name="settings_power_note">Some of these wait, greyed out, while battery saver or stamina mode is on.</string>
     <!-- Settings: what each page holds, under its name on the main page. -->
-    <string name="settings_map_about">Contour lines, steep slopes, trail difficulty, scale bar, north up, map updates</string>
-    <string name="settings_controls_about">Glove mode, button size, volume keys, lock button</string>
+    <string name="settings_map_about">Map points, hill shading, contour lines, steep slopes, trail difficulty, direction arrows, scale bar, north up, map updates</string>
+    <string name="settings_controls_about">Glove mode, button size, volume keys, zoom buttons, lock button</string>
     <string name="settings_appearance_about">Language, text size, app and map themes, full screen</string>
     <string name="settings_units_about">Metric or imperial, coordinates, each unit on its own</string>
     <string name="settings_alerts_about">Off route, turns, water, rain and storms, sun, turnaround alarm</string>
@@ -242,6 +244,12 @@
     <string name="settings_lock_button">Lock button</string>
     <string name="settings_lock_button_hint">Tap it so rain or your pocket can’t press anything. Hold it to unlock.</string>
     <string name="settings_contours">Contour lines</string>
+    <string name="settings_track_arrows">Direction arrows</string>
+    <string name="settings_track_arrows_hint">Small arrows along the tracks you show on the map, the way they go.</string>
+    <string name="settings_map_points">Map points</string>
+    <string name="settings_map_points_hint">Huts, springs, peaks, viewpoints and the other points of the map. Your own places and the waypoints of your tracks always show.</string>
+    <string name="settings_hillshade">Hill shading</string>
+    <string name="settings_hillshade_hint">Light and shadow on the mountains, from the terrain. Stamina mode turns it off.</string>
     <string name="settings_slopes">Steep slopes</string>
     <string name="settings_slopes_hint">Colours steep ground like an avalanche map. It’s worked out from 30 m terrain data, so short steep sections can be missed. Use it to plan, not to judge avalanche risk.</string>
     <string name="slope_legend">Slope</string>

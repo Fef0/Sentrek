@@ -6,6 +6,7 @@ import androidx.compose.runtime.derivedStateOf
 import app.sentrek.record.Following
 import androidx.compose.ui.unit.Dp
 import app.sentrek.map.SignalLayer
+import app.sentrek.map.MapPoints
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.animation.fadeOut
@@ -261,9 +262,10 @@ fun MapScreen(
     // through Off -> North up -> heading up -> Off, as in Trekarta; panning pauses following,
     // and the next tap resumes the mode it had ([resumeMode]).
     var followMode by remember { mutableStateOf(FollowMode.Off) }
-    var resumeMode by remember { mutableStateOf(FollowMode.North) }
-    // A mode to apply once the position marker exists (right after a permission grant it doesn't yet).
-    var followRequest by remember { mutableStateOf<FollowMode?>(null) }
+    var resumeMode by remember { mutableStateOf(viewModel.resumeMode) }
+    // A mode to apply once the position marker exists (right after a permission grant it doesn't
+    // yet). A map built again (battery saver coming on, a theme change) follows as the last one did.
+    var followRequest by remember { mutableStateOf(viewModel.followMode.takeIf { it != FollowMode.Off }) }
     val rotationLocked by viewModel.rotationLocked.collectAsStateWithLifecycle()
     // Buttons and bar fade out after a while without touches: more map, and nothing static to
     // burn into OLED screens. A touch brings them back. Not while planning: that needs them.
@@ -908,8 +910,10 @@ fun MapScreen(
             // Stopped by a gesture, not by the button: the next tap picks up where it was.
             if (mode == FollowMode.Off && followMode != FollowMode.Off && followRequest != FollowMode.Off) {
                 resumeMode = followMode
+                viewModel.resumeMode = followMode
             }
             followMode = mode
+            viewModel.followMode = mode
         }
         onDispose { stop() }
     }
@@ -1212,8 +1216,13 @@ private fun MapLayerEffects(
     val shownTracks by viewModel.shownTracks.collectAsStateWithLifecycle()
     val recording by viewModel.recording.collectAsStateWithLifecycle()
 
-    LaunchedEffect(style, rasters, overlays, overlaysVersion, showDifficulty) {
-        style?.let { MapOverlays.sync(it, rasters, overlays, showDifficulty) }
+    val showMapPoints by viewModel.showMapPoints.collectAsStateWithLifecycle()
+    LaunchedEffect(style, rasters, overlays, overlaysVersion, showDifficulty, showMapPoints) {
+        style?.let {
+            MapOverlays.sync(it, rasters, overlays, showDifficulty)
+            // After the overlays: their point layers are made anew there.
+            MapPoints.show(it, showMapPoints)
+        }
     }
 
     val contourTerrain by viewModel.contourTerrain.collectAsStateWithLifecycle()
@@ -1228,8 +1237,9 @@ private fun MapLayerEffects(
     LaunchedEffect(style, elevationUnit) {
         style?.let { MapHeights.apply(it, elevationUnit) }
     }
-    LaunchedEffect(style, powerMode) {
-        style?.let { MapContours.showRelief(it, powerMode != PowerMode.Stamina) }
+    val showHillshade by viewModel.showHillshade.collectAsStateWithLifecycle()
+    LaunchedEffect(style, showHillshade) {
+        style?.let { MapContours.showRelief(it, showHillshade) }
     }
 
     LaunchedEffect(style, plan, planLegs, planPreview) {
@@ -1276,8 +1286,12 @@ private fun MapLayerEffects(
 
     // A route open in the planner is drawn by the planner: its saved line would show twice.
     val editedId = plan.editing?.id?.takeIf { plan.active }
-    LaunchedEffect(style, shownTracks, editedId) {
-        style?.let { TrackLayers.syncShown(it, shownTracks.filter { t -> t.id != editedId }) }
+    val showTrackArrows by viewModel.showTrackArrows.collectAsStateWithLifecycle()
+    LaunchedEffect(style, shownTracks, editedId, showTrackArrows) {
+        style?.let {
+            val shown = shownTracks.filter { t -> t.id != editedId }
+            TrackLayers.syncShown(it, shown, context.getString(R.string.track_start), context.getString(R.string.track_end), showTrackArrows)
+        }
     }
     // A few seconds apart is plenty at walking pace, and the newest state is always the one
     // drawn. Not while another screen covers the map: it catches up when shown.

@@ -1,6 +1,5 @@
 package app.sentrek.record
 
-import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -8,13 +7,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.PackageManager
 import android.location.Location
 import android.os.BatteryManager
 import android.os.Build
 import android.os.SystemClock
 import android.telephony.SmsManager
-import android.telephony.SubscriptionManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -118,27 +115,9 @@ class Breadcrumbs(private val context: Context) {
         val now = SystemClock.elapsedRealtime()
         if (now - canSendAt >= RECHECK_MS) {
             canSendAt = now
-            canSendNow = ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED &&
-                context.packageManager.hasSystemFeature(SMS_FEATURE)
+            canSendNow = SmsSender.canSend(context)
         }
         return canSendNow
-    }
-
-    /**
-     * The SIM set for texts; with none set ("ask every time" on two SIMs) the one for calls or
-     * data, since there is nobody to ask while the phone is in the pocket.
-     */
-    private fun smsManager(): SmsManager? {
-        val chosen = SubscriptionManager.getDefaultSmsSubscriptionId()
-        val id = chosen.takeIf { it != SubscriptionManager.INVALID_SUBSCRIPTION_ID }
-            ?: SubscriptionManager.getDefaultSubscriptionId().takeIf { it != SubscriptionManager.INVALID_SUBSCRIPTION_ID }
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val sms = context.getSystemService(SmsManager::class.java) ?: return null
-            if (id != null) sms.createForSubscriptionId(id) else sms
-        } else {
-            @Suppress("DEPRECATION")
-            if (id != null) SmsManager.getSmsManagerForSubscriptionId(id) else SmsManager.getDefault()
-        }
     }
 
     private var canSendAt = -RECHECK_MS
@@ -160,9 +139,9 @@ class Breadcrumbs(private val context: Context) {
     private var batteryNow: Int? = null
 
     private fun send(to: String, text: String, session: Long, now: Long, lowBattery: Boolean = false) {
-        val sms = runCatching { smsManager() }.getOrNull() ?: return
+        val sms = runCatching { SmsSender.manager(context) }.getOrNull() ?: return
         runCatching {
-            val parts = sms.divideMessage(gsm(text))
+            val parts = sms.divideMessage(SmsSender.plain(text))
             val sent = PendingIntent.getBroadcast(
                 context, 0, Intent(ACTION_SENT).setPackage(context.packageName), PendingIntent.FLAG_IMMUTABLE,
             )
@@ -246,13 +225,6 @@ class Breadcrumbs(private val context: Context) {
 
         private const val TAG = "Breadcrumbs"
 
-        /** Phones before Android 13 don't list texting on its own, only the phone network. */
-        private val SMS_FEATURE = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            PackageManager.FEATURE_TELEPHONY_MESSAGING
-        } else {
-            PackageManager.FEATURE_TELEPHONY
-        }
-
         /** The SMS permission and the battery level are read at most this often. */
         private const val RECHECK_MS = 60_000L
         private const val ACTION_SENT = "app.sentrek.record.BREADCRUMB_SENT"
@@ -272,13 +244,5 @@ class Breadcrumbs(private val context: Context) {
 
         /** The phone always answers; this only guards against it not doing so. */
         private const val PENDING_TIMEOUT_MS = 5 * 60_000L
-
-        /**
-         * Plain characters only: a single one outside the SMS alphabet (a narrow space in a
-         * time, a "±") makes a text hold 70 characters instead of 160, and cost two or three.
-         */
-        private fun gsm(text: String) = buildString {
-            for (c in text) append(if (c.code in 32..126 || c == '\n') c else ' ')
-        }
     }
 }

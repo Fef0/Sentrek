@@ -14,6 +14,12 @@
     <string name="emergency_back">Torna alla mappa</string>
     <string name="emergency_call">Chiama il %s</string>
     <string name="emergency_sms_to">Invia la mia posizione via SMS a %s</string>
+    <string name="emergency_sms_confirm_title">Inviare ora la tua posizione a %s?</string>
+    <string name="emergency_sms_confirm">Invia</string>
+    <string name="emergency_sms_sending">Invio in corso…</string>
+    <string name="emergency_sms_sent">Inviato alle %s</string>
+    <string name="emergency_sms_failed">Non inviato. Forse qui non c\'è campo: riprova un po\' più avanti, o dall\'app dei messaggi.</string>
+    <string name="emergency_sms_open">Apri nell\'app dei messaggi</string>
     <string name="emergency_no_permission">Sentrek ha bisogno della tua posizione per mostrarti dove sei.</string>
     <string name="emergency_allow">Consenti la posizione</string>
     <string name="emergency_waiting">In attesa del GPS… Resta all’aperto, lontano da pareti di roccia.</string>
@@ -192,7 +198,7 @@
     <string name="settings_emergency_number">Numero da chiamare</string>
     <string name="settings_emergency_number_hint">Il numero che chiama la schermata SOS. Il 112 in Europa, il 911 in Nord America, il soccorso alpino o un amico.</string>
     <string name="settings_emergency_sms">SMS di emergenza</string>
-    <string name="settings_emergency_sms_hint">Aggiunge alla schermata SOS un pulsante che scrive un SMS con la tua posizione.</string>
+    <string name="settings_emergency_sms_hint">Aggiunge alla schermata SOS un pulsante che invia un SMS con la tua posizione al contatto di emergenza, dopo una conferma. Senza contatto, scrive l\'SMS nell\'app dei messaggi.</string>
     <string name="breadcrumb_chip">SMS ogni %1$d min · %2$s</string>
     <string name="settings_emergency_contact">Contatto di emergenza</string>
     <string name="settings_emergency_contact_none">Nessuno: scegli ogni volta</string>

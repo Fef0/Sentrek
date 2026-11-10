@@ -3,6 +3,8 @@ package app.sentrek.emergency
 import app.sentrek.geo.Geo
 import kotlinx.coroutines.flow.map
 import app.sentrek.record.SignalWatch
+import app.sentrek.record.SmsSender
+import dagger.hilt.android.qualifiers.ApplicationContext
 import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.ClipData
@@ -34,6 +36,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -52,6 +58,8 @@ import app.sentrek.geo.LatLon
 import app.sentrek.geo.units.CoordinateFormat
 import app.sentrek.geo.units.UnitFormat
 import app.sentrek.record.LocationRepository
+import app.sentrek.ui.ConfirmDialog
+import app.sentrek.ui.Confirmation
 import app.sentrek.ui.Format
 import app.sentrek.ui.MapButton
 import app.sentrek.ui.SentrekIcons
@@ -71,6 +79,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class EmergencyViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val location: LocationRepository,
     settings: SettingsRepository,
     signal: SignalWatch,
@@ -103,6 +112,19 @@ class EmergencyViewModel @Inject constructor(
 
     fun hasPermission() = location.hasPermission()
 
+    /** The SOS text sent by the app: null until tried. */
+    private val _sent = MutableStateFlow<SmsResult?>(null)
+    val sent: StateFlow<SmsResult?> = _sent
+
+    /** Sends [text] to [to] straight away, without the messaging app. */
+    fun send(to: String, text: String) {
+        if (_sent.value is SmsResult.Sending) return
+        _sent.value = SmsResult.Sending
+        SmsSender.send(context, to, text) { ok ->
+            _sent.value = if (ok) SmsResult.Sent(System.currentTimeMillis()) else SmsResult.Failed
+        }
+    }
+
     fun onPermissionChanged() {
         permissionChecks.value++
     }
@@ -110,6 +132,13 @@ class EmergencyViewModel @Inject constructor(
     private companion object {
         const val FIX_MS = 1_000L
     }
+}
+
+sealed interface SmsResult {
+    data object Sending : SmsResult
+    data class Sent(val at: Long) : SmsResult
+    /** Mostly no signal: nothing left the phone. */
+    data object Failed : SmsResult
 }
 
 /**
@@ -202,17 +231,62 @@ fun EmergencyScreen(
                         }
                     }
                     val message = message(context, position, here)
-                    if (smsButton) {
-                        Button(onClick = { sms(context, smsTo, message) }, modifier = wide) {
-                            Text(if (smsTo.isEmpty()) stringResource(R.string.emergency_sms) else stringResource(R.string.emergency_sms_to, contactName.ifBlank { smsTo }))
-                        }
-                    }
+                    if (smsButton) SmsButton(viewModel, smsTo, contactName.ifBlank { smsTo }, message, wide)
                     OutlinedButton(onClick = { share(context, message) }, modifier = wide) { Text(stringResource(R.string.emergency_share)) }
                     OutlinedButton(onClick = { copy(context, message) }, modifier = wide) { Text(stringResource(R.string.emergency_copy)) }
                 }
             }
             Text(stringResource(R.string.emergency_hint), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 16.dp))
         }
+    }
+}
+
+/**
+ * With a contact set, the app sends the text itself after one "are you sure": no messaging app
+ * to go through with cold hands. Without one, or if it can't, the messaging app opens with it.
+ */
+@Composable
+private fun SmsButton(viewModel: EmergencyViewModel, to: String, name: String, message: String, modifier: Modifier) {
+    val context = LocalContext.current
+    val sent by viewModel.sent.collectAsStateWithLifecycle()
+    var confirming by remember { mutableStateOf(false) }
+    val latest by rememberUpdatedState(message)
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) viewModel.send(to, latest) else sms(context, to, latest)
+    }
+    Button(
+        onClick = { if (to.isEmpty()) sms(context, to, message) else confirming = true },
+        enabled = sent != SmsResult.Sending,
+        modifier = modifier,
+    ) {
+        Text(if (to.isEmpty()) stringResource(R.string.emergency_sms) else stringResource(R.string.emergency_sms_to, name))
+    }
+    when (val s = sent) {
+        null -> Unit
+        SmsResult.Sending -> Text(stringResource(R.string.emergency_sms_sending), style = MaterialTheme.typography.titleMedium)
+        is SmsResult.Sent -> Text(
+            stringResource(R.string.emergency_sms_sent, DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(s.at))),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        SmsResult.Failed -> {
+            Text(stringResource(R.string.emergency_sms_failed), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            OutlinedButton(onClick = { sms(context, to, message) }, modifier = modifier) {
+                Text(stringResource(R.string.emergency_sms_open))
+            }
+        }
+    }
+    if (confirming) {
+        ConfirmDialog(
+            Confirmation(
+                title = stringResource(R.string.emergency_sms_confirm_title, name),
+                text = message,
+                confirmLabel = stringResource(R.string.emergency_sms_confirm),
+                onConfirm = {
+                    if (SmsSender.hasPermission(context)) viewModel.send(to, latest) else permission.launch(Manifest.permission.SEND_SMS)
+                },
+            ),
+        ) { confirming = false }
     }
 }
 

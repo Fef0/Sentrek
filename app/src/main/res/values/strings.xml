@@ -15,6 +15,12 @@
     <string name="emergency_back">Back to the map</string>
     <string name="emergency_call">Call %s</string>
     <string name="emergency_sms_to">Send my position by SMS to %s</string>
+    <string name="emergency_sms_confirm_title">Send your position to %s now?</string>
+    <string name="emergency_sms_confirm">Send</string>
+    <string name="emergency_sms_sending">Sending…</string>
+    <string name="emergency_sms_sent">Sent at %s</string>
+    <string name="emergency_sms_failed">Not sent. There may be no signal here: try again a little further on, or from the messaging app.</string>
+    <string name="emergency_sms_open">Open in the messaging app</string>
     <string name="emergency_no_permission">Sentrek needs your location to show where you are.</string>
     <string name="emergency_allow">Allow location</string>
     <string name="emergency_waiting">Waiting for GPS… Stay in the open, away from rock walls.</string>
@@ -196,7 +202,7 @@
     <string name="settings_emergency_number">Number to call</string>
     <string name="settings_emergency_number_hint">The number the SOS screen calls. 112 in Europe, 911 in North America, or mountain rescue, or a friend.</string>
     <string name="settings_emergency_sms">Emergency SMS</string>
-    <string name="settings_emergency_sms_hint">Adds a button to the SOS screen that writes an SMS with your position.</string>
+    <string name="settings_emergency_sms_hint">Adds a button to the SOS screen that sends an SMS with your position to your emergency contact, after asking. With no contact, it writes the SMS in the messaging app.</string>
     <!-- The short line on the map while recording. -->
     <string name="breadcrumb_chip">SMS every %1$d min · %2$s</string>
     <string name="settings_emergency_contact">Emergency contact</string>

@@ -24,6 +24,7 @@ android {
 }
 
 dependencies {
+    testImplementation(libs.junit)
     api(project(":core:geo"))
     implementation(project(":core:data"))
     implementation(project(":core:map"))

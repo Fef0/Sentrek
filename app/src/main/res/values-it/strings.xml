@@ -236,6 +236,10 @@
     <string name="settings_lock_button">Pulsante di blocco</string>
     <string name="settings_lock_button_hint">Toccalo così la pioggia o la tasca non premono niente. Tienilo premuto per sbloccare.</string>
     <string name="settings_contours">Curve di livello</string>
+    <string name="settings_map_points">Punti della mappa</string>
+    <string name="settings_map_points_hint">Rifugi, sorgenti, cime, punti panoramici e gli altri punti della mappa. I tuoi luoghi e i punti delle tue tracce si vedono sempre.</string>
+    <string name="settings_hillshade">Ombreggiatura del rilievo</string>
+    <string name="settings_hillshade_hint">Luci e ombre sulle montagne, ricavate dal terreno. La modalità estrema la spegne.</string>
     <string name="settings_slopes">Pendii ripidi</string>
     <string name="settings_slopes_hint">Colora i pendii ripidi come una carta valanghe. È calcolato da dati del terreno a 30 m, quindi brevi tratti ripidi possono sfuggire. Usalo per pianificare, non per valutare il rischio valanghe.</string>
     <string name="slope_legend">Pendenza</string>

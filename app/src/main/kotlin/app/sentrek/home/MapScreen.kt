@@ -6,6 +6,7 @@ import androidx.compose.runtime.derivedStateOf
 import app.sentrek.record.Following
 import androidx.compose.ui.unit.Dp
 import app.sentrek.map.SignalLayer
+import app.sentrek.map.MapPoints
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.animation.fadeOut
@@ -1212,8 +1213,13 @@ private fun MapLayerEffects(
     val shownTracks by viewModel.shownTracks.collectAsStateWithLifecycle()
     val recording by viewModel.recording.collectAsStateWithLifecycle()
 
-    LaunchedEffect(style, rasters, overlays, overlaysVersion, showDifficulty) {
-        style?.let { MapOverlays.sync(it, rasters, overlays, showDifficulty) }
+    val showMapPoints by viewModel.showMapPoints.collectAsStateWithLifecycle()
+    LaunchedEffect(style, rasters, overlays, overlaysVersion, showDifficulty, showMapPoints) {
+        style?.let {
+            MapOverlays.sync(it, rasters, overlays, showDifficulty)
+            // After the overlays: their point layers are made anew there.
+            MapPoints.show(it, showMapPoints)
+        }
     }
 
     val contourTerrain by viewModel.contourTerrain.collectAsStateWithLifecycle()
@@ -1228,8 +1234,9 @@ private fun MapLayerEffects(
     LaunchedEffect(style, elevationUnit) {
         style?.let { MapHeights.apply(it, elevationUnit) }
     }
-    LaunchedEffect(style, powerMode) {
-        style?.let { MapContours.showRelief(it, powerMode != PowerMode.Stamina) }
+    val showHillshade by viewModel.showHillshade.collectAsStateWithLifecycle()
+    LaunchedEffect(style, showHillshade) {
+        style?.let { MapContours.showRelief(it, showHillshade) }
     }
 
     LaunchedEffect(style, plan, planLegs, planPreview) {

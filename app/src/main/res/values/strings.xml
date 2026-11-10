@@ -242,6 +242,10 @@
     <string name="settings_lock_button">Lock button</string>
     <string name="settings_lock_button_hint">Tap it so rain or your pocket can’t press anything. Hold it to unlock.</string>
     <string name="settings_contours">Contour lines</string>
+    <string name="settings_map_points">Map points</string>
+    <string name="settings_map_points_hint">Huts, springs, peaks, viewpoints and the other points of the map. Your own places and the waypoints of your tracks always show.</string>
+    <string name="settings_hillshade">Hill shading</string>
+    <string name="settings_hillshade_hint">Light and shadow on the mountains, from the terrain. Stamina mode turns it off.</string>
     <string name="settings_slopes">Steep slopes</string>
     <string name="settings_slopes_hint">Colours steep ground like an avalanche map. It’s worked out from 30 m terrain data, so short steep sections can be missed. Use it to plan, not to judge avalanche risk.</string>
     <string name="slope_legend">Slope</string>

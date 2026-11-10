@@ -352,10 +352,24 @@ class SettingsViewModel @Inject constructor(
     }
 
     val showContours: StateFlow<Boolean> =
-        settings.showContours.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+        settings.showContours.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     fun setShowContours(show: Boolean) {
         viewModelScope.launch { settings.setShowContours(show) }
+    }
+
+    val showHillshade: StateFlow<Boolean> =
+        settings.showHillshade.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setShowHillshade(show: Boolean) {
+        viewModelScope.launch { settings.setShowHillshade(show) }
+    }
+
+    val showMapPoints: StateFlow<Boolean> =
+        settings.showMapPoints.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setShowMapPoints(show: Boolean) {
+        viewModelScope.launch { settings.setShowMapPoints(show) }
     }
 
     val showSlopes: StateFlow<Boolean> =
@@ -505,6 +519,9 @@ private fun SettingsPage(title: String, onBack: () -> Unit, content: @Composable
 private fun MapSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val showContours by viewModel.showContours.collectAsStateWithLifecycle()
     val showSlopes by viewModel.showSlopes.collectAsStateWithLifecycle()
+    val showHillshade by viewModel.showHillshade.collectAsStateWithLifecycle()
+    val showMapPoints by viewModel.showMapPoints.collectAsStateWithLifecycle()
+    val stamina = viewModel.powerMode.collectAsStateWithLifecycle().value == PowerMode.Stamina
     val showTrailDifficulty by viewModel.showTrailDifficulty.collectAsStateWithLifecycle()
     val showScaleBar by viewModel.showScaleBar.collectAsStateWithLifecycle()
     val rotationLocked by viewModel.rotationLocked.collectAsStateWithLifecycle()
@@ -512,6 +529,20 @@ private fun MapSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val saving = rememberSaving(viewModel)
     SettingsPage(stringResource(R.string.settings_map), onBack) {
         if (saving) PowerNote()
+        ToggleRow(
+            title = stringResource(R.string.settings_map_points),
+            hint = stringResource(R.string.settings_map_points_hint),
+            checked = showMapPoints,
+            onChange = viewModel::setShowMapPoints,
+        )
+        // Stamina mode hides it; battery saver leaves it.
+        ToggleRow(
+            enabled = !stamina,
+            title = stringResource(R.string.settings_hillshade),
+            hint = stringResource(R.string.settings_hillshade_hint),
+            checked = showHillshade,
+            onChange = viewModel::setShowHillshade,
+        )
         ToggleRow(
             enabled = !saving,
             title = stringResource(R.string.settings_contours),

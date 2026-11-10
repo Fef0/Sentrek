@@ -1,0 +1,4 @@
+• Routes and tracks have a note and photos, as places do: tap the name to add them, also when saving a route or a recording
+• The note shows in one line on the track list and on the card while you follow the route; tap it for all of it and the photos
+• The note goes in the GPX file, and imported files bring theirs
+• Typing a place's note no longer makes the screen jump

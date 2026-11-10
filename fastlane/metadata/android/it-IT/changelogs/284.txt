@@ -1,0 +1,4 @@
+• Percorsi e tracce hanno una nota e foto, come i luoghi: tocca il nome per aggiungerle, anche quando salvi un percorso o una registrazione
+• La nota appare in una riga nell'elenco tracce e nella scheda mentre segui il percorso; toccala per vederla tutta con le foto
+• La nota va nel file GPX, e i file importati portano la loro
+• Scrivere la nota di un luogo non fa più saltare lo schermo

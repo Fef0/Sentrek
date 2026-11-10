@@ -177,8 +177,8 @@
     <string name="settings_app_theme_hint">Il nero fa risparmiare batteria sui telefoni con schermo OLED.</string>
     <string name="settings_units_system_hint">Imposta insieme distanza, altezza e velocità.</string>
     <string name="settings_power_note">Alcune di queste restano in attesa, in grigio, mentre è attivo il risparmio batteria o la modalità estrema.</string>
-    <string name="settings_map_about">Curve di livello, pendii ripidi, difficoltà dei sentieri, scala, nord in alto, aggiornamento mappe</string>
-    <string name="settings_controls_about">Modalità guanti, dimensione dei pulsanti, tasti del volume, pulsante di blocco</string>
+    <string name="settings_map_about">Punti della mappa, ombreggiatura del rilievo, curve di livello, pendii ripidi, difficoltà dei sentieri, scala, nord in alto, aggiornamento mappe</string>
+    <string name="settings_controls_about">Modalità guanti, dimensione dei pulsanti, tasti del volume, pulsanti dello zoom, pulsante di blocco</string>
     <string name="settings_appearance_about">Lingua, dimensione del testo, temi dell’app e della mappa, schermo intero</string>
     <string name="settings_units_about">Metrico o imperiale, coordinate, ogni unità a parte</string>
     <string name="settings_alerts_about">Fuori percorso, svolte, acqua, pioggia e temporali, sole, allarme di rientro</string>

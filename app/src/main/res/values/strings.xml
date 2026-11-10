@@ -181,8 +181,8 @@
     <string name="settings_units_system_hint">Sets distance, height and speed together.</string>
     <string name="settings_power_note">Some of these wait, greyed out, while battery saver or stamina mode is on.</string>
     <!-- Settings: what each page holds, under its name on the main page. -->
-    <string name="settings_map_about">Contour lines, steep slopes, trail difficulty, scale bar, north up, map updates</string>
-    <string name="settings_controls_about">Glove mode, button size, volume keys, lock button</string>
+    <string name="settings_map_about">Map points, hill shading, contour lines, steep slopes, trail difficulty, scale bar, north up, map updates</string>
+    <string name="settings_controls_about">Glove mode, button size, volume keys, zoom buttons, lock button</string>
     <string name="settings_appearance_about">Language, text size, app and map themes, full screen</string>
     <string name="settings_units_about">Metric or imperial, coordinates, each unit on its own</string>
     <string name="settings_alerts_about">Off route, turns, water, rain and storms, sun, turnaround alarm</string>

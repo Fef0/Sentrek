@@ -86,7 +86,7 @@ import org.maplibre.android.geometry.LatLng
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-private enum class Screen { Map, Maps, Tracks, Places, Search, Peaks, Emergency, Settings }
+private enum class Screen { Map, Maps, Walks, Routes, Places, Search, Peaks, Emergency, Settings }
 
 private const val CAMERA_SAVE_MS = 5_000L
 
@@ -250,7 +250,8 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onOpenMaps = { downloadAt = null; screen = Screen.Maps },
                                     onDownloadArea = { downloadAt = it; screen = Screen.Maps },
-                                    onOpenTracks = { screen = Screen.Tracks },
+                                    onOpenWalks = { screen = Screen.Walks },
+                                    onOpenRoutes = { screen = Screen.Routes },
                                     onOpenPlaces = { screen = Screen.Places },
                                     onOpenSearch = { screen = Screen.Search },
                                     onOpenEmergency = { screen = Screen.Emergency },
@@ -272,7 +273,8 @@ class MainActivity : ComponentActivity() {
                             when (screen) {
                                 Screen.Map -> Unit
                                 Screen.Maps -> RegionsScreen(initialCamera = shownCamera, onBack = toMap, select = downloadAt)
-                                Screen.Tracks -> TracksScreen(
+                                Screen.Walks, Screen.Routes -> TracksScreen(
+                                    walks = screen == Screen.Walks,
                                     onBack = toMap,
                                     onShowOnMap = { box -> focus = box; screen = Screen.Map },
                                     onEditRoute = { track ->

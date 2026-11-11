@@ -28,19 +28,15 @@
     <string name="record_notification_paused">Registrazione in pausa</string>
     <string name="record_notification_text">%1$s · ↑ %2$s</string>
 
-    <string name="tracks_title">Tracce</string>
     <string name="totals_this_year">Quest’anno</string>
     <string name="totals_all_time">In totale</string>
-    <string name="totals_switch">Passa da quest’anno al totale</string>
-    <string name="totals_none">Ancora nessuna escursione registrata</string>
+    <string name="totals_none">Ancora nessuna escursione quest’anno</string>
     <plurals name="totals_hikes">
         <item quantity="one">%d escursione</item>
         <item quantity="many">%d escursioni</item>
         <item quantity="other">%d escursioni</item>
     </plurals>
     <string name="tracks_back">Torna alla mappa</string>
-    <string name="tracks_empty">Ancora nessuna traccia.
-Registra un’escursione o importa un file GPX/KML.</string>
     <string name="tracks_stats">%1$s · %2$s · ↑ %3$s ↓ %4$s</string>
     <string name="tracks_show">Mostra sulla mappa</string>
     <string name="tracks_hide">Nascondi dalla mappa</string>
@@ -226,4 +222,43 @@ Tieni premuto sulla mappa per aggiungerne uno.</string>
     <string name="ahead_memorial">Memoriale</string>
     <string name="ahead_board">Pannello informativo</string>
     <string name="tracks_more">Altro</string>
+    <string name="walks_title">Escursioni</string>
+    <string name="routes_title">Percorsi</string>
+    <string name="walks_empty">Ancora nessuna escursione.
+Tocca Registra sulla mappa quando parti: qui trovi le tue escursioni e le loro statistiche.</string>
+    <string name="routes_empty">Ancora nessun percorso.
+Pianificane uno sulla mappa, o importa un file GPX o KML.</string>
+    <string name="totals_per_year">Distanza per anno · tocca una barra</string>
+    <string name="walk_speed">%s in movimento</string>
+    <string name="walk_climb_rate">↑ %s all’ora</string>
+    <string name="walk_stopped">%s di sosta</string>
+    <string name="track_top">Punto più alto %s</string>
+    <string name="route_your_pace">%s al tuo passo</string>
+    <string name="walks_copy_to_routes">Copia in Percorsi</string>
+    <string name="walks_copied_to_routes">Copiata in Percorsi: %s</string>
+    <string name="routes_count_as_walk">È una mia escursione</string>
+    <string name="routes_moved_to_walks">Spostata in Escursioni: %s</string>
+    <plurals name="import_walks_title">
+        <item quantity="one">È una tua escursione?</item>
+        <item quantity="many">Queste %d tracce sono tue escursioni?</item>
+        <item quantity="other">Queste %d tracce sono tue escursioni?</item>
+    </plurals>
+    <string name="import_walks_text">Hanno gli orari, come le registrazioni. Le tue escursioni vanno in Escursioni e contano nelle statistiche. Le tracce di altri restano in Percorsi, da seguire.</string>
+    <string name="import_walks_yes">Mie escursioni</string>
+    <string name="import_walks_no">Lascia in Percorsi</string>
+    <string name="stats_open">Mostra tutte le statistiche</string>
+    <string name="stats_fold">Chiudi le statistiche</string>
+    <string name="stats_moving">In movimento</string>
+    <string name="stats_longest">La più lunga</string>
+    <string name="stats_most_climb">La più salita</string>
+    <string name="stats_pace_faster">%d%% più veloce</string>
+    <string name="stats_pace_slower">%d%% più lento</string>
+    <string name="stats_pace_same">Tempi dei cartelli</string>
+    <string name="stats_race">%1$d contro %2$d · scorri col dito</string>
+    <string name="stats_so_far">Distanza nel %1$d · scorri col dito</string>
+    <string name="stats_speed">Velocità media</string>
+    <string name="stats_climb_rate">Salita all’ora</string>
+    <string name="stats_vs_signposts">Rispetto ai cartelli</string>
+    <string name="stats_speed_chart">Velocità in ogni escursione, in movimento · tocca un punto</string>
+    <string name="stats_average">Media %s</string>
 </resources>

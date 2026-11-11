@@ -44,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -54,6 +55,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sentrek.feature.record.R
 import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.route.HikingTime
+import app.sentrek.geo.track.PersonalPace
 import app.sentrek.ui.Confirmation
 import app.sentrek.ui.ConfirmDialog
 import app.sentrek.ui.ElevationProfile
@@ -63,9 +65,15 @@ import app.sentrek.ui.MapButton
 import app.sentrek.ui.SentrekIcons
 import app.sentrek.ui.safeTopPadding
 
-/** Saved and imported tracks: follow, show on the map, share, save as GPX, name and notes, delete; import files. */
+/**
+ * The user's [walks] (recorded here, with their stats) or their routes (planned or imported,
+ * to follow): show on the map, follow, share, save as a file, name and notes, delete. Routes
+ * also import files, and a walk can be copied to them; a route with times can be counted as
+ * a walk.
+ */
 @Composable
 fun TracksScreen(
+    walks: Boolean,
     onBack: () -> Unit,
     onShowOnMap: (BoundingBox?) -> Unit,
     /** Opens a planned or imported route in the planner. */
@@ -73,10 +81,16 @@ fun TracksScreen(
     viewModel: TracksViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
-    val tracks by viewModel.tracks.collectAsStateWithLifecycle()
+    val all by viewModel.tracks.collectAsStateWithLifecycle()
+    val tracks = remember(all, walks) { all.filter { it.imported != walks } }
+    // The user's pace from their walks: route times at it, once there are enough.
+    val pace = remember(all) { PersonalPace.factor(all.filter { !it.imported }.trips()) }
+    // Imported tracks with times, perhaps the user's own hikes: asked where they go.
+    var askWalks by remember { mutableStateOf<List<SavedTrack>>(emptyList()) }
     val shown by viewModel.shown.collectAsStateWithLifecycle()
     val following by viewModel.following.collectAsStateWithLifecycle()
-    val totalsAllTime by viewModel.totalsAllTime.collectAsStateWithLifecycle()
+    val statsYear by viewModel.statsYear.collectAsStateWithLifecycle()
+    val statsOpen by viewModel.statsOpen.collectAsStateWithLifecycle()
     val notesExpanded by viewModel.notesExpanded.collectAsStateWithLifecycle()
     var exporting by remember { mutableStateOf<SavedTrack?>(null) }
     var choosingFormat by remember { mutableStateOf<SavedTrack?>(null) }
@@ -105,7 +119,13 @@ fun TracksScreen(
         viewModel.import(uris) { result ->
             importing = false
             showImportResult(context, result)
-            result.bounds?.let(onShowOnMap)
+            val timed = when (result) {
+                is ImportResult.Imported -> listOf(result.track)
+                is ImportResult.ImportedMany -> result.tracks
+                else -> emptyList()
+            }.filter { it.duration > 0 }
+            // Asked here, before the map: once on the map the question would be missed.
+            if (timed.isNotEmpty()) askWalks = timed else result.bounds?.let(onShowOnMap)
         }
     }
     val startFollowing = { track: SavedTrack -> viewModel.follow(track, onShowOnMap) }
@@ -124,22 +144,25 @@ fun TracksScreen(
             ) {
                 MapButton(SentrekIcons.Back, stringResource(R.string.tracks_back), onBack)
                 Text(
-                    stringResource(R.string.tracks_title),
+                    stringResource(if (walks) R.string.walks_title else R.string.routes_title),
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.weight(1f),
                 )
-                OutlinedButton(
-                    onClick = { pickFiles.launch(arrayOf("*/*")) },
-                    enabled = !importing,
-                    modifier = Modifier.heightIn(min = TouchTarget),
-                ) { Text(stringResource(if (importing) R.string.tracks_importing else R.string.tracks_import)) }
+                // Files are routes (or, asked, the user's own walks): imported from Routes.
+                if (!walks) {
+                    OutlinedButton(
+                        onClick = { pickFiles.launch(arrayOf("*/*")) },
+                        enabled = !importing,
+                        modifier = Modifier.heightIn(min = TouchTarget),
+                    ) { Text(stringResource(if (importing) R.string.tracks_importing else R.string.tracks_import)) }
+                }
             }
         }
 
         if (tracks.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
-                    stringResource(R.string.tracks_empty),
+                    stringResource(if (walks) R.string.walks_empty else R.string.routes_empty),
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center,
                 )
@@ -150,8 +173,16 @@ fun TracksScreen(
                 contentPadding = PaddingValues(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                item(key = "totals") {
-                    TripTotalsCard(tracks, allTime = totalsAllTime, onToggle = { viewModel.setTotalsAllTime(!totalsAllTime) })
+                if (walks) {
+                    item(key = "totals") {
+                        TripTotalsCard(
+                            walks = tracks,
+                            year = statsYear,
+                            onYear = viewModel::setStatsYear,
+                            open = statsOpen,
+                            onOpen = viewModel::setStatsOpen,
+                        )
+                    }
                 }
                 items(tracks, key = { it.id }) { track ->
                     TrackCard(
@@ -173,7 +204,7 @@ fun TracksScreen(
                                             )
                                         }
                                     }
-                                    val current = tracks.firstOrNull { it.id == following }
+                                    val current = all.firstOrNull { it.id == following }
                                     if (current != null) confirm = FollowConfirmations.switch(context, current.name, track.name, start) else start()
                                 }
                             }
@@ -205,6 +236,20 @@ fun TracksScreen(
                             }
                         },
                         onEdit = if (track.imported) ({ onEditRoute(track) }) else null,
+                        walk = walks,
+                        pace = pace,
+                        onCopyAsRoute = {
+                            viewModel.copyAsRoute(track, track.name) { copy ->
+                                val text = copy?.let { context.getString(R.string.walks_copied_to_routes, it.name) }
+                                    ?: context.getString(R.string.tracks_copy_failed)
+                                Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        // Only with times: a line without them wasn't walked.
+                        onCountAsWalk = if (track.duration > 0) ({
+                            viewModel.setWalk(track, true)
+                            Toast.makeText(context, context.getString(R.string.routes_moved_to_walks, track.name), Toast.LENGTH_SHORT).show()
+                        }) else null,
                         onDelete = { deleting = track },
                         onRename = { renaming = track },
                         onColor = { coloring = track },
@@ -219,6 +264,26 @@ fun TracksScreen(
     }
 
     confirm?.let { ConfirmDialog(it) { confirm = null } }
+
+    if (askWalks.isNotEmpty()) {
+        val asked = askWalks
+        val done = { askWalks = emptyList() }
+        AlertDialog(
+            onDismissRequest = done,
+            title = { Text(pluralStringResource(R.plurals.import_walks_title, asked.size, asked.size)) },
+            text = { Text(stringResource(R.string.import_walks_text)) },
+            confirmButton = {
+                Button(onClick = { viewModel.setWalks(asked); done() }, modifier = Modifier.heightIn(min = TouchTarget)) {
+                    Text(stringResource(R.string.import_walks_yes))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = done, modifier = Modifier.heightIn(min = TouchTarget)) {
+                    Text(stringResource(R.string.import_walks_no))
+                }
+            },
+        )
+    }
 
     choosingFormat?.let { track ->
         AlertDialog(
@@ -339,6 +404,13 @@ private fun TrackCard(
     onColor: () -> Unit,
     /** Null for recorded tracks, which can't be edited. */
     onEdit: (() -> Unit)?,
+    /** A walk of the user's (its stats first), or a route (following it first). */
+    walk: Boolean,
+    /** The user's pace against signpost times, for a route's time; null until known. */
+    pace: Double?,
+    onCopyAsRoute: () -> Unit,
+    /** Null when it can't be a walk (no times). */
+    onCountAsWalk: (() -> Unit)?,
     loadProfile: suspend (SavedTrack) -> List<Pair<Double, Double>>,
     notesExpanded: Boolean,
     onExpandNotes: (Boolean) -> Unit,
@@ -364,12 +436,10 @@ private fun TrackCard(
                 )
                 Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.tracks_details))
             }
-            // Planned routes have no times: show the signpost estimate instead.
-            val time = if (track.duration > 0) {
-                Format.duration(track.duration)
-            } else {
-                Format.estimate(HikingTime.millis(track.distance, track.ascent, track.descent))
-            }
+            // A walk: how long it moved. A route: the signpost time (times it may have are
+            // someone else's walk, not a promise for this one).
+            val signpost = HikingTime.millis(track.distance, track.ascent, track.descent)
+            val time = if (walk) Format.duration(track.duration) else Format.estimate(signpost)
             Text(
                 stringResource(
                     R.string.tracks_stats,
@@ -380,22 +450,36 @@ private fun TrackCard(
                 ),
                 style = MaterialTheme.typography.bodyLarge,
             )
+            val top = profile.maxOfOrNull { it.second }
+            val details = if (walk) walkDetails(track, top) else routeDetails(signpost, pace, top)
+            if (details.isNotEmpty()) {
+                Text(details.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             ElevationProfile(profile, Modifier.fillMaxWidth().height(56.dp))
             TrackNote(track.note, track.photos, notesExpanded, onExpandNotes, photoSize = TouchTarget * 1.2f)
             val buttonModifier = Modifier.weight(1f).heightIn(min = TouchTarget)
             val padding = PaddingValues(horizontal = 4.dp)
+            val followLabel = if (isFollowed) R.string.tracks_stop_following else R.string.tracks_follow
+            val mapLabel = if (isShown) R.string.tracks_hide else R.string.tracks_show
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (isFollowed) {
-                    Button(onClick = onFollow, modifier = buttonModifier, contentPadding = padding) {
-                        Text(stringResource(R.string.tracks_stop_following))
+                if (walk) {
+                    // A walk is looked back on: the map first. Following it again is in the menu,
+                    // unless it's being followed now, when stopping must be at hand.
+                    Button(onClick = onToggleMap, modifier = buttonModifier, contentPadding = padding) {
+                        Text(stringResource(mapLabel), textAlign = TextAlign.Center)
+                    }
+                    if (isFollowed) {
+                        OutlinedButton(onClick = onFollow, modifier = buttonModifier, contentPadding = padding) {
+                            Text(stringResource(followLabel))
+                        }
                     }
                 } else {
                     Button(onClick = onFollow, modifier = buttonModifier, contentPadding = padding) {
-                        Text(stringResource(R.string.tracks_follow))
+                        Text(stringResource(followLabel))
                     }
-                }
-                OutlinedButton(onClick = onToggleMap, modifier = buttonModifier, contentPadding = padding) {
-                    Text(stringResource(if (isShown) R.string.tracks_hide else R.string.tracks_show), textAlign = TextAlign.Center)
+                    OutlinedButton(onClick = onToggleMap, modifier = buttonModifier, contentPadding = padding) {
+                        Text(stringResource(mapLabel), textAlign = TextAlign.Center)
+                    }
                 }
                 // The rest, used now and then, behind one button: the card stays short.
                 Box {
@@ -420,9 +504,15 @@ private fun TrackCard(
                             onClick = { menu = false; action() },
                             modifier = Modifier.heightIn(min = TouchTarget),
                         )
-                        onEdit?.let { item(R.string.tracks_edit, action = it) }
-                        item(R.string.tracks_reverse, action = onReverse)
-                        item(R.string.tracks_duplicate, action = onDuplicate)
+                        if (walk) {
+                            if (!isFollowed) item(R.string.tracks_follow, action = onFollow)
+                            item(R.string.walks_copy_to_routes, action = onCopyAsRoute)
+                        } else {
+                            onEdit?.let { item(R.string.tracks_edit, action = it) }
+                            item(R.string.tracks_reverse, action = onReverse)
+                            item(R.string.tracks_duplicate, action = onDuplicate)
+                            onCountAsWalk?.let { item(R.string.routes_count_as_walk, action = it) }
+                        }
                         item(R.string.tracks_share, action = onShare)
                         item(R.string.tracks_save, action = onSave)
                         item(R.string.tracks_delete, destructive = true, action = onDelete)
@@ -432,6 +522,47 @@ private fun TrackCard(
         }
     }
 }
+
+/**
+ * A walk's own numbers: speed while moving, climb per hour, time stopped, highest point.
+ * Each only when it means something (a flat walk has no climb rate worth saying).
+ */
+@Composable
+private fun walkDetails(track: SavedTrack, top: Double?): List<String> {
+    val parts = ArrayList<String>()
+    val hours = track.duration / 3_600_000.0
+    // A few seconds' walk would give a speed, but a meaningless one.
+    if (track.duration >= MIN_SPEED_MS && track.distance >= MIN_SPEED_M) {
+        parts += stringResource(R.string.walk_speed, Format.speed(track.distance / (track.duration / 1000.0)))
+    }
+    if (hours >= MIN_RATE_HOURS && track.ascent >= MIN_RATE_CLIMB_M) {
+        parts += stringResource(R.string.walk_climb_rate, Format.elevation(track.ascent / hours))
+    }
+    val stopped = (track.endTime - track.startTime) - track.duration
+    if (stopped >= MIN_STOPPED_MS) parts += stringResource(R.string.walk_stopped, Format.duration(stopped))
+    top?.let { parts += stringResource(R.string.track_top, Format.elevation(it)) }
+    return parts
+}
+
+/** A route's: its time at the user's pace (once known), and its highest point. */
+@Composable
+private fun routeDetails(signpost: Long, pace: Double?, top: Double?): List<String> {
+    val parts = ArrayList<String>()
+    pace?.let { parts += stringResource(R.string.route_your_pace, Format.estimate((signpost * it).toLong())) }
+    top?.let { parts += stringResource(R.string.track_top, Format.elevation(it)) }
+    return parts
+}
+
+/** A climb rate from a short walk or a small climb would be noise. */
+private const val MIN_RATE_HOURS = 0.5
+private const val MIN_RATE_CLIMB_M = 100.0
+
+/** Below these, a walk's speed is noise. */
+private const val MIN_SPEED_MS = 5 * 60_000L
+private const val MIN_SPEED_M = 500.0
+
+/** Stops shorter than this aren't worth a word. */
+private const val MIN_STOPPED_MS = 5 * 60_000L
 
 private const val GPX_MIME = "application/gpx+xml"
 private const val KML_MIME = "application/vnd.google-earth.kml+xml"

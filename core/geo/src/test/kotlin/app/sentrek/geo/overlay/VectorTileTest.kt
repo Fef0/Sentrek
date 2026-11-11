@@ -101,4 +101,37 @@ class VectorTileTest {
         assertTrue(VectorTile.polygons(tile(), "transportation") { true }.isEmpty())
         assertTrue(VectorTile.polygons(ByteArray(0), "landcover") { true }.isEmpty())
     }
+
+    @Test
+    fun `reads named points with their heights`() {
+        val etna = Out().apply {
+            packed(2, listOf(0, 0, 1, 1)) // name = Etna, ele = 3357
+            key(3, 0); varint(1)
+            packed(4, listOf(((1 shl 3) or 1).toLong(), zz(1200), zz(800)))
+        }
+        val nameless = Out().apply {
+            packed(2, listOf(1, 1))
+            key(3, 0); varint(1)
+            packed(4, listOf(((1 shl 3) or 1).toLong(), zz(10), zz(10)))
+        }
+        val peaks = Out().apply {
+            key(15, 0); varint(2)
+            string(1, "mountain_peak")
+            bytes(2, etna.bytes.toByteArray())
+            bytes(2, nameless.bytes.toByteArray())
+            string(3, "name")
+            string(3, "ele")
+            bytes(4, Out().apply { string(1, "Etna") }.bytes.toByteArray())
+            bytes(4, Out().apply { key(4, 0); varint(3357) }.bytes.toByteArray())
+            key(5, 0); varint(4096)
+        }
+        val bytes = Out().apply { bytes(3, peaks.bytes.toByteArray()) }.bytes.toByteArray()
+        val points = VectorTile.points(bytes, "mountain_peak") { "name" in it }
+        assertEquals(1, points.size)
+        assertEquals("Etna", points[0].tags["name"])
+        assertEquals("3357", points[0].tags["ele"])
+        assertEquals(1200 to 800, points[0].x to points[0].y)
+        // Polygons of that layer: none, the points aren't taken for them.
+        assertTrue(VectorTile.polygons(bytes, "mountain_peak") { true }.isEmpty())
+    }
 }

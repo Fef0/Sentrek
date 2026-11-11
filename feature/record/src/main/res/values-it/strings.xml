@@ -42,8 +42,8 @@
     <string name="tracks_empty">Ancora nessuna traccia.
 Registra un’escursione o importa un file GPX/KML.</string>
     <string name="tracks_stats">%1$s · %2$s · ↑ %3$s ↓ %4$s</string>
-    <string name="tracks_show">Mappa</string>
-    <string name="tracks_hide">Nascondi</string>
+    <string name="tracks_show">Mostra sulla mappa</string>
+    <string name="tracks_hide">Nascondi dalla mappa</string>
     <string name="tracks_share">Condividi</string>
     <string name="tracks_reverse">Copia al contrario</string>
     <string name="tracks_reversed_name">%1$s (al contrario)</string>
@@ -52,7 +52,7 @@ Registra un’escursione o importa un file GPX/KML.</string>
     <string name="tracks_duplicate">Duplica</string>
     <string name="tracks_copy_name">%1$s (copia)</string>
     <string name="tracks_copy_failed">Impossibile creare la copia</string>
-    <string name="tracks_save">Salva</string>
+    <string name="tracks_save">Salva come file</string>
     <string name="tracks_delete">Elimina</string>
     <string name="tracks_cancel">Annulla</string>
     <string name="tracks_name">Nome</string>
@@ -225,4 +225,5 @@ Tieni premuto sulla mappa per aggiungerne uno.</string>
     <string name="ahead_monument">Monumento</string>
     <string name="ahead_memorial">Memoriale</string>
     <string name="ahead_board">Pannello informativo</string>
+    <string name="tracks_more">Altro</string>
 </resources>

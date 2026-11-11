@@ -1,15 +1,9 @@
 package app.sentrek.record
 
-import android.content.Context
-import android.database.sqlite.SQLiteDatabase
 import android.util.Log
 import android.util.LruCache
 import app.sentrek.geo.LatLon
 import app.sentrek.geo.overlay.VectorTile
-import dagger.hilt.android.qualifiers.ApplicationContext
-import java.io.File
-import java.util.zip.GZIPInputStream
-import java.util.zip.InflaterInputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.PI
@@ -23,7 +17,7 @@ import kotlin.math.tan
  * vineyards are too low to shade a path. Offline only: outside downloaded areas it can't say.
  */
 @Singleton
-class TreeCover @Inject constructor(@ApplicationContext private val context: Context) {
+class TreeCover @Inject constructor(private val offline: OfflineTiles) {
     private val tiles = LruCache<Long, List<VectorTile.Polygon>>(CACHED_TILES)
 
     /** Whether trees cover [p]; false where there's no downloaded tile to tell. */
@@ -58,42 +52,10 @@ class TreeCover @Inject constructor(@ApplicationContext private val context: Con
     private fun shades(tags: Map<String, String>): Boolean =
         tags["class"] == "wood" || tags["subclass"] in TREE_SUBCLASSES
 
-    /** The vector tile from MapLibre's offline database, uncompressed; null when it isn't there. */
-    private fun tile(x: Int, y: Int): ByteArray? {
-        val file = File(context.filesDir, OFFLINE_DB)
-        if (!file.exists()) return null
-        return try {
-            SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
-                // The address carries the map's version (it changes with each update): the newest.
-                val t = db.rawQuery(
-                    "SELECT url_template FROM tiles WHERE url_template LIKE ? ORDER BY url_template DESC LIMIT 1",
-                    arrayOf("%{z}/{x}/{y}.pbf"),
-                ).use { c -> if (c.moveToFirst()) c.getString(0) else null } ?: return null
-                db.rawQuery(
-                    "SELECT data, compressed FROM tiles WHERE url_template = ? AND z = ? AND x = ? AND y = ? LIMIT 1",
-                    arrayOf(t, "$ZOOM", "$x", "$y"),
-                ).use { c ->
-                    if (!c.moveToFirst()) return null
-                    val data = c.getBlob(0) ?: return null
-                    val raw = if (c.getInt(1) != 0) InflaterInputStream(data.inputStream()).use { it.readBytes() } else data
-                    // Tile servers often send them gzipped, and MapLibre keeps them so.
-                    if (raw.size > 2 && raw[0] == 0x1f.toByte() && raw[1] == 0x8b.toByte()) {
-                        GZIPInputStream(raw.inputStream()).use { it.readBytes() }
-                    } else {
-                        raw
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            // Busy (MapLibre writing) or a schema we don't know: no trees known here, this time.
-            Log.d(TAG, "No map tile $x/$y: ${e.message}")
-            null
-        }
-    }
+    private fun tile(x: Int, y: Int): ByteArray? = offline.tile(ZOOM, x, y)
 
     private companion object {
         const val TAG = "TreeCover"
-        const val OFFLINE_DB = "mbgl-offline.db"
         const val LAYER = "landcover"
 
         /** The most detailed tiles: forests drawn closest to how they are. */

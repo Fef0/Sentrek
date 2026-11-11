@@ -155,8 +155,8 @@ fun RecordingDialog(
                     Button(onClick = onPauseResume, modifier = wide) { Text(stringResource(R.string.record_resume)) }
                     OutlinedButton(onClick = onSave, modifier = wide) { Text(stringResource(R.string.record_save)) }
                 } else {
+                    // Pausing has its own button in the bar: fewer choices here, with cold hands.
                     Button(onClick = onSave, modifier = wide) { Text(stringResource(R.string.record_save)) }
-                    OutlinedButton(onClick = onPauseResume, modifier = wide) { Text(stringResource(R.string.record_pause)) }
                     OutlinedButton(onClick = onDismiss, modifier = wide) { Text(stringResource(R.string.record_continue)) }
                 }
                 if (onBackToStart != null) {

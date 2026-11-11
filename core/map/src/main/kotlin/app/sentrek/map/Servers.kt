@@ -41,11 +41,26 @@ enum class Server(val defaults: List<String>, private val prefix: Boolean) {
 
 /** The user's servers, by [Server]; set from the settings, read by the HTTP client. */
 object ServerRoutes {
+    /** Set once the saved addresses are read, at start: until then requests wait (below). */
+    private val known = java.util.concurrent.CountDownLatch(1)
+
     @Volatile
     var custom: Map<Server, String> = emptyMap()
+        set(value) {
+            field = value
+            known.countDown()
+        }
 
+    /**
+     * Called for each request, off the main thread. The first ones of a start wait briefly
+     * for the saved addresses, so none reaches a server the user replaced; the app's start
+     * itself doesn't wait for them.
+     */
     fun rewrite(url: String): String {
+        known.await(KNOWN_WAIT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
         for ((server, address) in custom) server.route(url, address)?.let { return it }
         return url
     }
+
+    private const val KNOWN_WAIT_MS = 3_000L
 }

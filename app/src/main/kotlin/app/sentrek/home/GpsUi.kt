@@ -1,6 +1,7 @@
 package app.sentrek.home
 
 import app.sentrek.ui.SentrekIcons
+import app.sentrek.ui.mapButtonBorder
 import app.sentrek.record.SignalWatch
 import app.sentrek.geo.Geo
 import androidx.compose.foundation.clickable
@@ -187,11 +188,11 @@ private fun Pill(
     val shape = RoundedCornerShape(50)
     val sized = modifier.heightIn(min = TouchTarget)
     if (onClick != null) {
-        Surface(onClick, sized, shape = shape, color = container, contentColor = content, shadowElevation = 4.dp) {
+        Surface(onClick, sized, shape = shape, color = container, contentColor = content, shadowElevation = 4.dp, border = mapButtonBorder) {
             body()
         }
     } else {
-        Surface(sized, shape = shape, color = container, contentColor = content, shadowElevation = 4.dp) {
+        Surface(sized, shape = shape, color = container, contentColor = content, shadowElevation = 4.dp, border = mapButtonBorder) {
             body()
         }
     }
@@ -232,6 +233,7 @@ fun CoordinatesLabel(fix: StateFlow<Location?>, barometer: Flow<HomeViewModel.Ba
         color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
         shadowElevation = 4.dp,
+        border = mapButtonBorder,
     ) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
             Text(coordinates, style = MaterialTheme.typography.titleMedium)
@@ -277,6 +279,19 @@ private const val MOVING_MPS = 0.5f
  * A quiet note on the map, e.g. offline over an area that isn't downloaded. Small and
  * see-through, and it takes no touches: the map underneath works as ever.
  */
+/** A word or two beside a map button, saying what it does. Not a button itself. */
+@Composable
+fun MapLabel(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), RoundedCornerShape(50))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    )
+}
+
 @Composable
 fun MapNote(text: String, icon: ImageVector, modifier: Modifier = Modifier) {
     // A plain background, not a Surface: a Surface would swallow taps on the map under it.
@@ -327,6 +342,7 @@ fun PowerBadge(mode: PowerMode, onClick: () -> Unit) {
         color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.primary,
         shadowElevation = 4.dp,
+        border = mapButtonBorder,
         modifier = Modifier.size(TouchTarget),
     ) {
         Box(contentAlignment = Alignment.Center) {

@@ -43,6 +43,13 @@ import app.sentrek.record.WeatherResult
 import app.sentrek.record.WeatherSection
 import app.sentrek.ui.Format
 import app.sentrek.ui.TouchTarget
+import app.sentrek.ui.SentrekIcons
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.clickable
 import java.util.Locale
 
 /** Everything we know about a long-pressed map feature. */
@@ -118,8 +125,23 @@ fun FeatureSheet(
                         stringResource(R.string.feature_coordinates),
                         Format.coordinates(info.position.latitude, info.position.longitude),
                     )
+                    // What OSM says that matters on the way (water, a fire, a bed), in words.
+                    for ((key, label) in USEFUL_TAGS) {
+                        val value = info.tags[key] ?: continue
+                        Fact(stringResource(label), tagValue(value))
+                    }
                 }
             }
+
+            // What to do with it first: the rest is for reading.
+            OutlinedButton(
+                onClick = onGoTo,
+                modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget),
+            ) { Text(stringResource(R.string.feature_go_to)) }
+            OutlinedButton(
+                onClick = onSaveAsPlace,
+                modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget),
+            ) { Text(stringResource(R.string.feature_save_place)) }
 
             WeatherSection(loadWeather)
 
@@ -132,22 +154,27 @@ fun FeatureSheet(
             val tags = info.tags - "ele"
             if (tags.isNotEmpty()) {
                 HorizontalDivider()
-                Text(stringResource(R.string.feature_osm_tags), style = MaterialTheme.typography.titleSmall)
-                SelectionContainer {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        for ((key, value) in tags) Fact(key, value)
+                // As OpenStreetMap has it, for who wants it all: closed until asked for.
+                var open by rememberSaveable(info.osmId) { mutableStateOf(false) }
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = TouchTarget)
+                        .clickable { open = !open },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(stringResource(R.string.feature_osm_tags), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                    Icon(if (open) SentrekIcons.ExpandLess else SentrekIcons.ExpandMore, contentDescription = null)
+                }
+                if (open) {
+                    SelectionContainer {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            for ((key, value) in tags) Fact(key, value)
+                        }
                     }
                 }
             }
 
-            OutlinedButton(
-                onClick = onGoTo,
-                modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget),
-            ) { Text(stringResource(R.string.feature_go_to)) }
-            OutlinedButton(
-                onClick = onSaveAsPlace,
-                modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget),
-            ) { Text(stringResource(R.string.feature_save_place)) }
             info.osmId?.let { id ->
                 OutlinedButton(
                     onClick = { uriHandler.openUri("https://www.openstreetmap.org/$id") },
@@ -273,6 +300,12 @@ private val KIND_NAMES = mapOf(
     "peak" to R.string.kind_peak,
     "saddle" to R.string.kind_saddle,
     "volcano" to R.string.kind_volcano,
+    SPOT to R.string.kind_spot,
+    "city" to R.string.kind_city,
+    "town" to R.string.kind_town,
+    "village" to R.string.kind_village,
+    "hamlet" to R.string.kind_hamlet,
+    "suburb" to R.string.kind_suburb,
     "drinking_water" to R.string.kind_drinking_water,
     "water_point" to R.string.kind_water_point,
     "shelter" to R.string.kind_shelter,
@@ -347,6 +380,31 @@ private val PISTE_GROOMING = mapOf(
     "backcountry" to R.string.grooming_backcountry,
     "scooter" to R.string.grooming_scooter,
 )
+
+/** The kind of a long-pressed spot with nothing on it. */
+const val SPOT = "spot"
+
+/** OSM tags worth a line of their own on a feature's card, under a name in the app's language. */
+private val USEFUL_TAGS = listOf(
+    "drinking_water" to R.string.feature_tag_water,
+    "fireplace" to R.string.feature_tag_fireplace,
+    "beds" to R.string.feature_tag_beds,
+    "mattress" to R.string.feature_tag_mattress,
+    "toilets" to R.string.feature_tag_toilets,
+    "reservation" to R.string.feature_tag_reservation,
+    "fee" to R.string.feature_tag_fee,
+    "opening_hours" to R.string.feature_tag_opening_hours,
+    "phone" to R.string.feature_tag_phone,
+    "seasonal" to R.string.feature_tag_seasonal,
+)
+
+/** "yes" and "no" in the app's language; anything else as written. */
+@Composable
+private fun tagValue(value: String): String = when (value) {
+    "yes" -> stringResource(R.string.feature_yes)
+    "no" -> stringResource(R.string.feature_no)
+    else -> value.replace(';', ',').replace('_', ' ')
+}
 
 fun humanize(osm: String): String =
     osm.replace('_', ' ').replaceFirstChar { it.titlecase(Locale.getDefault()) }

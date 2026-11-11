@@ -1,9 +1,11 @@
 package app.sentrek.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,6 +43,17 @@ data class Touch(val target: Dp, val icon: Dp, val pressRadius: Dp) {
 }
 
 val LocalTouch = staticCompositionLocalOf { Touch.Standard }
+
+/**
+ * True over the night map: its ground is nearly black, and so are the buttons of a dark
+ * theme. They get a light edge then, or only their shadow would show where they are.
+ */
+val LocalDarkMap = staticCompositionLocalOf { false }
+
+/** The edge of a button floating over the map: none by day, light over the night map. */
+val mapButtonBorder: BorderStroke?
+    @Composable @ReadOnlyComposable
+    get() = if (LocalDarkMap.current) BorderStroke(1.5.dp, Color.White.copy(alpha = 0.55f)) else null
 
 /** Minimum touch target for the current mode. */
 val TouchTarget: Dp
@@ -84,19 +97,26 @@ fun MapButton(
         color = if (active) colors.primary else colors.surface,
         contentColor = if (active) colors.onPrimary else colors.onSurface,
         shadowElevation = 4.dp,
+        border = mapButtonBorder,
     ) {
         val iconSize = LocalTouch.current.icon
         Box(contentAlignment = Alignment.Center) {
             if (badge == null) {
                 Icon(icon, contentDescription, Modifier.size(iconSize))
             } else {
-                // The main icon a little up and left, to leave the corner to the badge.
-                Icon(icon, contentDescription, Modifier.size(iconSize).offset(x = -iconSize / 8, y = -iconSize / 8))
-                Icon(
-                    badge,
-                    contentDescription = null,
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(iconSize / 6).size(iconSize / 2),
-                )
+                // The main icon centred like every other button's; the badge over its corner,
+                // on a patch of the button's own colour so the two stay apart.
+                Icon(icon, contentDescription, Modifier.size(iconSize))
+                Box(
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = iconSize / 12, bottom = iconSize / 12)
+                        .background(if (active) colors.primary else colors.surface, RoundedCornerShape(5.dp))
+                        .padding(2.dp),
+                ) {
+                    // Big enough to read at a glance, over the main icon's corner.
+                    Icon(badge, contentDescription = null, modifier = Modifier.size(iconSize * 0.6f))
+                }
             }
         }
     }

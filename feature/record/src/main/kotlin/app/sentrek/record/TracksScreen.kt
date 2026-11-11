@@ -29,6 +29,9 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -391,38 +394,39 @@ private fun TrackCard(
                         Text(stringResource(R.string.tracks_follow))
                     }
                 }
-                if (isShown) {
-                    OutlinedButton(onClick = onToggleMap, modifier = buttonModifier, contentPadding = padding) {
-                        Text(stringResource(R.string.tracks_hide))
+                OutlinedButton(onClick = onToggleMap, modifier = buttonModifier, contentPadding = padding) {
+                    Text(stringResource(if (isShown) R.string.tracks_hide else R.string.tracks_show), textAlign = TextAlign.Center)
+                }
+                // The rest, used now and then, behind one button: the card stays short.
+                Box {
+                    var menu by remember { mutableStateOf(false) }
+                    OutlinedButton(
+                        onClick = { menu = true },
+                        modifier = Modifier.size(TouchTarget),
+                        contentPadding = PaddingValues(0.dp),
+                    ) {
+                        Icon(SentrekIcons.More, contentDescription = stringResource(R.string.tracks_more))
                     }
-                } else {
-                    OutlinedButton(onClick = onToggleMap, modifier = buttonModifier, contentPadding = padding) {
-                        Text(stringResource(R.string.tracks_show))
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        @Composable
+                        fun item(label: Int, destructive: Boolean = false, action: () -> Unit) = DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(label),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                                )
+                            },
+                            onClick = { menu = false; action() },
+                            modifier = Modifier.heightIn(min = TouchTarget),
+                        )
+                        onEdit?.let { item(R.string.tracks_edit, action = it) }
+                        item(R.string.tracks_reverse, action = onReverse)
+                        item(R.string.tracks_duplicate, action = onDuplicate)
+                        item(R.string.tracks_share, action = onShare)
+                        item(R.string.tracks_save, action = onSave)
+                        item(R.string.tracks_delete, destructive = true, action = onDelete)
                     }
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                onEdit?.let {
-                    OutlinedButton(onClick = it, modifier = buttonModifier, contentPadding = padding) {
-                        Text(stringResource(R.string.tracks_edit))
-                    }
-                }
-                OutlinedButton(onClick = onReverse, modifier = buttonModifier, contentPadding = padding) {
-                    Text(stringResource(R.string.tracks_reverse), textAlign = TextAlign.Center)
-                }
-                OutlinedButton(onClick = onShare, modifier = buttonModifier, contentPadding = padding) {
-                    Text(stringResource(R.string.tracks_share))
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onDuplicate, modifier = buttonModifier, contentPadding = padding) {
-                    Text(stringResource(R.string.tracks_duplicate))
-                }
-                OutlinedButton(onClick = onSave, modifier = buttonModifier, contentPadding = padding) {
-                    Text(stringResource(R.string.tracks_save))
-                }
-                OutlinedButton(onClick = onDelete, modifier = buttonModifier, contentPadding = padding) {
-                    Text(stringResource(R.string.tracks_delete), color = MaterialTheme.colorScheme.error)
                 }
             }
         }

@@ -219,6 +219,12 @@ object SentrekIcons {
     /** A lightning bolt. */
     val Storm: ImageVector by lazy { icon("Sentrek.Storm", "M7,2v11h3v9l7,-12h-4l4,-8z") }
 
+    val More: ImageVector by lazy {
+        icon("Sentrek.More", "M12,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM12,10c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM12,16c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2z")
+    }
+
+    val ChevronRight: ImageVector by lazy { icon("Sentrek.ChevronRight", "M10,6L8.59,7.41 13.17,12l-4.58,4.59L10,18l6,-6z") }
+
     val ExpandMore: ImageVector by lazy { icon("Sentrek.ExpandMore", "M16.59,8.59L12,13.17 7.41,8.59 6,10l6,6 6,-6z") }
 
     val ExpandLess: ImageVector by lazy { icon("Sentrek.ExpandLess", "M12,8l-6,6 1.41,1.41L12,10.83l4.59,4.58L18,14z") }

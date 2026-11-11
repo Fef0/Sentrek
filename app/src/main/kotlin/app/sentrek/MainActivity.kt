@@ -2,6 +2,7 @@ package app.sentrek
 
 import app.sentrek.search.PeaksScreen
 import app.sentrek.home.FirstRunGuide
+import app.sentrek.record.around
 import app.sentrek.home.GoTo
 import app.sentrek.home.HomeViewModel
 import android.content.Context
@@ -55,6 +56,7 @@ import app.sentrek.data.PowerMode
 import org.maplibre.android.MapLibre
 import app.sentrek.map.LocalMapMaxFps
 import app.sentrek.map.LocalNightMap
+import app.sentrek.ui.LocalDarkMap
 import app.sentrek.data.SavedCamera
 import app.sentrek.data.SettingsRepository
 import app.sentrek.geo.BoundingBox
@@ -223,6 +225,8 @@ class MainActivity : ComponentActivity() {
                             // (style, icons, overlays, tiles) made every return to it slow.
                             // Hidden, it draws nothing new unless followed GPS moves it.
                             Box(if (screen == Screen.Map) Modifier else Modifier.clearAndSetSemantics {}) {
+                                // Edged buttons over the night map: only there, not on the other screens.
+                                CompositionLocalProvider(LocalDarkMap provides nightMap) {
                                 MapScreen(
                                     camera = shownCamera,
                                     onCameraChange = {
@@ -235,12 +239,14 @@ class MainActivity : ComponentActivity() {
                                     onOpenPlaces = { screen = Screen.Places },
                                     onOpenSearch = { screen = Screen.Search },
                                     onOpenEmergency = { screen = Screen.Emergency },
-                                    onOpenSettings = { screen = Screen.Settings },
+                                    // Always from the top: not left on the last page looked at, maybe days ago.
+                                    onOpenSettings = { pages.removeState(Screen.Settings.name); screen = Screen.Settings },
                                     focus = focus,
                                     onFocusDone = { focus = null },
                                     zoomKeys = zoomKeys,
                                     visible = screen == Screen.Map,
                                 )
+                                }
                             }
                         }
                         // Opaque and touch-tight: nothing reaches the map below.
@@ -277,6 +283,11 @@ class MainActivity : ComponentActivity() {
                                     onBack = toMap,
                                     onShowOnMap = { box -> focus = box; screen = Screen.Map },
                                     onPeaks = { screen = Screen.Peaks },
+                                    onGoTo = { name, position ->
+                                        home.goTo(GoTo(name, position))
+                                        focus = around(position)
+                                        screen = Screen.Map
+                                    },
                                 )
                                 Screen.Peaks -> PeaksScreen(onBack = { screen = Screen.Search })
                                 Screen.Emergency -> EmergencyScreen(
@@ -290,7 +301,16 @@ class MainActivity : ComponentActivity() {
                             }
                             }
                         }
-                        if (!guideSeen) FirstRunGuide { scope.launch { settings.setGuideSeen(true) } }
+                        if (!guideSeen) {
+                            FirstRunGuide(
+                                onDone = { scope.launch { settings.setGuideSeen(true) } },
+                                onDownload = {
+                                    scope.launch { settings.setGuideSeen(true) }
+                                    downloadAt = null
+                                    screen = Screen.Maps
+                                },
+                            )
+                        }
                     }
                 }
             }

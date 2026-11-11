@@ -515,8 +515,9 @@ private fun MapKinds(extras: Set<MapKind>, onToggle: (MapKind) -> Unit) {
                 val selected = !extra || kind in extras
                 FilterChip(
                     selected = selected,
+                    // Hiking always comes: drawn ticked like the others chosen, not greyed out as
+                    // if it were off. A tap on it does nothing.
                     onClick = { if (extra) onToggle(kind) },
-                    enabled = extra,
                     label = { Text(stringResource(kindName(kind))) },
                     // A tick: the filled look alone is hard to tell apart in the dark theme.
                     leadingIcon = if (selected) {

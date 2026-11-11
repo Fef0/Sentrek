@@ -219,6 +219,9 @@ class HomeViewModel @Inject constructor(
     /** The downloaded areas, for what the shown map is missing where the user looks. */
     val regionStates: StateFlow<Map<RegionCell, RegionState>> get() = regions.state
 
+    /** The downloaded areas are known (a moment after start): before, none is said to be missing. */
+    val regionsListed: StateFlow<Boolean> get() = regions.listed
+
     /** Downloads the shown map's details for [cell], already on the phone. */
     fun downloadExtra(cell: RegionCell, kind: MapKind) {
         regions.download(listOf(cell), setOf(kind))

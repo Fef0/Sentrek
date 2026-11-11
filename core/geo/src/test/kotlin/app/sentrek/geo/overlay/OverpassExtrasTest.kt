@@ -24,14 +24,19 @@ class OverpassExtrasTest {
              "tags":{"route":"piste","piste:type":"nordic","name":"Anello del lago"}},
             {"type":"piste","id":1,"geometry":{"type":"LineString","coordinates":[[7.0,46.0],[7.01,46.01]]},
              "tags":{"pt":"downhill","pd":"intermediate","pr":"12"}},
-            {"type":"piste","id":2,"geometry":{"type":"LineString","coordinates":[[7.0,46.0],[7.02,46.0]]},"tags":{}},
-            {"type":"piste","id":3,"geometry":{"type":"LineString","coordinates":[[7.0,46.0],[7.03,46.0]]},"tags":{}}
+            {"type":"piste","id":2,"geometry":{"type":"LineString","coordinates":[[7.0,46.0],[7.02,46.0]]},
+             "tags":{"pt":"","pd":"","pg":"","pn":"","pr":"","nm":"","rf":"","ar":""}},
+            {"type":"piste","id":3,"geometry":{"type":"LineString","coordinates":[[7.0,46.0],[7.03,46.0]]},
+             "tags":{"pt":"","pd":"","pg":"","pn":"","pr":"","nm":"","rf":"","ar":""}}
         ]}"""
         val features = convert(MapKind.Winter, json)
         val props = features.map { it.getAsJsonObject("properties") }
         // Way 1: its own downhill piste, and the nordic loop on it, with the way's number.
         assertEquals(listOf("downhill", "nordic", "nordic"), props.map { it.str("pt") })
         assertEquals("intermediate", props[0].str("pd"))
+        // Overpass writes missing tags as "": none of them become a value.
+        assertFalse(props[0].has("g"))
+        assertFalse(props[2].has("pd"))
         assertEquals("12", props[0].str("n"))
         assertEquals("12", props[1].str("n"))
         // Way 2 has no piste of its own: the route's name.
@@ -62,7 +67,7 @@ class OverpassExtrasTest {
             {"type":"relation","id":10,"members":[{"type":"way","ref":1,"role":""}],
              "tags":{"route":"bicycle","network":"icn","ref":"EV5","name":"Via Romea Francigena"}},
             {"type":"relation","id":11,"members":[{"type":"way","ref":1,"role":""}],
-             "tags":{"route":"mtb","network":"ncn","ref":"1","name":"Giro del Rosa"}},
+             "tags":{"route":"mtb","network":"ncn","ref":"1","name":"Giro del Rosa","stage":"V23C-B","from":"Rifugio","to":"Bivacco","cai_scale:mtb":"MC","source":"survey"}},
             {"type":"relation","id":12,"members":[{"type":"way","ref":1,"role":""}],"tags":{"route":"bicycle"}},
             {"type":"bike","id":1,"geometry":{"type":"LineString","coordinates":[[7.0,46.0],[7.01,46.01]]},"tags":{}},
             {"type":"bike","id":2,"geometry":{"type":"LineString","coordinates":[[7.0,46.0],[7.01,46.01]]},"tags":{}}
@@ -72,6 +77,9 @@ class OverpassExtrasTest {
         assertEquals(listOf(4, 1), props.map { it.get("w").asInt })
         assertEquals("EV5", props[0].str("ref"))
         assertEquals("Giro del Rosa", props[1].str("n"))
+        // What tells a stage's two directions apart; not the mapping's own notes.
+        assertEquals(listOf("V23C-B", "Rifugio", "Bivacco", "MC"), listOf("stage", "from", "to", "cai_scale:mtb").map { props[1].str(it) })
+        assertFalse(props[1].has("source"))
         assertEquals(10L, props[0].get("rid").asLong)
         assertFalse(props.any { it.get("rid")?.asLong == 12L })
     }

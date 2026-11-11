@@ -29,18 +29,14 @@
     <!-- Distance, then ascent, e.g. "3.42 km · ↑ 420 m". -->
     <string name="record_notification_text">%1$s · ↑ %2$s</string>
 
-    <string name="tracks_title">Tracks</string>
     <string name="totals_this_year">This year</string>
     <string name="totals_all_time">All time</string>
-    <string name="totals_switch">Switch between this year and all time</string>
-    <string name="totals_none">No hikes recorded yet</string>
+    <string name="totals_none">No walks this year yet</string>
     <plurals name="totals_hikes">
-        <item quantity="one">%d hike</item>
-        <item quantity="other">%d hikes</item>
+        <item quantity="one">%d walk</item>
+        <item quantity="other">%d walks</item>
     </plurals>
     <string name="tracks_back">Back to map</string>
-    <string name="tracks_empty">No tracks yet.
-Record a hike or import a GPX/KML file.</string>
     <!-- Distance, duration, ascent, descent. -->
     <string name="tracks_stats">%1$s · %2$s · ↑ %3$s ↓ %4$s</string>
     <string name="tracks_show">Show on map</string>
@@ -228,4 +224,43 @@ Long-press the map to add one.</string>
     <string name="ahead_memorial">Memorial</string>
     <string name="ahead_board">Information board</string>
     <string name="tracks_more">More</string>
+    <string name="walks_title">Walks</string>
+    <string name="routes_title">Routes</string>
+    <string name="walks_empty">No walks yet.
+Tap Record on the map when you set off: your walks and their stats show here.</string>
+    <string name="routes_empty">No routes yet.
+Plan one on the map, or import a GPX or KML file.</string>
+    <string name="totals_per_year">Distance per year · tap a bar</string>
+    <string name="walk_speed">%s moving</string>
+    <string name="walk_climb_rate">↑ %s per hour</string>
+    <string name="walk_stopped">%s stopped</string>
+    <string name="track_top">Top %s</string>
+    <string name="route_your_pace">%s at your pace</string>
+    <string name="walks_copy_to_routes">Copy to Routes</string>
+    <string name="walks_copied_to_routes">Copied to Routes: %s</string>
+    <string name="routes_count_as_walk">Count as my walk</string>
+    <string name="routes_moved_to_walks">Moved to Walks: %s</string>
+    <plurals name="import_walks_title">
+        <item quantity="one">Is this one of your walks?</item>
+        <item quantity="other">Are these %d tracks your walks?</item>
+    </plurals>
+    <string name="import_walks_text">They have times, as recordings do. Your own walks go to Walks and count in your stats. Others’ tracks stay in Routes, to follow.</string>
+    <string name="import_walks_yes">My walks</string>
+    <string name="import_walks_no">Keep in Routes</string>
+    <string name="stats_open">Show all the stats</string>
+    <string name="stats_fold">Fold the stats</string>
+    <string name="stats_moving">Moving</string>
+    <string name="stats_longest">Longest</string>
+    <string name="stats_most_climb">Most climb</string>
+    <string name="stats_pace_faster">%d%% faster</string>
+    <string name="stats_pace_slower">%d%% slower</string>
+    <string name="stats_pace_same">Signpost times</string>
+    <!-- The year shown, and the one before it. -->
+    <string name="stats_race">%1$d against %2$d · drag along it</string>
+    <string name="stats_so_far">Distance through %1$d · drag along it</string>
+    <string name="stats_speed">Average speed</string>
+    <string name="stats_climb_rate">Climb per hour</string>
+    <string name="stats_vs_signposts">Against signpost times</string>
+    <string name="stats_speed_chart">Speed on each walk, while moving · tap a dot</string>
+    <string name="stats_average">Average %s</string>
 </resources>

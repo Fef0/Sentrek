@@ -42,7 +42,8 @@
     <string name="record_confirm_breadcrumbs">La tua posizione verrà anche inviata via SMS a %1$s ogni %2$d min, dalla tua SIM. Puoi disattivarlo in Impostazioni › Emergenza.</string>
     <string name="bar_plan">Pianifica</string>
     <string name="bar_settings">Impostazioni</string>
-    <string name="bar_tracks">Tracce</string>
+    <string name="bar_walks">Escursioni</string>
+    <string name="bar_routes">Percorsi</string>
     <string name="bar_places">Luoghi</string>
     <string name="bar_record">Registra</string>
     <string name="bar_stop">Ferma</string>

@@ -3,6 +3,7 @@ package app.sentrek.record
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.sentrek.data.STATS_THIS_YEAR
 import app.sentrek.data.SettingsRepository
 import app.sentrek.geo.BoundingBox
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,11 +23,19 @@ class TracksViewModel @Inject constructor(
     val tracks: StateFlow<List<SavedTrack>> = repository.tracks
 
     /** Whether the walking totals cover all time rather than this year; remembered. */
-    val totalsAllTime: StateFlow<Boolean> =
-        settings.tripTotalsAllTime.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    /** The year the stats show: STATS_THIS_YEAR, STATS_ALL_TIME, or a year. */
+    val statsYear: StateFlow<Int> =
+        settings.walkStatsYear.stateIn(viewModelScope, SharingStarted.Eagerly, STATS_THIS_YEAR)
 
-    fun setTotalsAllTime(allTime: Boolean) {
-        viewModelScope.launch { settings.setTripTotalsAllTime(allTime) }
+    val statsOpen: StateFlow<Boolean> =
+        settings.walkStatsOpen.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setStatsOpen(open: Boolean) {
+        viewModelScope.launch { settings.setWalkStatsOpen(open) }
+    }
+
+    fun setStatsYear(year: Int) {
+        viewModelScope.launch { settings.setWalkStatsYear(year) }
     }
 
     /** Notes and photos open, or in one line; remembered, for all the tracks at once. */
@@ -88,6 +97,21 @@ class TracksViewModel @Inject constructor(
     /** Saves [track] the other way round as [name]; [onDone] gets the copy, or null. */
     fun saveReversed(track: SavedTrack, name: String, onDone: (SavedTrack?) -> Unit) {
         viewModelScope.launch { onDone(repository.saveReversed(track, name)) }
+    }
+
+    /** Counts [track] as one of the user's walks, or not. */
+    fun setWalk(track: SavedTrack, walk: Boolean) {
+        viewModelScope.launch { repository.setWalk(track, walk) }
+    }
+
+    /** All of [tracks] that can be walks, counted as walks. */
+    fun setWalks(tracks: List<SavedTrack>) {
+        viewModelScope.launch { tracks.forEach { repository.setWalk(it, true) } }
+    }
+
+    /** Copies the walk [track] to the routes as [name]; [onDone] gets the copy, or null. */
+    fun copyAsRoute(track: SavedTrack, name: String, onDone: (SavedTrack?) -> Unit) {
+        viewModelScope.launch { onDone(repository.copyAsRoute(track, name)) }
     }
 
     fun setColor(track: SavedTrack, color: Int) {

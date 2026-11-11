@@ -51,7 +51,10 @@ data class SavedTrack(
     val descent: Double,
     /** Moving time, without pauses; 0 for planned routes without times. */
     val duration: Long,
-    /** Imported from a file rather than recorded here. */
+    /**
+     * A route (planned, imported, or a copy) rather than a walk the user recorded. An imported
+     * track of the user's own hike can be counted as a walk: this goes false.
+     */
     val imported: Boolean = false,
     /** Line colour on the map (ARGB), one of [TrackColors.palette]. */
     val color: Int = TrackColors.palette.first(),
@@ -260,6 +263,36 @@ class TrackRepository @Inject constructor(
         photoStore.delete(track.photos - photos.toSet())
         _tracks.update { all -> all.map { if (it.id == track.id) edited else it } }
         return edited
+    }
+
+    /**
+     * Moves [track] to the user's walks ([walk]), where it counts in the stats, or back to the
+     * routes. Only tracks with times can be walks: a line without them wasn't walked here.
+     */
+    suspend fun setWalk(track: SavedTrack, walk: Boolean) {
+        if (walk && track.duration <= 0) return
+        val moved = track.copy(imported = !walk)
+        withContext(Dispatchers.IO) { File(dir, track.id + SUMMARY).writeText(summaryJson(moved)) }
+        _tracks.update { all -> all.map { if (it.id == track.id) moved else it } }
+    }
+
+    /**
+     * A walk copied to the routes as [name], to follow or plan from. Without its times: as a
+     * route it's walked again, and its time is estimated like any route's, so it can't be
+     * counted twice in the stats. Null when the file can't be read.
+     */
+    suspend fun copyAsRoute(track: SavedTrack, name: String): SavedTrack? {
+        val file = withContext(Dispatchers.IO) {
+            runCatching { read(track) }.onFailure { Log.w(TAG, "Cannot read ${track.id}", it) }.getOrNull()
+        } ?: return null
+        val segments = file.tracks.flatMap { it.segments }
+            .map { segment -> segment.map { TrackPoint(it.position, 0) } }
+            .filter { it.isNotEmpty() }
+        if (segments.isEmpty()) return null
+        return save(
+            segments, name, file.waypoints, imported = true, smoothElevation = track.imported,
+            note = track.note, photos = photoStore.copy(track.photos),
+        )
     }
 
     suspend fun setColor(track: SavedTrack, color: Int) {

@@ -23,6 +23,12 @@ private val Context.settings by preferencesDataStore(name = "settings")
 /** Works across Europe and on most phones elsewhere, even without a SIM. */
 const val DEFAULT_EMERGENCY_NUMBER = "112"
 
+/** The walk stats show whichever year it is now. */
+const val STATS_THIS_YEAR = -1
+
+/** The walk stats show every walk. */
+const val STATS_ALL_TIME = 0
+
 @Singleton
 class SettingsRepository @Inject constructor(@ApplicationContext private val context: Context) {
     /**
@@ -396,11 +402,23 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
     }
 
     /** The walking totals on the Tracks screen: all time, or this year (the default). */
-    val tripTotalsAllTime: Flow<Boolean> =
-        prefs { it[TRIP_TOTALS_ALL_TIME] ?: false }
+    /**
+     * The year the walk stats show: [STATS_THIS_YEAR] (whichever year it is now), [STATS_ALL_TIME],
+     * or a year. Who had chosen "all time" before years could be picked keeps it.
+     */
+    val walkStatsYear: Flow<Int> =
+        prefs { it[WALK_STATS_YEAR] ?: if (it[TRIP_TOTALS_ALL_TIME] == true) STATS_ALL_TIME else STATS_THIS_YEAR }
 
-    suspend fun setTripTotalsAllTime(allTime: Boolean) {
-        context.settings.edit { it[TRIP_TOTALS_ALL_TIME] = allTime }
+    suspend fun setWalkStatsYear(year: Int) {
+        context.settings.edit { it[WALK_STATS_YEAR] = year }
+    }
+
+    /** The walk stats open, or folded to one line. */
+    val walkStatsOpen: Flow<Boolean> =
+        prefs { it[WALK_STATS_OPEN] ?: false }
+
+    suspend fun setWalkStatsOpen(open: Boolean) {
+        context.settings.edit { it[WALK_STATS_OPEN] = open }
     }
 
     /** Light (the default), dark, OLED black, or the phone's own choice. */
@@ -622,6 +640,8 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val FOLLOW_NOTE_EXPANDED = booleanPreferencesKey("follow_note_expanded")
         val TRACK_NOTES_EXPANDED = booleanPreferencesKey("track_notes_expanded")
         val TRIP_TOTALS_ALL_TIME = booleanPreferencesKey("trip_totals_all_time")
+        val WALK_STATS_OPEN = booleanPreferencesKey("walk_stats_open")
+        val WALK_STATS_YEAR = intPreferencesKey("walk_stats_year")
         val BATTERY_SAVER = booleanPreferencesKey("battery_saver")
         val STAMINA_MODE = booleanPreferencesKey("stamina_mode")
         val AUTO_POWER = booleanPreferencesKey("auto_power")

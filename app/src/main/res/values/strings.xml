@@ -44,7 +44,8 @@
     <string name="record_confirm_breadcrumbs">Your position will also go by SMS to %1$s every %2$d min, from your SIM. You can turn this off in Settings › Emergency.</string>
     <string name="bar_plan">Plan</string>
     <string name="bar_settings">Settings</string>
-    <string name="bar_tracks">Tracks</string>
+    <string name="bar_walks">Walks</string>
+    <string name="bar_routes">Routes</string>
     <string name="bar_places">Places</string>
     <string name="bar_record">Record</string>
     <string name="bar_stop">Stop</string>

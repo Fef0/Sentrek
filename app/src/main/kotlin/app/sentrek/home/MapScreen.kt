@@ -214,7 +214,10 @@ fun MapScreen(
     onOpenMaps: () -> Unit,
     /** Opens Maps with the area around this point selected. */
     onDownloadArea: (LatLon) -> Unit,
-    onOpenTracks: () -> Unit,
+    /** The user's recorded walks, with their stats. */
+    onOpenWalks: () -> Unit,
+    /** Planned and imported routes, to follow. */
+    onOpenRoutes: () -> Unit,
     onOpenPlaces: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenEmergency: () -> Unit,
@@ -819,12 +822,13 @@ fun MapScreen(
                     ),
                 )
             } else AnimatedVisibility(visible = !controlsHidden, enter = fadeIn(), exit = fadeOut()) { Column {
-                // Saved: the user's own tracks and places. Map downloads are under the map
+                // Saved: the user's walks, routes and places. Map downloads are under the map
                 // button, SOS on the map itself.
                 if (libraryOpen) {
                     BottomBar(
                         items = listOf(
-                            BarItem(SentrekIcons.Tracks, stringResource(R.string.bar_tracks), { libraryOpen = false; onOpenTracks() }),
+                            BarItem(SentrekIcons.Hiking, stringResource(R.string.bar_walks), { libraryOpen = false; onOpenWalks() }),
+                            BarItem(SentrekIcons.Tracks, stringResource(R.string.bar_routes), { libraryOpen = false; onOpenRoutes() }),
                             BarItem(SentrekIcons.Place, stringResource(R.string.bar_places), { libraryOpen = false; onOpenPlaces() }),
                         ),
                         edgeToEdge = false,

@@ -23,12 +23,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -90,7 +92,7 @@ fun RegionsScreen(
     val imported by viewModel.imported.collectAsStateWithLifecycle()
     val importing by viewModel.importing.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
-    val online by viewModel.online.collectAsStateWithLifecycle()
+    val status by viewModel.status.collectAsStateWithLifecycle()
     val flyTo by viewModel.flyTo.collectAsStateWithLifecycle()
     val extras by viewModel.extras.collectAsStateWithLifecycle()
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
@@ -192,7 +194,7 @@ fun RegionsScreen(
             importedCount = imported.size,
             importing = importing,
             message = message,
-            online = online,
+            status = status,
             estimate = viewModel::estimate,
             extras = extras,
             onToggleExtra = viewModel::toggleExtra,
@@ -209,6 +211,16 @@ fun RegionsScreen(
                 )
             },
             onClear = viewModel::clearSelection,
+            onStop = {
+                // Asked first: a stray tap mustn't throw away a long download.
+                confirm = Confirmation(
+                    title = context.getString(R.string.confirm_stop_downloads_title),
+                    text = context.getString(R.string.confirm_stop_downloads_text),
+                    confirmLabel = context.getString(R.string.confirm_stop_downloads),
+                    destructive = true,
+                    onConfirm = viewModel::stopDownloads,
+                )
+            },
             onUpdate = viewModel::updateSelected,
             onUpdateOld = viewModel::updateOld,
             onRetryTrails = viewModel::retryTrails,
@@ -269,7 +281,8 @@ private fun cellLooks(
     for ((cell, state) in regions) {
         looks[cell] = when (val m = state.map) {
             MapDownload.Queued -> CellLook.Queued to labels.queued
-            is MapDownload.Downloading -> CellLook.Downloading to String.format(labels.map, (m.fraction * 100).roundToInt())
+            // The area's own share of the batch's percentage: with one area, the same number.
+            is MapDownload.Downloading -> CellLook.Downloading to String.format(labels.map, (state.progress() * 100).toInt().coerceAtMost(99))
             // Green only once the hiking details (trails, huts, springs…) are there too, and
             // the pistes or cycle routes asked for.
             is MapDownload.Ready -> {
@@ -298,7 +311,8 @@ private fun RegionsPanel(
     importedCount: Int,
     importing: Boolean,
     @StringRes message: Int?,
-    online: Boolean,
+    /** What is downloading now, null when nothing is. */
+    status: DownloadStatus?,
     /** About how many bytes downloading these areas takes, and the space left. */
     estimate: (Collection<RegionCell>) -> Pair<Long, Long>,
     /** The extra maps chosen for the selected areas. */
@@ -308,6 +322,7 @@ private fun RegionsPanel(
     onDownload: () -> Unit,
     onDelete: () -> Unit,
     onClear: () -> Unit,
+    onStop: () -> Unit,
     onUpdate: () -> Unit,
     onUpdateOld: () -> Unit,
     onRetryTrails: () -> Unit,
@@ -318,7 +333,6 @@ private fun RegionsPanel(
     val context = LocalContext.current
     val toDownload = selection.count { it !in regions }
     val toDelete = selection.count { it in regions }
-    val pending = regions.values.count { it.isPending }
     val trailsFailed = regions.values.count { it.trails == TrailsDownload.Failed }
     val extrasFailed = regions.values.count { TrailsDownload.Failed in it.extras.values }
     // Selected areas on the phone whose extra maps aren't the ones chosen.
@@ -337,24 +351,22 @@ private fun RegionsPanel(
             modifier = Modifier.navigationBarsPadding().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            val status = when {
+            val title = when {
                 selection.isNotEmpty() -> pluralStringResource(R.plurals.regions_selected, selection.size, selection.size)
                 importing -> stringResource(R.string.import_running)
+                // Before "zoom in": the download is what the user came back to see.
+                status != null -> pluralStringResource(R.plurals.download_title, status.areas, status.areas) + " · ${status.percent}%"
                 !zoomedIn -> stringResource(R.string.regions_zoom_in)
-                pending > 0 -> pluralStringResource(R.plurals.regions_progress, regions.size, regions.size - pending, regions.size)
                 regions.isNotEmpty() ->
                     pluralStringResource(R.plurals.regions_stored, regions.size, regions.size, Formatter.formatShortFileSize(context, storedBytes))
                 else -> stringResource(R.string.regions_hint)
             }
-            Text(status, style = MaterialTheme.typography.titleMedium)
+            Text(title, style = MaterialTheme.typography.titleMedium)
 
             message?.let {
                 Text(stringResource(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
             }
-            if (pending > 0 && selection.isEmpty()) DownloadProgress(regions.values)
-            if (!online && pending > 0 && message == null) {
-                Text(stringResource(R.string.regions_waiting_network), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
-            }
+            if (status != null && selection.isEmpty()) DownloadProgress(status, onStop)
 
             if (selection.isNotEmpty()) {
                 val new = selection.filter { it !in regions }
@@ -400,7 +412,7 @@ private fun RegionsPanel(
                 return@Column
             }
 
-            if (old > 0 && pending == 0) {
+            if (old > 0 && status == null) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
                         pluralStringResource(R.plurals.regions_old, old, old),
@@ -559,47 +571,40 @@ private fun PanelButton(text: String, onClick: () -> Unit, modifier: Modifier = 
 }
 
 /**
- * What the download is doing now: the map of one area, then its trail details, which come
- * from another server, one area at a time, and can take minutes.
+ * What the download is doing now, for the whole batch: a bar, how many areas are done, and the
+ * step under way (the map of one area, then its trail details, which come from another server,
+ * one area at a time) or what it waits for.
  */
 @Composable
-private fun DownloadProgress(states: Collection<RegionState>) {
+private fun DownloadProgress(status: DownloadStatus, onStop: () -> Unit) {
     val context = LocalContext.current
-    val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        val active = states.firstNotNullOfOrNull { it.map as? MapDownload.Downloading }
-        val mapsWaiting = states.count { it.map == MapDownload.Queued }
-        if (active != null) {
-            val line = stringResource(
-                R.string.regions_map_progress,
-                (active.fraction * 100).roundToInt(),
-                Formatter.formatShortFileSize(context, active.bytes),
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        LinearProgressIndicator(
+            progress = { status.fraction },
+            modifier = Modifier.fillMaxWidth().height(6.dp),
+            drawStopIndicator = {},
+        )
+        Text(
+            DownloadNotifications.statusLine(context, status),
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (status.waiting == DownloadStatus.Waiting.Network) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+        )
+        val trails = status.step != DownloadStatus.Step.Map && status.step != DownloadStatus.Step.Queued
+        if (trails || status.waiting == DownloadStatus.Waiting.Server) {
+            Text(
+                stringResource(R.string.regions_trails_explain),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            val more = if (mapsWaiting > 0) " · " + pluralStringResource(R.plurals.regions_more_waiting, mapsWaiting, mapsWaiting) else ""
-            Text(line + more, style = MaterialTheme.typography.bodyLarge)
-        } else if (mapsWaiting > 0) {
-            Text(pluralStringResource(R.plurals.regions_maps_waiting, mapsWaiting, mapsWaiting), style = MaterialTheme.typography.bodyLarge)
         }
-
-        // Pistes and cycle routes come from the same server, in the same queue.
-        val trails = states.flatMap { it.details }
-        val fetching = TrailsDownload.Downloading in trails || TrailsDownload.Retrying in trails
-        val trailsWaiting = states.sumOf { s ->
-            s.details.count { it == TrailsDownload.Waiting || (it == TrailsDownload.Missing && s.map !is MapDownload.Ready) }
-        }
-        val extraFetching = states.firstNotNullOfOrNull { s -> s.extras.entries.firstOrNull { it.value == TrailsDownload.Downloading }?.key }
-        val trailsLine = when {
-            TrailsDownload.Retrying in trails -> stringResource(R.string.regions_trails_busy)
-            states.any { it.trails == TrailsDownload.Downloading } -> stringResource(R.string.regions_trails_progress)
-            extraFetching == MapKind.Winter -> stringResource(R.string.regions_pistes_progress)
-            extraFetching == MapKind.Cycling -> stringResource(R.string.regions_cycling_progress)
-            trailsWaiting > 0 -> stringResource(R.string.regions_trails_next)
-            else -> null
-        }
-        trailsLine?.let {
-            val more = if (trailsWaiting > 0 && fetching) " · " + pluralStringResource(R.plurals.regions_more_waiting, trailsWaiting, trailsWaiting) else ""
-            Text(it + more, style = MaterialTheme.typography.bodyLarge)
-            Text(stringResource(R.string.regions_trails_explain), style = MaterialTheme.typography.bodyMedium, color = muted)
+        // Leaving is fine: said here, where people wait for it to end.
+        Text(
+            stringResource(R.string.regions_leave_ok),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget)) {
+            Text(stringResource(R.string.regions_stop_downloads), color = MaterialTheme.colorScheme.error)
         }
     }
 }

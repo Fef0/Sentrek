@@ -1,5 +1,6 @@
 package app.sentrek
 
+import app.sentrek.maps.DownloadNotifications
 import app.sentrek.search.PeaksScreen
 import app.sentrek.home.FirstRunGuide
 import app.sentrek.record.around
@@ -117,6 +118,9 @@ class MainActivity : ComponentActivity() {
     /** Bounds of a file just imported from another app, to show on the map. */
     private val imported = MutableStateFlow<BoundingBox?>(null)
 
+    /** Opened from a download notification: Maps, where the areas are. */
+    private val openMaps = MutableStateFlow(false)
+
     // The map view to remember. Written at most every few seconds (the camera moves with every
     // fix while following), and at once when the app goes to the background.
     private val cameraToSave = MutableStateFlow<CameraPosition?>(null)
@@ -132,7 +136,10 @@ class MainActivity : ComponentActivity() {
             cameraToSave.filterNotNull().sample(CAMERA_SAVE_MS).collect { settings.setLastCamera(it.toSaved()) }
         }
         // Not again after a rotation or process restore: the file was imported already.
-        if (savedInstanceState == null) importFrom(intent)
+        if (savedInstanceState == null) {
+            importFrom(intent)
+            openMapsFrom(intent)
+        }
         setContent {
             val textSize by settings.textSize.collectAsStateWithLifecycle(initialValue = TextSize.Default)
             val buttonSize by settings.buttonSize.collectAsStateWithLifecycle(initialValue = ButtonSize.Standard)
@@ -201,6 +208,14 @@ class MainActivity : ComponentActivity() {
                     // The area a "not downloaded" note asked for, selected when Maps opens.
                     var downloadAt by remember { mutableStateOf<LatLon?>(null) }
                     SideEffect { volumeKeysZoom = (gloves || volumeZoom) && screen == Screen.Map }
+
+                    val mapsAsked by openMaps.collectAsStateWithLifecycle()
+                    LaunchedEffect(mapsAsked) {
+                        if (!mapsAsked) return@LaunchedEffect
+                        downloadAt = null
+                        screen = Screen.Maps
+                        openMaps.value = false
+                    }
 
                     val importedBounds by imported.collectAsStateWithLifecycle()
                     LaunchedEffect(importedBounds) {
@@ -366,6 +381,13 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         importFrom(intent)
+        openMapsFrom(intent)
+    }
+
+    private fun openMapsFrom(intent: Intent?) {
+        if (intent?.getBooleanExtra(DownloadNotifications.EXTRA_OPEN_MAPS, false) != true) return
+        intent.removeExtra(DownloadNotifications.EXTRA_OPEN_MAPS)
+        openMaps.value = true
     }
 
     /** "Open with" (VIEW) or "Share to" (SEND, SEND_MULTIPLE) GPX, KML or KMZ files from another app. */

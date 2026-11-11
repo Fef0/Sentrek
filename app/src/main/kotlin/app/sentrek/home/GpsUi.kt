@@ -1,6 +1,8 @@
 package app.sentrek.home
 
 import app.sentrek.ui.SentrekIcons
+import app.sentrek.maps.DownloadOutcome
+import app.sentrek.maps.DownloadStatus
 import app.sentrek.ui.mapButtonBorder
 import app.sentrek.record.SignalWatch
 import app.sentrek.geo.Geo
@@ -292,8 +294,9 @@ fun MapLabel(text: String, modifier: Modifier = Modifier) {
     )
 }
 
+/** A short note over the map. With [progress] (0 to 1), a ring filling up in place of the icon. */
 @Composable
-fun MapNote(text: String, icon: ImageVector, modifier: Modifier = Modifier) {
+fun MapNote(text: String, icon: ImageVector, modifier: Modifier = Modifier, progress: Float? = null) {
     // A plain background, not a Surface: a Surface would swallow taps on the map under it.
     Row(
         modifier = modifier
@@ -302,7 +305,17 @@ fun MapNote(text: String, icon: ImageVector, modifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
+        if (progress != null) {
+            CircularProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 3.dp,
+                trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                gapSize = 0.dp,
+            )
+        } else {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
+        }
         Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
     }
 }
@@ -350,3 +363,38 @@ fun PowerBadge(mode: PowerMode, onClick: () -> Unit) {
         }
     }
 }
+
+/**
+ * Maps downloading: one note with how far the whole lot is, or what it waits for. When it's
+ * over, [OUTCOME_SHOWN_MS] of "downloaded" (or of what's missing). A tap opens Maps.
+ */
+@Composable
+fun DownloadNotes(status: DownloadStatus?, outcome: Pair<Long, DownloadOutcome>?, onOpenMaps: () -> Unit) {
+    val open = Modifier
+        .heightIn(min = TouchTarget)
+        .clickable(onClickLabel = stringResource(R.string.map_download_open), onClick = onOpenMaps)
+    if (status != null) {
+        val offline = status.waiting == DownloadStatus.Waiting.Network
+        MapNote(
+            if (offline) stringResource(R.string.map_download_offline) else stringResource(R.string.map_downloading, status.percent),
+            SentrekIcons.CloudOff,
+            open,
+            progress = if (offline) null else status.fraction,
+        )
+        return
+    }
+    val (at, result) = outcome ?: return
+    var shown by remember(at) { mutableStateOf(System.currentTimeMillis() - at < OUTCOME_SHOWN_MS) }
+    LaunchedEffect(at) {
+        delay((OUTCOME_SHOWN_MS - (System.currentTimeMillis() - at)).coerceAtLeast(0))
+        shown = false
+    }
+    if (!shown) return
+    if (result.failed > 0) {
+        MapNote(pluralStringResource(R.plurals.map_download_failed, result.failed, result.failed), SentrekIcons.Download, open)
+    } else {
+        MapNote(stringResource(R.string.map_download_done), SentrekIcons.Check, open)
+    }
+}
+
+private const val OUTCOME_SHOWN_MS = 8_000L

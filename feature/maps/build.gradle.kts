@@ -36,5 +36,6 @@ dependencies {
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
 
     implementation(libs.hilt.android)
+    testImplementation(libs.junit)
     ksp(libs.hilt.compiler)
 }

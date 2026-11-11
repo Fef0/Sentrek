@@ -4,10 +4,20 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /** Whether the phone has a connection to the internet now (or at least claims one). */
 fun isOnline(context: Context): Boolean {
@@ -48,3 +58,19 @@ fun onlineFlow(context: Context): Flow<Boolean> = callbackFlow {
     manager.registerDefaultNetworkCallback(callback)
     awaitClose { manager.unregisterNetworkCallback(callback) }
 }.distinctUntilChanged()
+
+/**
+ * The connection, watched for the whole app's life: downloads wait for it instead of failing,
+ * and start again on their own when it's back.
+ */
+@Singleton
+class Connectivity @Inject constructor(@ApplicationContext context: Context) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    val online: StateFlow<Boolean> = onlineFlow(context).stateIn(scope, SharingStarted.Eagerly, isOnline(context))
+
+    /** Returns at once when online, else when the connection is back. */
+    suspend fun awaitOnline() {
+        online.first { it }
+    }
+}

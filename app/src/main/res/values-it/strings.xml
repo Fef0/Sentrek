@@ -480,8 +480,6 @@
     <string name="extra_missing_winter">Piste non scaricate qui</string>
     <string name="extra_missing_cycling">Percorsi bici non scaricati qui</string>
     <string name="extra_download">Scaricali</string>
-    <string name="extra_getting_winter">Scarico le piste…</string>
-    <string name="extra_getting_cycling">Scarico i percorsi bici…</string>
     <string name="extra_failed_winter">Piste non scaricate · tocca per riprovare</string>
     <string name="extra_failed_cycling">Percorsi bici non scaricati · tocca per riprovare</string>
     <string name="kind_piste">Pista</string>
@@ -556,4 +554,13 @@
     <string name="feature_no">No</string>
     <string name="peaks_high">quota %1$s</string>
     <string name="peaks_away">a %1$s</string>
+    <string name="map_downloading">Scarico le mappe · %d%%</string>
+    <string name="map_download_offline">Mappe: in attesa di connessione</string>
+    <string name="map_download_done">Mappe scaricate</string>
+    <plurals name="map_download_failed">
+        <item quantity="one">%d zona non scaricata · riprova più tardi</item>
+        <item quantity="many">%d zone non scaricate · riprova più tardi</item>
+        <item quantity="other">%d zone non scaricate · riprova più tardi</item>
+    </plurals>
+    <string name="map_download_open">Apri Mappe</string>
 </resources>

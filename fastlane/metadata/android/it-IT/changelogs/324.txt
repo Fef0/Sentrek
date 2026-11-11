@@ -1,0 +1,5 @@
+• Salvati ora è Escursioni e Percorsi: quello che hai registrato, e quello che hai pianificato o importato
+• Statistiche per ogni anno o di sempre, con grafici: l'anno contro il precedente e la velocità in ogni escursione
+• Velocità media e salita all'ora; i tempi dei cartelli a parte
+• I percorsi mostrano il tempo al tuo passo
+• Copia un'escursione nei Percorsi, o conta una traccia importata come escursione

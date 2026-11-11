@@ -39,6 +39,7 @@ The name comes from *sentiero*, Italian for trail, and *trek*.
 - Save the route, or export it as GPX or KML.
 
 ### Routes and tracks
+- Your walks and your routes are kept apart. Walks are what you recorded; routes are what you planned or imported. An imported track with times can count as a walk, and a walk can be copied to Routes to follow it again.
 - Add a note and photos to any route or track, as for places: water on the way, the last bus, a photo of a timetable or a junction. The note goes in the GPX file when you export it, and imported GPX files bring theirs.
 - Duplicate a route to change a copy and keep the original, or make a reversed copy to walk it the other way.
 - Routes shown on the map mark where they start and end, with small arrows the way they go. Where two overlap, only the top one has arrows.
@@ -53,7 +54,7 @@ The name comes from *sentiero*, Italian for trail, and *trek*.
 ### Recording
 - It keeps recording with the screen off, and shows your stats in a notification on the lock screen.
 - You can pause, and add places and photos as you go.
-- Your recorded hikes add up to totals for the year and for all time.
+- Your walks add up to stats for any year or all time: distance, climb, moving time, average speed, climb per hour, your longest walks, and how you compare with signpost times. Charts show the year against the one before and your speed on each walk.
 
 ### Warnings
 The app warns you about these things, only when they apply:

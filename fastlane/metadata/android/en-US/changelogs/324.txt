@@ -1,0 +1,5 @@
+• Saved is now Walks and Routes: what you recorded, and what you planned or imported
+• Stats for any year or all time, with charts: the year against the last, and your speed on each walk
+• Average speed and climb per hour; signpost times compared on their own
+• Routes show the time at your pace
+• Copy a walk to Routes, or count an imported track as a walk

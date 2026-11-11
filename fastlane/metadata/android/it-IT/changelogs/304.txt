@@ -1,0 +1,6 @@
+• Un pulsante rosso SOS sulla mappa; si può nascondere nelle Impostazioni
+• La pausa ha un suo pulsante mentre registri
+• Scarica le mappe dal pulsante mappa; Raccolta ora è Salvati
+• La ricerca trova paesi, cime, laghi, parcheggi e coordinate
+• Schede delle tracce più corte, schede sulla mappa più chiare, guida iniziale più semplice
+• Tenendo premuto si vedono piste, impianti e percorsi in bici

@@ -1,0 +1,6 @@
+• A red SOS button on the map; it can be hidden in Settings
+• Pause has its own button while you record
+• Download maps from the map button; Library is now Saved
+• Search finds towns, peaks, lakes, car parks and coordinates
+• Shorter track cards, clearer cards on the map, a simpler first guide
+• Long press shows pistes, lifts and cycle routes on those maps

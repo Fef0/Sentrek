@@ -73,9 +73,13 @@ You can also set a turnaround alarm.
 - Even without them, the map only draws at full speed while you touch it, and the GPS slows down while you're only looking at the map.
 
 ### Safety
-- The SOS screen shows your position in big text (coordinates, UTM and Plus Code), with buttons to call for help and to send your position by SMS to your emergency contact. It asks first, then sends the text itself.
+- A red SOS button on the map opens a screen with your position in big text (coordinates, UTM and Plus Code), with buttons to call for help and to send your position by SMS to your emergency contact. It asks first, then sends the text itself.
 - It can send your position by SMS to someone every 30 or 60 minutes while you record. SMS works without mobile data.
 - "Peaks around" tells you the names of the mountains you can see.
+
+### Search
+- One search box for your places and tracks, and the towns, peaks, lakes, huts, springs and other named points of the downloaded areas. It works offline.
+- Paste coordinates (from a text message, say) and it takes you there.
 
 ### Your own servers
 Sentrek gets its data from free public services, so it doesn't depend on a server of mine. If one of them shuts down or changes its rules, you can host your own copy and point the app to it in Settings › Advanced › Servers. This works for:

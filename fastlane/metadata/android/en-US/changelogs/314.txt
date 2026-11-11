@@ -1,0 +1,5 @@
+• Map downloads show how far they are on the map and in the notification, and say when they're done
+• Stop downloading, in Download maps
+• An area is kept only with all its trails, pistes and cycle routes
+• Downloads wait for a connection and try again by themselves
+• The route card always shows Stop

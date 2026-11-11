@@ -1,0 +1,5 @@
+• I download delle mappe mostrano a che punto sono sulla mappa e nella notifica, e avvisano quando finiscono
+• Interrompi il download, in Scarica mappe
+• Una zona resta sul telefono solo con tutti i sentieri, le piste e i percorsi bici
+• I download aspettano la connessione e riprovano da soli
+• La scheda del percorso mostra sempre Ferma

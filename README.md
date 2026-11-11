@@ -26,6 +26,7 @@ The name comes from *sentiero*, Italian for trail, and *trek*.
 ### Maps
 - The map shows trails, marked routes with their signs, huts, springs, peaks and viewpoints. Contour lines and hill shading can be turned on in Settings › Map, and the map points turned off.
 - To use it offline, download squares from a grid. A square is about 55 × 55 km and takes around 30 MB.
+- Downloads carry on when you leave the app, with the progress on the map and in a notification. They wait for a connection and try again by themselves. An area is kept only once it has its map and all its details; Stop removes the ones not finished yet.
 - You can colour steep slopes like an avalanche map, and colour trails by difficulty (SAC scale).
 - Long-press a trail to see its difficulty and the marked routes that use it, with length, climb, walking time and who looks after them. From there you can get the weather forecast for that spot, day by day or hour by hour.
 - You can also open your own `.mbtiles` and `.pmtiles` files.

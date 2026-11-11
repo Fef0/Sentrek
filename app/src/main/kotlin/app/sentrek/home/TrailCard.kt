@@ -38,10 +38,10 @@ import app.sentrek.ui.TouchTarget
 
 /**
  * One card for the walk, however it's going: the route followed, the recording, or both.
- * Closed, three big numbers (what's left of the route, else what's been recorded) and the
- * most urgent note: what can be read at a glance, with the rest of the map free. A tap
- * anywhere on it opens the rest ([expanded], remembered): every note, the route's name and
- * Stop, the user's own note on the route, the recording, the places ahead and the profile.
+ * Closed, the route's name with Stop, three big numbers (what's left of the route, else
+ * what's been recorded) and the most urgent note: what can be read at a glance, with the rest
+ * of the map free. A tap anywhere on it opens the rest ([expanded], remembered): every note,
+ * the user's own note on the route, the recording, the places ahead and the profile.
  * Red while off the route.
  */
 @Composable
@@ -88,8 +88,9 @@ fun TrailCard(
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            // Off route it shows closed too: how far off, and the way out of the route.
-            if (following != null && (expanded || off)) RouteTitle(following, onOpenRoute, onStop)
+            // Closed too: Stop must never be hunted for (it asks first), and off route the
+            // title says how far off.
+            if (following != null) RouteTitle(following, onOpenRoute, onStop)
             if (following != null) FollowNumbers(following) else if (recording != null) RecordingNumbers(recording)
             if (expanded) {
                 // Under the numbers, so they stay where they were when the card opens.

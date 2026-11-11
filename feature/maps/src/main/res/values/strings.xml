@@ -28,23 +28,6 @@
     <string name="regions_cell_trails_waiting">Trails next</string>
     <string name="regions_cell_trails">Getting trails</string>
     <string name="regions_cell_busy">Server busy</string>
-    <plurals name="regions_progress">
-        <item quantity="one">%1$d of %2$d area ready</item>
-        <item quantity="other">%1$d of %2$d areas ready</item>
-    </plurals>
-    <!-- Percentage of the map of the area downloading now, and how much it has downloaded. -->
-    <string name="regions_map_progress">Map: %1$d%% · %2$s</string>
-    <plurals name="regions_more_waiting">
-        <item quantity="one">%d more waiting</item>
-        <item quantity="other">%d more waiting</item>
-    </plurals>
-    <plurals name="regions_maps_waiting">
-        <item quantity="one">%d map waiting to download</item>
-        <item quantity="other">%d maps waiting to download</item>
-    </plurals>
-    <string name="regions_trails_progress">Trails: getting difficulty, huts and springs</string>
-    <string name="regions_trails_next">Trails: they come after the map</string>
-    <string name="regions_trails_busy">Trails: the server is busy, trying again in half a minute</string>
     <string name="regions_trails_explain">Trail details come from OpenStreetMap, one area at a time. A big or busy area can take a few minutes. The map works without them.</string>
     <!-- Size of the selected areas, and free space on the phone. -->
     <string name="regions_size">About %1$s to download · %2$s free</string>
@@ -78,12 +61,8 @@
     <string name="import_failed">Import failed</string>
     <string name="regions_up_to_date">Already up to date, nothing to download.</string>
     <string name="regions_offline">No network. Connect to the internet to download maps.</string>
-    <string name="regions_waiting_network">No network: downloads continue once you’re back online.</string>
     <string name="download_channel">Map downloads</string>
     <string name="download_notification_title">Downloading maps</string>
-    <string name="download_notification_area">%1$d left · map %2$d%%</string>
-    <string name="download_notification_trails">Getting trail details: difficulty, huts and springs</string>
-    <string name="download_notification_trails_busy">Trail server busy, trying again shortly</string>
     <string name="regions_maps_label">Maps</string>
     <string name="regions_kind_hiking">Hiking</string>
     <string name="regions_kind_cycling">Cycling</string>
@@ -92,10 +71,39 @@
     <string name="regions_save">Save (%d)</string>
     <string name="regions_cell_pistes">Getting pistes</string>
     <string name="regions_cell_cycling">Getting cycle routes</string>
-    <string name="regions_pistes_progress">Pistes: getting ski runs and cross-country trails</string>
-    <string name="regions_cycling_progress">Cycling: getting cycle and mountain bike routes</string>
     <plurals name="regions_extras_failed">
         <item quantity="one">Pistes or cycle routes didn’t download for %d area</item>
         <item quantity="other">Pistes or cycle routes didn’t download for %d areas</item>
     </plurals>
+    <!-- How many areas download together; the percentage of the whole follows. -->
+    <plurals name="download_title">
+        <item quantity="one">Downloading %d map area</item>
+        <item quantity="other">Downloading %d map areas</item>
+    </plurals>
+    <string name="download_done_of">%1$d of %2$d done</string>
+    <!-- How much the map of the area downloading now has downloaded. -->
+    <string name="download_step_map">Map: %s so far</string>
+    <string name="download_step_trails">Trail details: difficulty, huts and springs</string>
+    <string name="download_step_pistes">Pistes: ski runs and cross-country trails</string>
+    <string name="download_step_cycling">Cycle and mountain bike routes</string>
+    <string name="download_step_queued">Starting</string>
+    <string name="download_waiting_network">No connection: it carries on by itself when there is one</string>
+    <string name="download_waiting_server">Trail server busy: trying again shortly</string>
+    <string name="download_finished_title">Maps ready to use offline</string>
+    <string name="download_finished_partly">Some maps didn’t download</string>
+    <plurals name="download_finished_text">
+        <item quantity="one">%d area downloaded, with its trails, huts and springs.</item>
+        <item quantity="other">%d areas downloaded, with their trails, huts and springs.</item>
+    </plurals>
+    <plurals name="download_finished_failed">
+        <item quantity="one">%d area didn’t download: the trail server didn’t answer, and a map without its trails isn’t kept. Try again later.</item>
+        <item quantity="other">%d areas didn’t download: the trail server didn’t answer, and a map without its trails isn’t kept. Try again later.</item>
+    </plurals>
+    <string name="download_finished_none">Maps not downloaded</string>
+    <string name="regions_leave_ok">You can leave this screen or the app: it carries on, and the notification shows how far it is.</string>
+    <string name="download_title_offline">Maps waiting for a connection · %d%%</string>
+    <string name="regions_stop_downloads">Stop downloading</string>
+    <string name="confirm_stop_downloads_title">Stop downloading?</string>
+    <string name="confirm_stop_downloads_text">Areas not finished yet are removed, map and all. Areas already on the phone stay as they were.</string>
+    <string name="confirm_stop_downloads">Stop</string>
 </resources>

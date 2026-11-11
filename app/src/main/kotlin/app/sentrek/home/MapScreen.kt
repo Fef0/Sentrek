@@ -291,6 +291,8 @@ fun MapScreen(
     val mapKind by viewModel.mapKind.collectAsStateWithLifecycle()
     val regionStates by viewModel.regionStates.collectAsStateWithLifecycle()
     val regionsListed by viewModel.regionsListed.collectAsStateWithLifecycle()
+    val downloadStatus by viewModel.downloadStatus.collectAsStateWithLifecycle()
+    val downloadOutcome by viewModel.downloadOutcome.collectAsStateWithLifecycle()
     var layersOpen by remember { mutableStateOf(false) }
     // A fix comes every second or so: read as it is only where needed (the GoTo panel, the map
     // layers), so it doesn't redraw this whole screen. The rest gets it rounded, and changes
@@ -524,7 +526,9 @@ fun MapScreen(
                     .fillMaxWidth()
                     .safeTopPadding()
                     .padding(horizontal = 12.dp, vertical = 8.dp)
-                    .padding(end = TouchTarget), // Keep clear of the compass.
+                    // Clear of the compass and the map button, with a gap: touching, they
+                    // read as one thing and a tap meant for one lands on the other.
+                    .padding(end = TouchTarget + 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (plan.active) PlanPanel(planStats, plan.editing?.name, Modifier.fillMaxWidth())
@@ -574,6 +578,9 @@ fun MapScreen(
                 // Top left, under any panel. It stays when the other controls fade out.
                 if (showScaleBar) ScaleBar(metersPerPx, night = LocalNightMap.current)
                 if (slopeTerrain != null && zoom >= MapSlopes.MIN_ZOOM) SlopeLegend()
+                // Maps downloading, wherever they were asked for: how far, a tap from Maps.
+                // Then, for a moment, how it went.
+                DownloadNotes(downloadStatus, downloadOutcome, onOpenMaps)
                 // Not downloaded: offline the map has nothing to draw here; online it draws, but
                 // without trail difficulty, marked routes, springs and hut details, and nothing
                 // else would say so. Only zoomed in to the trails, where those are looked for.
@@ -612,10 +619,7 @@ fun MapScreen(
                                 .heightIn(min = TouchTarget)
                                 .clickable(enabled = online) { viewModel.retryExtra(cell) },
                         )
-                        extra.inProgress -> MapNote(
-                            stringResource(if (winter) R.string.extra_getting_winter else R.string.extra_getting_cycling),
-                            SentrekIcons.Download,
-                        )
+                        // Downloading: the download note above says how far.
                         else -> Unit
                     }
                 }

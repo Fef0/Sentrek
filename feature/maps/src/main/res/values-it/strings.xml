@@ -29,25 +29,6 @@
     <string name="regions_cell_trails_waiting">Poi i sentieri</string>
     <string name="regions_cell_trails">Sentieri…</string>
     <string name="regions_cell_busy">Server occupato</string>
-    <plurals name="regions_progress">
-        <item quantity="one">%1$d zona pronta su %2$d</item>
-        <item quantity="many">%1$d zone pronte su %2$d</item>
-        <item quantity="other">%1$d zone pronte su %2$d</item>
-    </plurals>
-    <string name="regions_map_progress">Mappa: %1$d%% · %2$s</string>
-    <plurals name="regions_more_waiting">
-        <item quantity="one">ancora %d in attesa</item>
-        <item quantity="many">ancora %d in attesa</item>
-        <item quantity="other">ancora %d in attesa</item>
-    </plurals>
-    <plurals name="regions_maps_waiting">
-        <item quantity="one">%d mappa in attesa di download</item>
-        <item quantity="many">%d mappe in attesa di download</item>
-        <item quantity="other">%d mappe in attesa di download</item>
-    </plurals>
-    <string name="regions_trails_progress">Sentieri: scarico difficoltà, rifugi e sorgenti</string>
-    <string name="regions_trails_next">Sentieri: arrivano dopo la mappa</string>
-    <string name="regions_trails_busy">Sentieri: il server è occupato, riprovo tra mezzo minuto</string>
     <string name="regions_trails_explain">I dettagli dei sentieri vengono da OpenStreetMap, una zona alla volta. Una zona grande o un server occupato possono richiedere qualche minuto. La mappa funziona anche senza.</string>
     <string name="regions_size">Circa %1$s da scaricare · %2$s liberi</string>
     <string name="regions_no_space">Spazio insufficiente: servono circa %1$s, ne restano solo %2$s.</string>
@@ -83,12 +64,8 @@
     <string name="import_failed">Importazione non riuscita</string>
     <string name="regions_up_to_date">Già aggiornate, niente da scaricare.</string>
     <string name="regions_offline">Nessuna rete. Connettiti a internet per scaricare le mappe.</string>
-    <string name="regions_waiting_network">Nessuna rete: i download riprendono quando torni online.</string>
     <string name="download_channel">Download delle mappe</string>
     <string name="download_notification_title">Download delle mappe</string>
-    <string name="download_notification_area">%1$d rimaste · mappa %2$d%%</string>
-    <string name="download_notification_trails">Scarico i dettagli dei sentieri: difficoltà, rifugi e sorgenti</string>
-    <string name="download_notification_trails_busy">Server dei sentieri occupato, riprovo a breve</string>
     <string name="regions_maps_label">Mappe</string>
     <string name="regions_kind_hiking">Escursionismo</string>
     <string name="regions_kind_cycling">Bici</string>
@@ -97,11 +74,41 @@
     <string name="regions_save">Salva (%d)</string>
     <string name="regions_cell_pistes">Piste…</string>
     <string name="regions_cell_cycling">Percorsi bici…</string>
-    <string name="regions_pistes_progress">Piste: scarico piste da sci e da fondo</string>
-    <string name="regions_cycling_progress">Bici: scarico percorsi ciclabili e MTB</string>
     <plurals name="regions_extras_failed">
         <item quantity="one">Piste o percorsi bici non scaricati per %d zona</item>
         <item quantity="many">Piste o percorsi bici non scaricati per %d zone</item>
         <item quantity="other">Piste o percorsi bici non scaricati per %d zone</item>
     </plurals>
+    <plurals name="download_title">
+        <item quantity="one">Scarico %d zona</item>
+        <item quantity="many">Scarico %d zone</item>
+        <item quantity="other">Scarico %d zone</item>
+    </plurals>
+    <string name="download_done_of">%1$d su %2$d pronte</string>
+    <string name="download_step_map">Mappa: %s finora</string>
+    <string name="download_step_trails">Dettagli dei sentieri: difficoltà, rifugi e sorgenti</string>
+    <string name="download_step_pistes">Piste da sci e da fondo</string>
+    <string name="download_step_cycling">Percorsi ciclabili e MTB</string>
+    <string name="download_step_queued">Inizio</string>
+    <string name="download_waiting_network">Nessuna connessione: riprende da solo quando c’è</string>
+    <string name="download_waiting_server">Server dei sentieri occupato: riprovo a breve</string>
+    <string name="download_finished_title">Mappe pronte da usare offline</string>
+    <string name="download_finished_partly">Alcune mappe non sono state scaricate</string>
+    <plurals name="download_finished_text">
+        <item quantity="one">%d zona scaricata, con sentieri, rifugi e sorgenti.</item>
+        <item quantity="many">%d zone scaricate, con sentieri, rifugi e sorgenti.</item>
+        <item quantity="other">%d zone scaricate, con sentieri, rifugi e sorgenti.</item>
+    </plurals>
+    <plurals name="download_finished_failed">
+        <item quantity="one">%d zona non scaricata: il server dei sentieri non ha risposto, e una mappa senza i suoi sentieri non viene tenuta. Riprova più tardi.</item>
+        <item quantity="many">%d zone non scaricate: il server dei sentieri non ha risposto, e una mappa senza i suoi sentieri non viene tenuta. Riprova più tardi.</item>
+        <item quantity="other">%d zone non scaricate: il server dei sentieri non ha risposto, e una mappa senza i suoi sentieri non viene tenuta. Riprova più tardi.</item>
+    </plurals>
+    <string name="download_finished_none">Mappe non scaricate</string>
+    <string name="regions_leave_ok">Puoi uscire da questa schermata o dall’app: continua, e la notifica mostra a che punto è.</string>
+    <string name="download_title_offline">Mappe in attesa di connessione · %d%%</string>
+    <string name="regions_stop_downloads">Interrompi il download</string>
+    <string name="confirm_stop_downloads_title">Interrompere il download?</string>
+    <string name="confirm_stop_downloads_text">Le zone non ancora finite vengono rimosse, mappa compresa. Quelle già sul telefono restano com’erano.</string>
+    <string name="confirm_stop_downloads">Interrompi</string>
 </resources>

@@ -488,8 +488,6 @@
     <string name="extra_missing_winter">Pistes not downloaded here</string>
     <string name="extra_missing_cycling">Cycle routes not downloaded here</string>
     <string name="extra_download">Download them</string>
-    <string name="extra_getting_winter">Getting pistes…</string>
-    <string name="extra_getting_cycling">Getting cycle routes…</string>
     <string name="extra_failed_winter">Pistes didn’t download · tap to try again</string>
     <string name="extra_failed_cycling">Cycle routes didn’t download · tap to try again</string>
     <string name="kind_piste">Piste</string>
@@ -564,4 +562,13 @@
     <string name="feature_no">No</string>
     <string name="peaks_high">%1$s high</string>
     <string name="peaks_away">%1$s away</string>
+    <!-- A note on the map while maps download anywhere in the app; the percentage of the whole. -->
+    <string name="map_downloading">Downloading maps · %d%%</string>
+    <string name="map_download_offline">Maps: waiting for a connection</string>
+    <string name="map_download_done">Maps downloaded</string>
+    <plurals name="map_download_failed">
+        <item quantity="one">%d map area didn’t download · try again later</item>
+        <item quantity="other">%d map areas didn’t download · try again later</item>
+    </plurals>
+    <string name="map_download_open">Open Maps</string>
 </resources>

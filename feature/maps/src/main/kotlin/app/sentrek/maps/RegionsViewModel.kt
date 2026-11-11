@@ -12,10 +12,8 @@ import app.sentrek.geo.overlay.MapKind
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -25,11 +23,8 @@ class RegionsViewModel @Inject constructor(
     private val repository: RegionRepository,
     private val importedMaps: ImportedMapsRepository,
 ) : ViewModel() {
-    /** Offline, downloads wait (MapLibre resumes them by itself): the panel says so. */
-    val online: StateFlow<Boolean> = onlineFlow(context)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
-
     val regions: StateFlow<Map<RegionCell, RegionState>> = repository.state
+    val status: StateFlow<DownloadStatus?> = repository.status
     val imported: StateFlow<List<ImportedMap>> = importedMaps.maps
 
     private val _selection = MutableStateFlow<Set<RegionCell>>(emptySet())
@@ -89,6 +84,12 @@ class RegionsViewModel @Inject constructor(
         _message.value = null
         repository.setExtras(cells, _extras.value)
         clearSelection()
+    }
+
+    /** Stops every download; see RegionRepository.stop. */
+    fun stopDownloads() {
+        _message.value = null
+        repository.stop()
     }
 
     fun deleteSelected() {

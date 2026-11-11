@@ -4,6 +4,7 @@ import app.sentrek.geo.overlay.OverlayLineSource
 import app.sentrek.geo.overlay.OverlayLines
 import app.sentrek.geo.LatLon
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.DownloadSize
@@ -19,7 +20,14 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -106,6 +114,7 @@ data class RegionState(
 class RegionRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val trailSource: TrailOverlaySource,
+    private val connectivity: Connectivity,
 ) : OverlayPoiSource, OverlayLineSource {
     private val offline = OfflineManager.getInstance(context)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -136,7 +145,50 @@ class RegionRepository @Inject constructor(
     private val _listed = MutableStateFlow(false)
     val listed: StateFlow<Boolean> = _listed.asStateFlow()
 
+    /**
+     * The areas downloading together: each one pending joins, and the lot is over once none
+     * is. An area only being checked at startup doesn't join: it isn't being downloaded.
+     */
+    private val batch = LinkedHashSet<RegionCell>()
+    private val checking = HashSet<RegionCell>()
+
+    private val _status = MutableStateFlow<DownloadStatus?>(null)
+    /** What is downloading now, for every screen and the notification; null when nothing is. */
+    val status: StateFlow<DownloadStatus?> = _status.asStateFlow()
+
+    private val _outcome = MutableStateFlow<Pair<Long, DownloadOutcome>?>(null)
+    /** How the last batch ended, and when: shown for a moment on the map. Null before any. */
+    val outcome: StateFlow<Pair<Long, DownloadOutcome>?> = _outcome.asStateFlow()
+
+    // Before init: its collector runs at once (Main.immediate) and reads these.
+    /** Areas of this batch that couldn't get everything asked for: removed, or left as they were. */
+    private val failedInBatch = HashSet<RegionCell>()
+
+    /** True while [stop] runs: its steps aren't a batch ending. */
+    private var stopping = false
+
+    /** Trail details (or pistes, cycle routes) being fetched or waiting their turn, by area. */
+    private val detailJobs = HashMap<Pair<RegionCell, MapKind>, Job>()
+
+    /** The map each area had before its update: what it goes back to if the update is stopped. */
+    private val bytesBefore = HashMap<RegionCell, Long>()
+
+    private var watchdog: Job? = null
+
     init {
+        scope.launch {
+            combine(_state, connectivity.online) { all, online -> all to online }.collect { (all, online) -> refresh(all, online) }
+        }
+        // Back online: what failed for the connection is tried again by itself, and the map
+        // being downloaded is nudged (MapLibre can take long to notice the network is back).
+        scope.launch {
+            connectivity.online.drop(1).filter { it }.collect {
+                val failed = _state.value.values.filter { TrailsDownload.Failed in it.details }.map(RegionState::cell)
+                if (failed.isNotEmpty()) retryTrails(failed)
+                active?.let { regions[it] }?.let(::restart)
+                if (_state.value.values.any { it.isPending }) ensureService()
+            }
+        }
         offline.listOfflineRegions(object : OfflineManager.ListOfflineRegionsCallback {
             override fun onList(offlineRegions: Array<OfflineRegion>?) = restore(offlineRegions.orEmpty())
             override fun onError(error: String) {
@@ -144,6 +196,95 @@ class RegionRepository @Inject constructor(
                 _listed.value = true
             }
         })
+    }
+
+    /** The batch and its [status], from the areas' states; its [outcome] once it's over. */
+    private fun refresh(all: Map<RegionCell, RegionState>, online: Boolean) {
+        if (stopping) return
+        val wasEmpty = batch.isEmpty()
+        for ((cell, state) in all) if (state.isPending && cell !in checking) batch += cell
+        if (wasEmpty && batch.isNotEmpty()) DownloadNotifications.clearFinished(context)
+        batch.retainAll(all.keys) // Deleted meanwhile.
+        val states = batch.mapNotNull { all[it] }
+        // An area removed for failing is still part of the batch for its count.
+        val status = downloadStatus(states, online, failed = failedInBatch.count { it !in all })
+        if (status == null && (states.isNotEmpty() || failedInBatch.isNotEmpty())) {
+            val outcome = DownloadOutcome(done = states.count { it.cell !in failedInBatch }, failed = failedInBatch.size)
+            _outcome.value = System.currentTimeMillis() to outcome
+            DownloadNotifications.finished(context, outcome)
+        }
+        if (status == null) {
+            batch.clear()
+            failedInBatch.clear()
+        }
+        _status.value = status
+    }
+
+    /** Not complete yet since it was asked for: it's on the phone whole, or not at all. */
+    private fun isNew(cell: RegionCell) = newFile(cell).exists()
+
+    private fun newFile(cell: RegionCell) = File(datesDir, cell.id + ".new")
+
+    /** A new area that couldn't get all it needs: removed, map and all, and counted as failed. */
+    private fun discard(cell: RegionCell) {
+        Log.w(TAG, "Area ${cell.id} incomplete, removed")
+        failedInBatch += cell
+        delete(listOf(cell))
+    }
+
+    private fun dropExtra(cell: RegionCell, kind: MapKind) {
+        extraFile(cell, kind).delete()
+        _state.update { all -> all[cell]?.let { all + (cell to it.copy(extras = it.extras - kind)) } ?: all }
+        writeKinds(wantedFile(cell), _state.value[cell]?.extras?.keys.orEmpty())
+    }
+
+    /**
+     * Stops everything downloading. Areas not on the phone yet are removed: half an area is no
+     * use offline. Areas being updated keep the map and details they had (the map's tiles are
+     * all still there), and pistes or cycle routes being added are dropped. Nothing of it
+     * starts again by itself, not even at the next start.
+     */
+    fun stop() {
+        stopping = true
+        try {
+            val pending = _state.value.values.filter { it.isPending }
+            val (new, old) = pending.partition { isNew(it.cell) }
+            for (state in pending) {
+                for (kind in MapKind.entries) detailJobs.remove(state.cell to kind)?.cancel()
+            }
+            delete(new.map(RegionState::cell))
+            for (state in old) {
+                val cell = state.cell
+                updating -= cell
+                if (state.map !is MapDownload.Ready) {
+                    queue.remove(cell)
+                    if (active == cell) {
+                        regions[cell]?.let {
+                            it.setObserver(null)
+                            it.setDownloadState(OfflineRegion.STATE_INACTIVE)
+                        }
+                        watchdog?.cancel()
+                        active = null
+                    }
+                    runCatching { stoppedFile(cell).writeText("") }
+                    updateMap(cell, MapDownload.Ready(bytesBefore.remove(cell) ?: 0L))
+                }
+                if (state.trails.inProgress) {
+                    updateTrails(cell, if (trailFile(cell).exists()) TrailsDownload.Ready else TrailsDownload.Failed)
+                }
+                for ((kind, s) in state.extras) {
+                    if (!s.inProgress) continue
+                    if (extraFile(cell, kind).exists()) updateExtra(cell, kind, TrailsDownload.Ready) else dropExtra(cell, kind)
+                }
+            }
+        } finally {
+            stopping = false
+        }
+        // The lot is over, and not because it finished: no "downloaded".
+        batch.clear()
+        failedInBatch.clear()
+        _status.value = null
+        pump()
     }
 
     fun trailFile(cell: RegionCell): File = File(trailsDir, cell.id + OVERLAY_SUFFIX)
@@ -189,6 +330,7 @@ class RegionRepository @Inject constructor(
                 continue
             }
             writeKinds(wantedFile(cell), extras)
+            runCatching { newFile(cell).writeText("") }
             put(RegionState(cell, MapDownload.Queued, trailsStateOnDisk(cell), failedUpdates = failures(cell), extras = extrasOnDisk(cell)))
             val definition = OfflineTilePyramidRegionDefinition(
                 MapStyle.Hiking.offlineUrl,
@@ -274,6 +416,8 @@ class RegionRepository @Inject constructor(
                 }
                 updating += cell
                 if (!mapCurrent) {
+                    (state.map as? MapDownload.Ready)?.let { bytesBefore[cell] = it.bytes }
+                    stoppedFile(cell).delete()
                     region.invalidate(object : OfflineRegion.OfflineRegionInvalidateCallback {
                         override fun onInvalidate() {
                             queue.addLast(cell)
@@ -302,6 +446,10 @@ class RegionRepository @Inject constructor(
             dateFile(cell).delete()
             failuresFile(cell).delete()
             versionFile(cell).delete()
+            stoppedFile(cell).delete()
+            newFile(cell).delete()
+            for (kind in MapKind.entries) detailJobs.remove(cell to kind)?.cancel()
+            bytesBefore -= cell
             updating -= cell
             val region = regions.remove(cell)
             if (active == cell) {
@@ -365,6 +513,7 @@ class RegionRepository @Inject constructor(
                 continue
             }
             regions[cell] = region
+            checking += cell
             put(RegionState(cell, MapDownload.Queued, trailsStateOnDisk(cell), failedUpdates = failures(cell), extras = extrasOnDisk(cell)))
             if (!trailFile(cell).exists()) fetchTrails(cell)
             // Asked for, not there yet (the app was closed while they downloaded).
@@ -373,11 +522,16 @@ class RegionRepository @Inject constructor(
             if (!trailFile(cell).exists() || missing.isNotEmpty()) ensureService()
             region.getStatus(object : OfflineRegion.OfflineRegionStatusCallback {
                 override fun onStatus(status: OfflineRegionStatus?) {
-                    if (status?.isComplete == true) {
+                    checking -= cell
+                    // An update stopped by the user: the tiles it had are all there.
+                    val stopped = status != null && stoppedFile(cell).exists()
+                    if (status?.isComplete == true || stopped) {
                         // Areas from before dates were kept count from now.
                         val date = downloadedAt(cell) ?: stamp(cell)
-                        updateMap(cell, MapDownload.Ready(status.completedResourceSize), date)
+                        updateMap(cell, MapDownload.Ready(status!!.completedResourceSize), date)
+                        settleUpdate(cell)
                     } else {
+                        if (downloadedAt(cell) == null) runCatching { newFile(cell).writeText("") }
                         // Interrupted last time (app killed): resume.
                         queue.addLast(cell)
                         pump()
@@ -387,6 +541,11 @@ class RegionRepository @Inject constructor(
 
                 override fun onError(error: String?) {
                     Log.e(TAG, "Status of ${cell.id}: $error")
+                    // Not known: downloaded again, which costs only what is missing.
+                    checking -= cell
+                    queue.addLast(cell)
+                    pump()
+                    ensureService()
                 }
             })
         }
@@ -401,12 +560,39 @@ class RegionRepository @Inject constructor(
         active = cell
         // The version MapLibre is about to download, for the next update to compare with.
         val version = scope.async { tileVersion() }
+        var lastProgress = SystemClock.elapsedRealtime()
+        var lastCount = -1L
+        // A slow or flaky connection can leave MapLibre waiting on requests that will never
+        // answer: with no tile in a while, though online, the download is started again.
+        // Nothing is lost, the tiles in are kept.
+        watchdog?.cancel()
+        val watchdog: Job = scope.launch {
+            while (isActive) {
+                delay(STALL_CHECK_MS)
+                if (active != cell) break
+                if (!connectivity.online.value) {
+                    lastProgress = SystemClock.elapsedRealtime()
+                } else if (SystemClock.elapsedRealtime() - lastProgress > STALL_MS) {
+                    Log.w(TAG, "Region ${cell.id} stalled, restarting")
+                    restart(region)
+                    lastProgress = SystemClock.elapsedRealtime()
+                }
+            }
+        }
+        this.watchdog = watchdog
         region.setObserver(object : OfflineRegion.OfflineRegionObserver {
             private var shownPercent = -1
 
             override fun onStatusChanged(status: OfflineRegionStatus) {
                 if (active != cell) return
+                if (status.completedResourceCount != lastCount) {
+                    lastCount = status.completedResourceCount
+                    lastProgress = SystemClock.elapsedRealtime()
+                }
                 if (status.isComplete) {
+                    watchdog.cancel()
+                    stoppedFile(cell).delete()
+                    bytesBefore -= cell
                     region.setDownloadState(OfflineRegion.STATE_INACTIVE)
                     region.setObserver(null)
                     scope.launch { version.await()?.let { saveVersion(cell, it) } }
@@ -431,15 +617,23 @@ class RegionRepository @Inject constructor(
                 failUpdate(cell)
             }
 
-            override fun mapboxTileCountLimitExceeded(limit: Long) = Unit
+            override fun mapboxTileCountLimitExceeded(limit: Long) {
+                Log.e(TAG, "Region ${cell.id} needs more than $limit tiles")
+            }
         })
         updateMap(cell, MapDownload.Downloading(0f))
         region.setDownloadState(OfflineRegion.STATE_ACTIVE)
     }
 
+    /** Starts [region]'s download again, from where it got to. */
+    private fun restart(region: OfflineRegion) {
+        region.setDownloadState(OfflineRegion.STATE_INACTIVE)
+        region.setDownloadState(OfflineRegion.STATE_ACTIVE)
+    }
+
     private fun fetchTrails(cell: RegionCell) {
         updateTrails(cell, TrailsDownload.Waiting)
-        scope.launch {
+        detailJobs[cell to MapKind.Hiking] = scope.launch {
             trailsLock.withLock {
                 if (cell !in _state.value) return@withLock
                 updateTrails(cell, TrailsDownload.Downloading)
@@ -448,12 +642,21 @@ class RegionRepository @Inject constructor(
                         updateTrails(cell, if (busy) TrailsDownload.Retrying else TrailsDownload.Downloading)
                     }
                 }
-                result.exceptionOrNull()?.let { Log.w(TAG, "Trails for ${cell.id} failed", it) }
+                result.exceptionOrNull()?.let {
+                    if (it is CancellationException) throw it // Stopped: stop() says what's left.
+                    Log.w(TAG, "Trails for ${cell.id} failed", it)
+                }
                 if (cell !in _state.value) {
                     trailFile(cell).delete() // Area deleted while downloading.
+                } else if (result.isSuccess) {
+                    updateTrails(cell, TrailsDownload.Ready)
+                    settleUpdate(cell)
+                } else if (isNew(cell)) {
+                    discard(cell)
                 } else {
-                    updateTrails(cell, if (result.isSuccess) TrailsDownload.Ready else TrailsDownload.Failed)
-                    if (result.isSuccess) settleUpdate(cell) else failUpdate(cell)
+                    // An update: the details it had are still there, untouched.
+                    updateTrails(cell, if (trailFile(cell).exists()) TrailsDownload.Ready else TrailsDownload.Failed)
+                    failUpdate(cell)
                 }
             }
         }
@@ -462,7 +665,7 @@ class RegionRepository @Inject constructor(
     /** As [fetchTrails], for [kind]'s details: the same queue, one area at a time. */
     private fun fetchExtra(cell: RegionCell, kind: MapKind) {
         updateExtra(cell, kind, TrailsDownload.Waiting)
-        scope.launch {
+        detailJobs[cell to kind] = scope.launch {
             trailsLock.withLock {
                 // Deleted, or no longer wanted, while waiting.
                 if (_state.value[cell]?.extras?.containsKey(kind) != true) return@withLock
@@ -473,12 +676,25 @@ class RegionRepository @Inject constructor(
                         updateExtra(cell, kind, if (busy) TrailsDownload.Retrying else TrailsDownload.Downloading)
                     }
                 }
-                result.exceptionOrNull()?.let { Log.w(TAG, "${kind.key} for ${cell.id} failed", it) }
+                result.exceptionOrNull()?.let {
+                    if (it is CancellationException) throw it
+                    Log.w(TAG, "${kind.key} for ${cell.id} failed", it)
+                }
                 if (_state.value[cell]?.extras?.containsKey(kind) != true) {
                     file.delete()
+                } else if (result.isSuccess) {
+                    updateExtra(cell, kind, TrailsDownload.Ready)
+                    settleUpdate(cell)
+                } else if (isNew(cell)) {
+                    discard(cell)
+                } else if (file.exists()) {
+                    updateExtra(cell, kind, TrailsDownload.Ready) // An update: the old ones stay.
+                    failUpdate(cell)
                 } else {
-                    updateExtra(cell, kind, if (result.isSuccess) TrailsDownload.Ready else TrailsDownload.Failed)
-                    if (result.isSuccess) settleUpdate(cell) else failUpdate(cell)
+                    // Added to an area already whole: it stays as it was.
+                    failedInBatch += cell
+                    dropExtra(cell, kind)
+                    failUpdate(cell)
                 }
             }
         }
@@ -559,6 +775,9 @@ class RegionRepository @Inject constructor(
 
     private fun failuresFile(cell: RegionCell) = File(datesDir, cell.id + ".failed")
 
+    /** Marks an update the user stopped: the area keeps the map it had, and isn't resumed. */
+    private fun stoppedFile(cell: RegionCell) = File(datesDir, cell.id + ".stopped")
+
     private fun failures(cell: RegionCell): Int =
         runCatching { failuresFile(cell).readText().trim().toInt() }.getOrDefault(0)
 
@@ -574,6 +793,7 @@ class RegionRepository @Inject constructor(
     private fun settleUpdate(cell: RegionCell) {
         val state = _state.value[cell] ?: return
         if (!state.complete) return
+        newFile(cell).delete() // Whole at last: from now on it's kept whatever happens.
         updating -= cell
         if (state.failedUpdates > 0 || failuresFile(cell).exists()) forgetFailedUpdates(listOf(cell))
     }
@@ -595,5 +815,9 @@ class RegionRepository @Inject constructor(
 
         /** Trail details younger than this aren't fetched again: Overpass is shared. */
         const val TRAILS_FRESH_MS = 7L * 24 * 60 * 60 * 1000
+
+        /** No tile for this long, though online: the map download is started again. */
+        const val STALL_MS = 90_000L
+        const val STALL_CHECK_MS = 15_000L
     }
 }

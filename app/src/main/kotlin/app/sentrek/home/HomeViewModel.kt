@@ -32,6 +32,8 @@ import app.sentrek.map.RasterOverlay
 import app.sentrek.maps.ImportedMap
 import app.sentrek.maps.ImportedMapsRepository
 import app.sentrek.maps.RegionRepository
+import app.sentrek.maps.DownloadOutcome
+import app.sentrek.maps.DownloadStatus
 import app.sentrek.maps.MapDownload
 import app.sentrek.maps.TrailsDownload
 import app.sentrek.maps.RegionState
@@ -215,6 +217,12 @@ class HomeViewModel @Inject constructor(
     }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap<String, File>() to 0L)
+
+    /** Maps downloading now, wherever they were asked for: the map says so in a note. */
+    val downloadStatus: StateFlow<DownloadStatus?> get() = regions.status
+
+    /** How the last download ended, and when. */
+    val downloadOutcome: StateFlow<Pair<Long, DownloadOutcome>?> get() = regions.outcome
 
     /** The downloaded areas, for what the shown map is missing where the user looks. */
     val regionStates: StateFlow<Map<RegionCell, RegionState>> get() = regions.state

@@ -469,7 +469,7 @@
     <string name="guide_location_title">La tua posizione</string>
     <string name="guide_location_text">Tocca il pulsante rotondo a destra per vedere dove sei e tenere la mappa su di te. Toccalo di nuovo per far ruotare la mappa con la direzione in cui cammini. Tienilo premuto per le coordinate e l’altitudine.</string>
     <string name="guide_walk_title">Pianifica, segui, registra</string>
-    <string name="guide_walk_text">Pianifica disegna un percorso lungo i sentieri mentre tocchi. In Salvati › Tracce, Segui ti guida lungo un percorso e ti dice quanto manca. Registra salva la tua traccia, anche a schermo spento. Il pulsante rosso SOS mostra la tua posizione a caratteri grandi.</string>
+    <string name="guide_walk_text">Pianifica disegna un percorso lungo i sentieri mentre tocchi. In Salvati › Percorsi, Segui ti guida lungo un percorso e ti dice quanto manca. Registra salva la tua traccia, anche a schermo spento. Il pulsante rosso SOS mostra la tua posizione a caratteri grandi.</string>
     <string name="settings_show_guide">Mostra la guida iniziale</string>
     <string name="map_kind_hiking">Escursionismo</string>
     <string name="map_kind_cycling">Bici</string>

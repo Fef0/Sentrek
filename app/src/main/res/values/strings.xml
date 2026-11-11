@@ -477,7 +477,7 @@
     <string name="guide_location_title">Your position</string>
     <string name="guide_location_text">Tap the round button on the right to see where you are and keep the map on you. Tap it again to turn the map with the way you walk. Hold it for your coordinates and height.</string>
     <string name="guide_walk_title">Plan, follow, record</string>
-    <string name="guide_walk_text">Plan draws a route along the trails as you tap. In Saved › Tracks, Follow guides you along a route and tells you what’s left. Record keeps your track, with the screen off too. The red SOS button shows your position in big text.</string>
+    <string name="guide_walk_text">Plan draws a route along the trails as you tap. In Saved › Routes, Follow guides you along a route and tells you what’s left. Record keeps your track, with the screen off too. The red SOS button shows your position in big text.</string>
     <string name="settings_show_guide">Show the first-run guide</string>
     <string name="map_kind_hiking">Hiking</string>
     <string name="map_kind_cycling">Cycling</string>

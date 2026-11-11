@@ -67,6 +67,15 @@ object MapExtras {
 
     private val loadedAt = WeakHashMap<Style, MutableMap<String, Long>>()
 
+    /** The lines of the pistes, their areas, the cycle routes and cycleways: what a long press looks for. */
+    internal fun isPisteLine(id: String) = id.startsWith("$PREFIX${MapKind.Winter.key}-") && id.endsWith(LINES)
+    internal fun isPisteArea(id: String) = id.startsWith("$PREFIX${MapKind.Winter.key}-") && id.endsWith(AREAS)
+    internal fun isCycleRoute(id: String) = id.startsWith("$PREFIX${MapKind.Cycling.key}-") && id.endsWith(ROUTES)
+    internal const val CYCLEWAYS = "${PREFIX}cycleways"
+    private const val LINES = "-lines"
+    private const val AREAS = "-areas"
+    private const val ROUTES = "-routes"
+
     /** [files]: cell id → that area's file of [kind]. Nothing for [MapKind.Hiking]. */
     fun sync(style: Style, kind: MapKind, files: Map<String, File>, night: Boolean) {
         WinterStyle.apply(style, winter = kind == MapKind.Winter && !night)
@@ -144,7 +153,7 @@ object MapExtras {
 
     private fun lines() = eq(geometryType(), literal("LineString"))
 
-    private fun pisteAreas(source: String, night: Boolean) = FillLayer("$source-areas", source).apply {
+    private fun pisteAreas(source: String, night: Boolean) = FillLayer("$source$AREAS", source).apply {
         minZoom = 11f
         setFilter(eq(geometryType(), literal("Polygon")))
         setProperties(fillColor(pisteColor(night)), fillOpacity(0.15f))
@@ -154,7 +163,7 @@ object MapExtras {
      * One layer, so dashes can't vary by kind (data-driven dasharray isn't supported):
      * downhill solid, the rest made thinner and lighter instead, and areas outlined.
      */
-    private fun pisteLines(source: String, night: Boolean) = LineLayer("$source-lines", source).apply {
+    private fun pisteLines(source: String, night: Boolean) = LineLayer("$source$LINES", source).apply {
         minZoom = 10f
         setProperties(
             lineColor(pisteColor(night)),
@@ -216,7 +225,7 @@ object MapExtras {
     )
 
     /** Wide and see-through, as the hiking routes: the trail on it stays readable. */
-    private fun cycleRoutes(source: String) = LineLayer("$source-routes", source).apply {
+    private fun cycleRoutes(source: String) = LineLayer("$source$ROUTES", source).apply {
         minZoom = 8f
         setFilter(lines())
         setProperties(
@@ -244,7 +253,7 @@ object MapExtras {
         )
     }
 
-    private fun cycleways() = LineLayer("${PREFIX}cycleways", BASE_SOURCE).apply {
+    private fun cycleways() = LineLayer(CYCLEWAYS, BASE_SOURCE).apply {
         sourceLayer = "transportation"
         minZoom = 12f
         setFilter(all(eq(get("class"), literal("path")), eq(get("subclass"), literal("cycleway")), not(eq(get("brunnel"), literal("tunnel")))))

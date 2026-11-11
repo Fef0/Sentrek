@@ -18,7 +18,8 @@ import java.io.Writer
  *   are Polygons, with `a` = 1.
  * - [MapKind.Cycling], waymarked cycle and mountain bike routes: one line per route and way,
  *   `cn` = icn/ncn/rcn/lcn, or mtb for mountain bike routes, `w` = 4 (international) to 1
- *   (local, and mtb), `ref` and `n` (name), `rid` = the relation id.
+ *   (local, and mtb), `ref` and `n` (name), `rid` = the relation id, and the route's [CYCLE_FACTS]
+ *   under their OSM keys: the two directions of a stage often share a name and number.
  */
 object OverpassExtras {
     fun query(kind: MapKind, box: BoundingBox): String {
@@ -88,19 +89,24 @@ object OverpassExtras {
 
     private fun pisteFeatures(e: OverpassOverlay.Element, routes: List<OverpassOverlay.Element>, toleranceM: Double): List<String> {
         if (e.lons.size < 2) return emptyList()
-        val own = e.tags["pt"]?.let { Piste(it, e.tags["pd"], e.tags["pg"], name(e.tags["pn"], e.tags["pr"], e.tags["nm"], e.tags["rf"])) }
+        // Overpass "convert" writes a missing tag as an empty string.
+        val tags = e.tags.filterValues { it.isNotBlank() }
+        val own = tags["pt"]?.let { Piste(it, tags["pd"], tags["pg"], name(tags["pn"], tags["pr"], tags["nm"], tags["rf"])) }
         // A way's own piste first; then each other kind of piste a route adds on it (a downhill
         // piste can also be part of a ski tour). The way's name goes to all, the route's if none.
         val pistes = LinkedHashMap<String, Piste>()
         own?.let { pistes[it.type] = it }
         for (r in routes) {
-            val type = r.tags["piste:type"] ?: continue
+            val type = r.tags["piste:type"]?.takeIf { it.isNotBlank() } ?: continue
             if (type in pistes) continue
             val routeName = name(r.tags["piste:name"], r.tags["piste:ref"], r.tags["name"], r.tags["ref"])
-            pistes[type] = Piste(type, r.tags["piste:difficulty"], r.tags["piste:grooming"], own?.name ?: routeName)
+            pistes[type] = Piste(
+                type, r.tags["piste:difficulty"]?.takeIf { it.isNotBlank() }, r.tags["piste:grooming"]?.takeIf { it.isNotBlank() },
+                own?.name ?: routeName,
+            )
         }
         if (pistes.isEmpty()) return emptyList()
-        val area = e.geometryType == "Polygon" || (e.tags["ar"] == "yes" && closed(e))
+        val area = e.geometryType == "Polygon" || (tags["ar"] == "yes" && closed(e))
         val geometry = geometry(e, area, toleranceM) ?: return emptyList()
         return pistes.values.map { p ->
             val properties = StringWriter()
@@ -136,6 +142,10 @@ object OverpassExtras {
                 ref?.let { json.name("ref").value(it) }
                 name?.let { json.name("n").value(it) }
                 r.id?.let { json.name("rid").value(it) }
+                for (key in CYCLE_FACTS) {
+                    if (key == "ref") continue
+                    r.tags[key]?.takeIf { it.isNotBlank() }?.let { json.name(key).value(it) }
+                }
                 json.endObject()
             }
             """{"type":"Feature","properties":$properties,"geometry":$geometry}"""
@@ -166,6 +176,9 @@ object OverpassExtras {
 
     /** Most important first. */
     private val BIKE_NETWORKS = listOf("icn", "ncn", "rcn", "lcn")
+
+    /** Route tags worth showing on the card, kept as in OSM. */
+    val CYCLE_FACTS: List<String> = OverpassOverlay.ROUTE_FACTS + listOf("stage", "cai_scale:mtb", "mtb:scale")
 
     private const val MAX_REF = 8
     private const val MAX_NAME = 80

@@ -3,6 +3,8 @@ package app.sentrek.ui
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -48,6 +50,8 @@ val TouchTarget: Dp
 /**
  * Large square button floating over the map. [onLongClick] (described by [longClickLabel])
  * adds a second action; [interactionSource] tells when the finger is still on the button.
+ * [badge]: a small second icon in the bottom right corner, saying what kind of button it is
+ * when [icon] shows its current state.
  */
 @Composable
 fun MapButton(
@@ -59,6 +63,7 @@ fun MapButton(
     onLongClick: (() -> Unit)? = null,
     longClickLabel: String? = null,
     interactionSource: MutableInteractionSource? = null,
+    badge: ImageVector? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(16.dp)
@@ -80,8 +85,19 @@ fun MapButton(
         contentColor = if (active) colors.onPrimary else colors.onSurface,
         shadowElevation = 4.dp,
     ) {
+        val iconSize = LocalTouch.current.icon
         Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription, Modifier.size(LocalTouch.current.icon))
+            if (badge == null) {
+                Icon(icon, contentDescription, Modifier.size(iconSize))
+            } else {
+                // The main icon a little up and left, to leave the corner to the badge.
+                Icon(icon, contentDescription, Modifier.size(iconSize).offset(x = -iconSize / 8, y = -iconSize / 8))
+                Icon(
+                    badge,
+                    contentDescription = null,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(iconSize / 6).size(iconSize / 2),
+                )
+            }
         }
     }
 }

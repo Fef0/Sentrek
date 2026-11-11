@@ -96,6 +96,12 @@ fun FeatureSheet(
                         val name = SacScale.entries.firstOrNull { it.grade == grade }?.osm?.let { kindName(context, it) }
                         Fact(stringResource(R.string.feature_difficulty), listOfNotNull("T$grade", name).joinToString(" · "))
                     }
+                    info.pisteDifficulty?.let { d ->
+                        Fact(stringResource(R.string.feature_piste_difficulty), PISTE_DIFFICULTY[d]?.let { stringResource(it) } ?: humanize(d))
+                    }
+                    info.pisteGrooming?.let { g ->
+                        Fact(stringResource(R.string.feature_piste_grooming), PISTE_GROOMING[g]?.let { stringResource(it) } ?: humanize(g))
+                    }
                     info.visibility?.takeIf { it > 0 }?.let { level ->
                         TrailVisibility.entries.firstOrNull { it.level == level }?.let {
                             Fact(stringResource(R.string.feature_visibility), kindName(context, it.osm))
@@ -168,8 +174,9 @@ private fun RouteFacts(route: MapRoute, onOpen: (String) -> Unit) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             mark?.let { Image(it, contentDescription = null, modifier = Modifier.size(32.dp)) }
             Column {
+                val ref = facts["ref"].takeIf { route.mark == null }
                 Text(
-                    route.name ?: facts["ref"] ?: stringResource(R.string.feature_route),
+                    listOfNotNull(ref, route.name).joinToString(" · ").ifEmpty { null } ?: facts["ref"] ?: stringResource(R.string.feature_route),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
@@ -180,6 +187,7 @@ private fun RouteFacts(route: MapRoute, onOpen: (String) -> Unit) {
         }
         SelectionContainer {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                facts["stage"]?.let { Fact(stringResource(R.string.feature_route_stage), it) }
                 listOfNotNull(facts["from"], facts["to"]).takeIf { it.isNotEmpty() }?.let {
                     Fact(stringResource(R.string.feature_route_from_to), it.joinToString(" → "))
                 }
@@ -193,6 +201,8 @@ private fun RouteFacts(route: MapRoute, onOpen: (String) -> Unit) {
                 ).takeIf { it.isNotEmpty() }?.let { Fact(stringResource(R.string.feature_route_climb), it.joinToString("  ")) }
                 facts["duration:forward"]?.let { Fact(stringResource(R.string.feature_route_time), it.removePrefix("0") + " h") }
                 facts["cai_scale"]?.let { Fact(stringResource(R.string.feature_route_cai), it) }
+                facts["cai_scale:mtb"]?.let { Fact(stringResource(R.string.feature_route_cai_mtb), it) }
+                facts["mtb:scale"]?.let { Fact(stringResource(R.string.feature_route_mtb_scale), it) }
                 facts["operator"]?.let { Fact(stringResource(R.string.feature_route_operator), it) }
             }
         }
@@ -293,6 +303,49 @@ private val KIND_NAMES = mapOf(
     "bad" to R.string.visibility_bad,
     "horrible" to R.string.visibility_horrible,
     "no" to R.string.visibility_no,
+    "piste" to R.string.kind_piste,
+    "piste_downhill" to R.string.kind_piste_downhill,
+    "piste_nordic" to R.string.kind_piste_nordic,
+    "piste_skitour" to R.string.kind_piste_skitour,
+    "piste_sled" to R.string.kind_piste_sled,
+    "piste_sleigh" to R.string.kind_piste_sleigh,
+    "piste_hike" to R.string.kind_piste_hike,
+    "piste_snow_park" to R.string.kind_piste_snow_park,
+    "piste_connection" to R.string.kind_piste_connection,
+    "aerialway" to R.string.kind_aerialway,
+    "cable_car" to R.string.kind_cable_car,
+    "gondola" to R.string.kind_gondola,
+    "mixed_lift" to R.string.kind_mixed_lift,
+    "chair_lift" to R.string.kind_chair_lift,
+    "drag_lift" to R.string.kind_drag_lift,
+    "t-bar" to R.string.kind_t_bar,
+    "j-bar" to R.string.kind_j_bar,
+    "platter" to R.string.kind_platter,
+    "rope_tow" to R.string.kind_rope_tow,
+    "magic_carpet" to R.string.kind_magic_carpet,
+    "zip_line" to R.string.kind_zip_line,
+    "goods" to R.string.kind_goods,
+    "cycleway" to R.string.kind_cycleway,
+)
+
+/** A piste's difficulty, with the colour the winter map gives it. */
+private val PISTE_DIFFICULTY = mapOf(
+    "novice" to R.string.piste_novice,
+    "easy" to R.string.piste_easy,
+    "intermediate" to R.string.piste_intermediate,
+    "advanced" to R.string.piste_advanced,
+    "expert" to R.string.piste_expert,
+    "freeride" to R.string.piste_freeride,
+    "extreme" to R.string.piste_extreme,
+)
+
+private val PISTE_GROOMING = mapOf(
+    "classic" to R.string.grooming_classic,
+    "skating" to R.string.grooming_skating,
+    "classic+skating" to R.string.grooming_classic_skating,
+    "mogul" to R.string.grooming_mogul,
+    "backcountry" to R.string.grooming_backcountry,
+    "scooter" to R.string.grooming_scooter,
 )
 
 fun humanize(osm: String): String =

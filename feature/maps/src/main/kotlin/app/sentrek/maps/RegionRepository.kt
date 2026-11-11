@@ -129,11 +129,19 @@ class RegionRepository @Inject constructor(
     private val _state = MutableStateFlow<Map<RegionCell, RegionState>>(emptyMap())
     val state: StateFlow<Map<RegionCell, RegionState>> = _state.asStateFlow()
 
+    /**
+     * The downloaded areas are known: MapLibre lists them a moment after the app starts, while
+     * the map is already drawing. Until then no area can be said to be missing.
+     */
+    private val _listed = MutableStateFlow(false)
+    val listed: StateFlow<Boolean> = _listed.asStateFlow()
+
     init {
         offline.listOfflineRegions(object : OfflineManager.ListOfflineRegionsCallback {
             override fun onList(offlineRegions: Array<OfflineRegion>?) = restore(offlineRegions.orEmpty())
             override fun onError(error: String) {
                 Log.e(TAG, "Cannot list offline regions: $error")
+                _listed.value = true
             }
         })
     }
@@ -382,6 +390,7 @@ class RegionRepository @Inject constructor(
                 }
             })
         }
+        _listed.value = true
     }
 
     /** Starts the next queued region when none is downloading. */
@@ -578,8 +587,8 @@ class RegionRepository @Inject constructor(
         /** Bump when the overlay file format changes (v2: points, v3: huts, v4: all hiking points, v5: all tags, v6: all paths and tracks, v9: waymarked routes, v10: route details). */
         const val OVERLAY_SUFFIX = ".v10.geojson"
 
-        /** The same, for the extra maps' files ("<cell>.ski.x1.geojson"). */
-        const val EXTRA_SUFFIX = ".x1.geojson"
+        /** The same, for the extra maps' files ("<cell>.ski.x2.geojson"; x2: no empty tags). */
+        const val EXTRA_SUFFIX = ".x2.geojson"
 
         /** The vector source of the hiking style (assets/styles/hiking.json). */
         const val TILEJSON_URL = "https://tiles.openfreemap.org/planet"

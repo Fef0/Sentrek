@@ -287,6 +287,7 @@ fun MapScreen(
     val downloadedCells by viewModel.downloadedCells.collectAsStateWithLifecycle()
     val mapKind by viewModel.mapKind.collectAsStateWithLifecycle()
     val regionStates by viewModel.regionStates.collectAsStateWithLifecycle()
+    val regionsListed by viewModel.regionsListed.collectAsStateWithLifecycle()
     var layersOpen by remember { mutableStateOf(false) }
     // A fix comes every second or so: read as it is only where needed (the GoTo panel, the map
     // layers), so it doesn't redraw this whole screen. The rest gets it rounded, and changes
@@ -566,7 +567,9 @@ fun MapScreen(
                 // without trail difficulty, marked routes, springs and hut details, and nothing
                 // else would say so. Only zoomed in to the trails, where those are looked for.
                 // A tap opens Maps with this area selected.
-                centreCell?.takeIf { it !in downloadedCells && (!online || zoom >= DETAILS_ZOOM) }?.let { cell ->
+                // Not before the downloaded areas are listed, and not for one still downloading:
+                // at start, every area looked missing for a moment.
+                centreCell?.takeIf { regionsListed && it !in regionStates && (!online || zoom >= DETAILS_ZOOM) }?.let { cell ->
                     val centre = cell.bbox.let { LatLon((it.south + it.north) / 2, (it.west + it.east) / 2) }
                     MapNote(
                         stringResource(if (online) R.string.area_not_downloaded else R.string.offline_area),
@@ -644,12 +647,19 @@ fun MapScreen(
                     longClickLabel = stringResource(if (rotationLocked) R.string.compass_unlock else R.string.compass_lock),
                 )
                 if (controlsAlpha > 0f) {
+                    // Which map is shown, at a glance; the small map in the corner says what the
+                    // button is for. Not coloured: that's for things switched on, like following.
+                    val (kindIcon, kindName) = when (mapKind) {
+                        MapKind.Hiking -> SentrekIcons.Hiking to R.string.map_kind_hiking
+                        MapKind.Cycling -> SentrekIcons.Cycling to R.string.map_kind_cycling
+                        MapKind.Winter -> SentrekIcons.Skiing to R.string.map_kind_winter
+                    }
                     MapButton(
-                        icon = SentrekIcons.Map,
-                        contentDescription = stringResource(R.string.map_choose),
+                        icon = kindIcon,
+                        contentDescription = stringResource(R.string.map_choose_current, stringResource(kindName)),
                         onClick = { layersOpen = true },
                         modifier = Modifier.alpha(controlsAlpha),
-                        active = mapKind != MapKind.Hiking,
+                        badge = SentrekIcons.Map,
                     )
                 }
                     // Never forgotten, but small: they change how the whole app behaves. A tap to Settings.

@@ -2,7 +2,11 @@ package app.sentrek.map
 
 import android.graphics.PointF
 import android.graphics.RectF
+import app.sentrek.geo.overlay.OverpassExtras
 import app.sentrek.geo.overlay.OverpassOverlay
+import org.maplibre.android.style.expressions.Expression
+import org.maplibre.android.style.sources.GeoJsonSource
+import kotlin.math.cos
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.style.sources.VectorSource
@@ -38,6 +42,9 @@ data class MapFeatureInfo(
     val intermittent: Boolean? = null,
     /** A path or track that crosses water without a bridge here. */
     val ford: Boolean = false,
+    /** A piste's OSM piste:difficulty (novice, easy…) and piste:grooming (classic, skating…). */
+    val pisteDifficulty: String? = null,
+    val pisteGrooming: String? = null,
 ) {
     /** A river, stream or lake rather than a trail or a point. */
     val isWater: Boolean get() = intermittent != null
@@ -59,8 +66,10 @@ object MapFeatures {
     /** Base style layers with points worth describing (hiking.json). */
     private val BASE_POINT_LAYERS = setOf("poi-hiking", "poi-landmarks", "poi-detail", "peak")
 
-    /** Base style layers with the paths and tracks (hiking.json). */
-    private val BASE_PATH_LAYERS = listOf("path", "track")
+    /** Base style layers with the paths and tracks (hiking.json), and the cycling map's cycleways. */
+    private val BASE_PATH_LAYERS = listOf("path", "track", MapExtras.CYCLEWAYS)
+    private const val LIFT_LAYER = "aerialway"
+    private val LIFT_KINDS = setOf("aerialway")
     private const val FORD_LAYER = "path-ford"
 
     /** Base style: rivers and streams, lakes, and the source with the lakes' names (hiking.json). */
@@ -95,8 +104,19 @@ object MapFeatures {
         nearestPoint(map, near, screen, pointLayers)?.let { return it }
         if (hasTracks) track(map, near, at)?.let { return it }
 
-        // A trail, with the routes on it; or a route on its own (on a road, say).
-        val routes = routes(map, near, layerIds.filter(MapOverlays::isRouteLayer))
+        // On the winter map, pistes and lifts before the paths they cross.
+        val pisteLines = layerIds.filter(MapExtras::isPisteLine)
+        if (pisteLines.isNotEmpty()) {
+            (piste(map, exact, at, pisteLines) ?: lift(map, exact, at, screen, radiusPx, layerIds)
+                ?: piste(map, near, at, pisteLines) ?: lift(map, near, at, screen, radiusPx, layerIds))?.let { return it }
+        }
+
+        // A trail, with the routes on it; or a route on its own (on a road, say). The cycling
+        // and winter maps don't draw the hiking routes: they're looked up in the files then.
+        val routeLayers = layerIds.filter(MapOverlays::isRouteLayer)
+        val hikingRoutes = if (routeLayers.isNotEmpty()) routes(map, near, routeLayers) else routesNear(map, screen, radiusPx)
+        // On the cycling map, its own routes first: they name a road pressed on its own.
+        val routes = cycleRoutes(map, near, layerIds.filter(MapExtras::isCycleRoute)) + hikingRoutes
         val trailLayers = layerIds.filter(MapOverlays::isTrailLayer)
         val trail = trailLayers.takeIf { it.isNotEmpty() }
             ?.let { map.queryRenderedFeatures(near, *it.toTypedArray()).firstOrNull() }
@@ -105,7 +125,10 @@ object MapFeatures {
             // pressed for itself.
             val found = basePath(map, exact, near, at, layerIds) ?: ford(map, exact, at, layerIds) ?: water(map, exact, near, at, layerIds)
                 ?: basePath(map, near, near, at, layerIds) ?: ford(map, near, at, layerIds) ?: water(map, near, near, at, layerIds)
-            return found?.let { if (it.kind in PATH_KINDS) it.copy(name = pathName(map, screen, radiusPx)) else it }
+                ?: lift(map, near, at, screen, radiusPx, layerIds)
+                // Inside a ski area, off its runs: the area itself.
+                ?: piste(map, exact, at, layerIds.filter(MapExtras::isPisteArea))
+            return found?.let { if (it.kind in PATH_KINDS || it.kind == CYCLEWAY) it.copy(name = pathName(map, screen, radiusPx)) else it }
         }
         val props = trail?.let(::properties).orEmpty()
         return MapFeatureInfo(
@@ -131,7 +154,7 @@ object MapFeatures {
         val path = map.queryRenderedFeatures(box, *layers.toTypedArray()).firstOrNull() ?: return null
         return MapFeatureInfo(
             name = null,
-            kind = path.getStringProperty("class") ?: "path",
+            kind = if (path.getStringProperty("subclass") == CYCLEWAY) CYCLEWAY else path.getStringProperty("class") ?: "path",
             position = at,
             osmId = null,
             ford = baseFord(map, near, layerIds),
@@ -143,7 +166,7 @@ object MapFeatures {
      * their own tile layer, apart from the lines, and drawn along a simplified copy of them, a
      * few metres off at close zoom. The nearest named line within [radiusPx], or [NAME_REACH_M].
      */
-    private fun pathName(map: MapLibreMap, screen: PointF, radiusPx: Float): String? {
+    private fun pathName(map: MapLibreMap, screen: PointF, radiusPx: Float, classes: Set<String> = PATH_KINDS): String? {
         val source = map.style?.getSourceAs<VectorSource>(BASE_SOURCE) ?: return null
         val lat = map.projection.fromScreenLocation(screen).latitude
         val reachPx = (NAME_REACH_M / map.projection.getMetersPerPixelAtLatitude(lat)).toFloat()
@@ -152,7 +175,7 @@ object MapFeatures {
         for (line in source.querySourceFeatures(arrayOf(PATH_NAME_LAYER), null)) {
             val p = properties(line)
             val name = p["name"] ?: continue
-            if (p["class"] !in PATH_KINDS) continue
+            if (p["class"] !in classes) continue
             val parts = when (val g = line.geometry()) {
                 is LineString -> listOf(g.coordinates())
                 is MultiLineString -> g.coordinates()
@@ -178,6 +201,83 @@ object MapFeatures {
         val len = dx * dx + dy * dy
         val t = if (len == 0f) 0f else (((p.x - a.x) * dx + (p.y - a.y) * dy) / len).coerceIn(0f, 1f)
         return hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
+    }
+
+    /** A piste of the winter map: its name or number, kind, difficulty and grooming. */
+    private fun piste(map: MapLibreMap, box: RectF, at: LatLng, layers: List<String>): MapFeatureInfo? {
+        if (layers.isEmpty()) return null
+        // Downhill first where runs share a way, as drawn.
+        val p = map.queryRenderedFeatures(box, *layers.toTypedArray()).map(::properties)
+            .minByOrNull { if (it["pt"] == "downhill") 0 else 1 }
+            ?.filterValues { it.isNotBlank() } ?: return null
+        return MapFeatureInfo(
+            name = p["n"],
+            kind = p["pt"]?.let { "piste_$it" } ?: "piste",
+            position = at,
+            osmId = p["id"],
+            pisteDifficulty = p["pd"],
+            pisteGrooming = p["g"],
+        )
+    }
+
+    /** A ski lift or cable car of the base map, named as its label along it. */
+    private fun lift(map: MapLibreMap, box: RectF, at: LatLng, screen: PointF, radiusPx: Float, layerIds: List<String>): MapFeatureInfo? {
+        if (LIFT_LAYER !in layerIds) return null
+        val lift = map.queryRenderedFeatures(box, LIFT_LAYER).firstOrNull() ?: return null
+        return MapFeatureInfo(
+            name = pathName(map, screen, radiusPx, LIFT_KINDS),
+            kind = properties(lift)["subclass"] ?: "aerialway",
+            position = at,
+            osmId = null,
+        )
+    }
+
+    /**
+     * The hiking routes within [radiusPx], from the downloaded areas' files rather than the map:
+     * the cycling and winter maps don't draw them. Distances in metres, without asking the map
+     * to place every point on screen.
+     */
+    private fun routesNear(map: MapLibreMap, screen: PointF, radiusPx: Float): List<MapRoute> {
+        val style = map.style ?: return emptyList()
+        val at = map.projection.fromScreenLocation(screen)
+        val reachM = radiusPx * map.projection.getMetersPerPixelAtLatitude(at.latitude)
+        val kx = cos(Math.toRadians(at.latitude)) * M_PER_DEG
+        fun x(p: Point) = (p.longitude() - at.longitude) * kx
+        fun y(p: Point) = (p.latitude() - at.latitude) * M_PER_DEG
+        val found = style.sources.filter { MapOverlays.isOverlaySource(it.id) }.filterIsInstance<GeoJsonSource>()
+            .flatMap { it.querySourceFeatures(Expression.has(OverpassOverlay.NETWORK)) }
+            .filter { feature ->
+                val parts = when (val g = feature.geometry()) {
+                    is LineString -> listOf(g.coordinates())
+                    is MultiLineString -> g.coordinates()
+                    else -> emptyList()
+                }
+                parts.any { part ->
+                    part.zipWithNext().any { (a, b) ->
+                        segmentDistance(PointF(0f, 0f), PointF(x(a).toFloat(), y(a).toFloat()), PointF(x(b).toFloat(), y(b).toFloat())) <= reachM
+                    }
+                }
+            }
+        return routeList(found)
+    }
+
+    /** Cycle and mountain bike routes under the press, on the cycling map. */
+    private fun cycleRoutes(map: MapLibreMap, box: RectF, layers: List<String>): List<MapRoute> {
+        if (layers.isEmpty()) return emptyList()
+        return map.queryRenderedFeatures(box, *layers.toTypedArray())
+            .map(::properties)
+            .filter { "rid" in it }
+            .distinctBy { it["rid"] }
+            .sortedByDescending { it["w"]?.toDoubleOrNull() ?: 0.0 }
+            .map { p ->
+                MapRoute(
+                    name = p["n"],
+                    mark = null,
+                    partOf = emptyList(),
+                    osmId = "relation/${p["rid"]?.toDoubleOrNull()?.toLong() ?: p["rid"]}",
+                    facts = p.filterKeys { it in CYCLE_FACTS },
+                )
+            }
     }
 
     /** A ford's icon itself, on a road too (roads aren't pressable otherwise). */
@@ -270,7 +370,11 @@ object MapFeatures {
 
     private fun routes(map: MapLibreMap, box: RectF, layers: List<String>): List<MapRoute> {
         if (layers.isEmpty()) return emptyList()
-        return map.queryRenderedFeatures(box, *layers.toTypedArray())
+        return routeList(map.queryRenderedFeatures(box, *layers.toTypedArray()))
+    }
+
+    private fun routeList(features: List<Feature>): List<MapRoute> =
+        features
             .map(::properties)
             .filter { "rid" in it }
             .distinctBy { it["rid"] }
@@ -284,9 +388,11 @@ object MapFeatures {
                     facts = p.filterKeys { it in ROUTE_FACTS },
                 )
             }
-    }
 
     private val ROUTE_FACTS = OverpassOverlay.ROUTE_FACTS.toSet()
+    private val CYCLE_FACTS = OverpassExtras.CYCLE_FACTS.toSet()
+    private const val CYCLEWAY = "cycleway"
+    private const val M_PER_DEG = Math.PI / 180.0 * 6_371_000.0
 
     private fun box(center: PointF, radius: Float) =
         RectF(center.x - radius, center.y - radius, center.x + radius, center.y + radius)

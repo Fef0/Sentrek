@@ -524,7 +524,9 @@ fun MapScreen(
                     .fillMaxWidth()
                     .safeTopPadding()
                     .padding(horizontal = 12.dp, vertical = 8.dp)
-                    .padding(end = TouchTarget), // Keep clear of the compass.
+                    // Clear of the compass and the map button, with a gap: touching, they
+                    // read as one thing and a tap meant for one lands on the other.
+                    .padding(end = TouchTarget + 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (plan.active) PlanPanel(planStats, plan.editing?.name, Modifier.fillMaxWidth())

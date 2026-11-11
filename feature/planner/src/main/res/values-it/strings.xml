@@ -25,4 +25,7 @@
     <string name="plan_discard_text">Le modifiche non salvate andranno perse.</string>
     <string name="plan_discard">Scarta</string>
     <string name="plan_keep">Continua a pianificare</string>
+    <string name="plan_reverse_short">Inverti</string>
+    <string name="plan_mode_trails">Lungo i sentieri</string>
+    <string name="plan_mode_straight">In linea retta</string>
 </resources>

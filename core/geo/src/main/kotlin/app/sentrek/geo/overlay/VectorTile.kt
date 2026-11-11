@@ -1,8 +1,8 @@
 package app.sentrek.geo.overlay
 
 /**
- * Just enough of a Mapbox Vector Tile reader for the polygons of one layer: the map's own
- * downloaded tiles say where the forests are. Protocol buffers read by hand: the format is
+ * Just enough of a Mapbox Vector Tile reader for the polygons or points of one layer: the map's
+ * own downloaded tiles say where the forests are, and what the towns and mountains are called. Protocol buffers read by hand: the format is
  * small, and a library for it would weigh more than this file.
  */
 object VectorTile {
@@ -27,14 +27,32 @@ object VectorTile {
         }
     }
 
+    /** One point feature: its tags (numbers as text) and where it is, in tile units (0 to [extent]). */
+    class Point(val tags: Map<String, String>, val x: Int, val y: Int, val extent: Int)
+
     /** The polygons of [layer] in the tile [bytes] (uncompressed) that [keep] accepts. */
-    fun polygons(bytes: ByteArray, layer: String, keep: (Map<String, String>) -> Boolean): List<Polygon> {
+    fun polygons(bytes: ByteArray, layer: String, keep: (Map<String, String>) -> Boolean): List<Polygon> =
+        features(bytes, layer).mapNotNull { f ->
+            if (f.type != POLYGON || f.geometry == null || !keep(f.tags)) null else Polygon(f.tags, rings(f.geometry), f.extent)
+        }
+
+    /** The points of [layer] in the tile [bytes] (uncompressed) that [keep] accepts; the first of a multipoint. */
+    fun points(bytes: ByteArray, layer: String, keep: (Map<String, String>) -> Boolean): List<Point> =
+        features(bytes, layer).mapNotNull { f ->
+            if (f.type != POINT || f.geometry == null || !keep(f.tags)) return@mapNotNull null
+            val first = rings(f.geometry).firstOrNull()?.takeIf { it.size >= 2 } ?: return@mapNotNull null
+            Point(f.tags, first[0], first[1], f.extent)
+        }
+
+    private class Feature(val type: Int, val tags: Map<String, String>, val geometry: Reader?, val extent: Int)
+
+    private fun features(bytes: ByteArray, layer: String): List<Feature> {
         val tile = Reader(bytes, 0, bytes.size)
         while (tile.more()) {
             val (field, wire) = tile.key()
             if (field == LAYERS && wire == LENGTH) {
                 val l = tile.message()
-                readLayer(l, layer, keep)?.let { return it }
+                readLayer(l, layer)?.let { return it }
             } else {
                 tile.skip(wire)
             }
@@ -42,8 +60,8 @@ object VectorTile {
         return emptyList()
     }
 
-    /** The layer's polygons, or null when it's another layer. */
-    private fun readLayer(r: Reader, wanted: String, keep: (Map<String, String>) -> Boolean): List<Polygon>? {
+    /** The layer's features, or null when it's another layer. */
+    private fun readLayer(r: Reader, wanted: String): List<Feature>? {
         var name: String? = null
         val keys = mutableListOf<String>()
         val values = mutableListOf<String>()
@@ -63,25 +81,28 @@ object VectorTile {
             if (name != null && name != wanted) return null
         }
         if (name != wanted) return null
-        return features.mapNotNull { readFeature(it, keys, values, extent, keep) }
+        return features.map { readFeature(it, keys, values, extent) }
     }
 
+    /** A tag value as text: strings, and numbers (heights) written out. */
     private fun readValue(r: Reader): String {
         var value = ""
         while (r.more()) {
             val (field, wire) = r.key()
-            if (field == 1 && wire == LENGTH) value = r.string() else r.skip(wire)
+            value = when {
+                field == 1 && wire == LENGTH -> r.string()
+                field == 2 && wire == FIXED32 -> java.lang.Float.intBitsToFloat(r.fixed32()).toString()
+                field == 3 && wire == FIXED64 -> java.lang.Double.longBitsToDouble(r.fixed64()).toString()
+                (field == 4 || field == 5) && wire == VARINT -> r.varint().toString()
+                field == 6 && wire == VARINT -> r.varint().let { (it ushr 1) xor -(it and 1) }.toString()
+                field == 7 && wire == VARINT -> (r.varint() != 0L).toString()
+                else -> { r.skip(wire); value }
+            }
         }
         return value
     }
 
-    private fun readFeature(
-        r: Reader,
-        keys: List<String>,
-        values: List<String>,
-        extent: Int,
-        keep: (Map<String, String>) -> Boolean,
-    ): Polygon? {
+    private fun readFeature(r: Reader, keys: List<String>, values: List<String>, extent: Int): Feature {
         var tags = emptyMap<String, String>()
         var type = 0
         var geometry: Reader? = null
@@ -103,8 +124,7 @@ object VectorTile {
                 else -> r.skip(wire)
             }
         }
-        if (type != POLYGON || geometry == null || !keep(tags)) return null
-        return Polygon(tags, rings(geometry), extent)
+        return Feature(type, tags, geometry, extent)
     }
 
     /** MoveTo, LineTo, ClosePath with zigzag deltas: the rings as x, y pairs. */
@@ -169,6 +189,20 @@ object VectorTile {
             return Reader(bytes, start, pos)
         }
 
+        fun fixed32(): Int {
+            var v = 0
+            for (i in 0 until 4) v = v or ((bytes[pos + i].toInt() and 0xFF) shl (8 * i))
+            pos += 4
+            return v
+        }
+
+        fun fixed64(): Long {
+            var v = 0L
+            for (i in 0 until 8) v = v or ((bytes[pos + i].toLong() and 0xFF) shl (8 * i))
+            pos += 8
+            return v
+        }
+
         fun string(): String {
             val m = message()
             return String(bytes, m.pos, m.end - m.pos, Charsets.UTF_8)
@@ -190,6 +224,7 @@ object VectorTile {
     private const val FIXED64 = 1
     private const val LENGTH = 2
     private const val FIXED32 = 5
+    private const val POINT = 1
     private const val POLYGON = 3
     private const val MOVE_TO = 1
     private const val LINE_TO = 2

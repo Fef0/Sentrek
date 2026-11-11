@@ -185,6 +185,8 @@ private fun Ready(state: PeaksState.Ready) {
     val measurer = rememberTextMeasurer()
     val label = TextStyle(color = colors.onBackground, fontSize = 15.sp, fontWeight = FontWeight.Bold)
     val small = TextStyle(color = colors.onBackground, fontSize = 13.sp)
+    // Two lengths side by side would read as one: the distance says it's one.
+    val awayText = stringResource(R.string.peaks_away)
 
     Canvas(
         Modifier
@@ -224,7 +226,7 @@ private fun Ready(state: PeaksState.Ready) {
             if (abs(off) > FIELD_DEG / 2) continue
             val x = (size.width / 2 + off * pxPerDeg).toFloat()
             val name = measurer.measure(peak.name, label)
-            val detail = measurer.measure("${Format.elevation(peak.height)} · ${Format.distance(peak.distance)}", small)
+            val detail = measurer.measure("${Format.elevation(peak.height)} · ${String.format(awayText, Format.distance(peak.distance))}", small)
             val half = max(name.size.width, detail.size.width) / 2f
             // Names near an edge move in, the line still points at the summit.
             val labelX = x.coerceIn(half, size.width - half)
@@ -265,7 +267,11 @@ private fun Ready(state: PeaksState.Ready) {
             Column {
                 Text(peak.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(
-                    listOf(Format.elevation(peak.height), Format.distance(peak.distance), Format.bearing(peak.azimuth)).joinToString(" · "),
+                    listOf(
+                        stringResource(R.string.peaks_high, Format.elevation(peak.height)),
+                        stringResource(R.string.peaks_away, Format.distance(peak.distance)),
+                        Format.bearing(peak.azimuth),
+                    ).joinToString(" · "),
                     style = MaterialTheme.typography.bodyLarge,
                 )
             }

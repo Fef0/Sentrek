@@ -38,6 +38,7 @@ import app.sentrek.R
 import app.sentrek.ui.LocalTouch
 import app.sentrek.ui.SentrekIcons
 import app.sentrek.ui.TouchTarget
+import app.sentrek.ui.mapButtonBorder
 import kotlinx.coroutines.launch
 
 /**
@@ -115,6 +116,7 @@ fun LockButton(locked: Boolean, onLock: () -> Unit, onUnlock: () -> Unit, onShor
         color = if (locked) colors.primary else colors.surface,
         contentColor = if (locked) colors.onPrimary else colors.onSurface,
         shadowElevation = 4.dp,
+        border = mapButtonBorder,
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(if (locked) SentrekIcons.Lock else SentrekIcons.LockOpen, contentDescription = null, Modifier.size(LocalTouch.current.icon))

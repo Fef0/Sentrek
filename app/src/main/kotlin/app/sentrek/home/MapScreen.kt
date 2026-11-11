@@ -198,6 +198,9 @@ private const val CAMERA_REPORT_MS = 2_000L
 /** From here in, trails and their details are on the map: the zoom where a missing download shows. */
 private const val DETAILS_ZOOM = 12.0
 
+/** How long "hold SOS to open it" stays, while locked. */
+private const val SOS_HINT_MS = 3_000L
+
 /** How long "hold the lock to unlock" stays after a touch on a locked screen. */
 private const val LOCK_HINT_MS = 2_500L
 
@@ -319,6 +322,14 @@ fun MapScreen(
         showLockHint = false
     }
     LaunchedEffect(locked) { if (!locked) showLockHint = false }
+    var sosHint by remember { mutableIntStateOf(0) }
+    var showSosHint by remember { mutableStateOf(false) }
+    LaunchedEffect(sosHint) {
+        if (sosHint == 0) return@LaunchedEffect
+        showSosHint = true
+        kotlinx.coroutines.delay(SOS_HINT_MS)
+        showSosHint = false
+    }
     // Back would leave the map (or the app) under a wet thumb just the same.
     BackHandler(enabled = locked) { lockHint++ }
     LaunchedEffect(autoHide, touches, locked) {
@@ -689,20 +700,27 @@ fun MapScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalAlignment = Alignment.End,
             ) {
+                // Planning is a mode of its own: its two buttons say what they do, in words.
                 if (plan.active && plan.points.size >= 2) {
-                    MapButton(
-                        icon = SentrekIcons.Reverse,
-                        contentDescription = stringResource(PlannerR.string.plan_reverse),
-                        onClick = planner::reverse,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MapLabel(stringResource(PlannerR.string.plan_reverse_short))
+                        MapButton(
+                            icon = SentrekIcons.Reverse,
+                            contentDescription = stringResource(PlannerR.string.plan_reverse),
+                            onClick = planner::reverse,
+                        )
+                    }
                 }
                 if (plan.active) {
-                    MapButton(
-                        icon = SentrekIcons.Tracks,
-                        contentDescription = stringResource(PlannerR.string.plan_follow_trails),
-                        onClick = planner::toggleTrails,
-                        active = plan.followTrails,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MapLabel(stringResource(if (plan.followTrails) PlannerR.string.plan_mode_trails else PlannerR.string.plan_mode_straight))
+                        MapButton(
+                            icon = SentrekIcons.Tracks,
+                            contentDescription = stringResource(PlannerR.string.plan_follow_trails),
+                            onClick = planner::toggleTrails,
+                            active = plan.followTrails,
+                        )
+                    }
                 }
                 // Bottom-aligned: a taller label grows upwards and the button stays under the finger.
                 Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -797,15 +815,13 @@ fun MapScreen(
                     ),
                 )
             } else AnimatedVisibility(visible = !controlsHidden, enter = fadeIn(), exit = fadeOut()) { Column {
-                // Library: what's kept on the phone, opened less often than the rest of the bar.
+                // Saved: the user's own tracks and places. Map downloads are under the map
+                // button, SOS on the map itself.
                 if (libraryOpen) {
                     BottomBar(
-                        items = listOfNotNull(
+                        items = listOf(
                             BarItem(SentrekIcons.Tracks, stringResource(R.string.bar_tracks), { libraryOpen = false; onOpenTracks() }),
                             BarItem(SentrekIcons.Place, stringResource(R.string.bar_places), { libraryOpen = false; onOpenPlaces() }),
-                            BarItem(SentrekIcons.Layers, stringResource(R.string.bar_maps), { libraryOpen = false; onOpenMaps() }),
-                            BarItem(SentrekIcons.Emergency, stringResource(R.string.bar_emergency), { libraryOpen = false; onOpenEmergency() })
-                                .takeIf { sosEnabled },
                         ),
                         edgeToEdge = false,
                     )
@@ -813,15 +829,25 @@ fun MapScreen(
                 BottomBar(
                 items = listOf(
                     BarItem(SentrekIcons.Library, stringResource(R.string.bar_library), { libraryOpen = !libraryOpen }, highlighted = libraryOpen),
-                    BarItem(SentrekIcons.Plan, stringResource(R.string.bar_plan), {
-                        libraryOpen = false
-                        val block = planBlock
-                        if (block != null) Toast.makeText(context, block.message, Toast.LENGTH_LONG).show() else planner.start()
-                    }, dimmed = planBlock != null),
-                    if (recording?.isPaused == true) {
-                        BarItem(SentrekIcons.Pause, stringResource(R.string.bar_paused), { askStop = true }, highlighted = true)
-                    } else if (recording != null) {
-                        BarItem(SentrekIcons.Stop, stringResource(R.string.bar_stop), { askStop = true }, highlighted = true)
+                    // While recording, planning can't start anyway: its place goes to pausing,
+                    // one tap away and on its own, not inside the Stop dialog.
+                    if (recording != null) {
+                        val paused = recording?.isPaused == true
+                        BarItem(
+                            if (paused) SentrekIcons.Record else SentrekIcons.Pause,
+                            stringResource(if (paused) R.string.bar_resume else R.string.bar_pause),
+                            { libraryOpen = false; if (paused) viewModel.resumeRecording() else viewModel.pauseRecording() },
+                            highlighted = paused,
+                        )
+                    } else {
+                        BarItem(SentrekIcons.Plan, stringResource(R.string.bar_plan), {
+                            libraryOpen = false
+                            val block = planBlock
+                            if (block != null) Toast.makeText(context, block.message, Toast.LENGTH_LONG).show() else planner.start()
+                        }, dimmed = planBlock != null)
+                    },
+                    if (recording != null) {
+                        BarItem(SentrekIcons.Stop, stringResource(R.string.bar_stop), { askStop = true }, highlighted = recording?.isPaused != true)
                     } else {
                         BarItem(SentrekIcons.Record, stringResource(R.string.bar_record), {
                             // A bumped button mustn't fill the phone with a track nobody meant to record.
@@ -847,22 +873,34 @@ fun MapScreen(
         if (locked) TouchShield(onTouch = { lockHint++ })
         // Bottom left, where the thumb rests, opposite the map buttons. Shown while locked
         // whatever the setting says: there must always be a way out.
-        if (!plan.active && (locked || (showLockButton && controlsAlpha > 0f))) Row(
+        // SOS above it, red on every map; also while locked, then with a long press.
+        val lockShown = locked || (showLockButton && controlsAlpha > 0f)
+        val sosShown = sosEnabled && (locked || controlsAlpha > 0f)
+        if (!plan.active && (lockShown || sosShown)) Column(
             Modifier
                 .align(Alignment.BottomStart)
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Start))
                 .padding(start = 12.dp, end = TouchTarget + 24.dp, bottom = barHeight + 24.dp)
                 .alpha(if (locked) 1f else controlsAlpha),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            LockButton(
-                locked = locked,
-                onLock = { locked = true },
-                onUnlock = { locked = false },
-                onShortPress = { lockHint++ },
-            )
-            if (showLockHint) MapNote(stringResource(R.string.lock_hint), SentrekIcons.Lock)
+            if (sosShown) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SosButton(locked = locked, onOpen = onOpenEmergency, onShortPress = { sosHint++ })
+                    if (showSosHint) MapNote(stringResource(R.string.sos_locked_hint), SentrekIcons.Lock)
+                }
+            }
+            if (lockShown) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LockButton(
+                        locked = locked,
+                        onLock = { locked = true },
+                        onUnlock = { locked = false },
+                        onShortPress = { lockHint++ },
+                    )
+                    if (showLockHint) MapNote(stringResource(R.string.lock_hint), SentrekIcons.Lock)
+                }
+            }
         }
     }
 
@@ -904,12 +942,8 @@ fun MapScreen(
             val latLng = pressedAt.wrap()
             val info = MapFeatures.at(m, m.projection.toScreenLocation(pressedAt), latLng, pressRadiusPx, exactPressPx)
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-            // Nothing there: offer to save the spot as a place.
-            if (info == null) {
-                placeDraft = Place("", unnamedPlace, PlaceKind.Star, LatLon(latLng.latitude, latLng.longitude))
-            } else {
-                pressed = info
-            }
+            // Nothing there: the spot itself, to go to, save as a place or ask the weather of.
+            pressed = info ?: MapFeatureInfo(name = null, kind = SPOT, position = latLng, osmId = null)
             true
         }
         m.addOnMapLongClickListener(onLongPress)
@@ -1018,6 +1052,7 @@ fun MapScreen(
             onHillshade = viewModel::setShowHillshade,
             onSlopes = viewModel::setShowSlopes,
             onPoints = viewModel::setShowMapPoints,
+            onDownloadMaps = { layersOpen = false; onOpenMaps() },
             onDismiss = { layersOpen = false },
         )
     }
@@ -1206,7 +1241,7 @@ private fun PressedSheet(
                 val p = info.position
                 onPlaceDraft(Place(
                     id = "",
-                    name = info.name ?: info.kind?.let { kindName(context, it) } ?: unnamedPlace,
+                    name = info.name ?: info.kind?.takeIf { it != SPOT }?.let { kindName(context, it) } ?: unnamedPlace,
                     kind = PlaceKind.guess(info.kind),
                     position = LatLon(p.latitude, p.longitude, info.tags["ele"]?.toDoubleOrNull()),
                 ))
@@ -1214,7 +1249,7 @@ private fun PressedSheet(
             onGoTo = {
                 onClose()
                 val p = info.position
-                val name = info.name ?: info.kind?.let { kindName(context, it) } ?: unnamedPlace
+                val name = info.name ?: info.kind?.takeIf { it != SPOT }?.let { kindName(context, it) } ?: unnamedPlace
                 startGoTo(GoTo(name, LatLon(p.latitude, p.longitude, info.tags["ele"]?.toDoubleOrNull())))
             },
             onDismiss = { onClose() },

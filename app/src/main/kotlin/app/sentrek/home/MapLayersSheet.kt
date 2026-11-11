@@ -1,6 +1,7 @@
 package app.sentrek.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -58,6 +59,8 @@ fun MapLayersSheet(
     onHillshade: (Boolean) -> Unit,
     onSlopes: (Boolean) -> Unit,
     onPoints: (Boolean) -> Unit,
+    /** Opens the map downloads: where the map is looked for, not in a menu of its own. */
+    onDownloadMaps: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(
@@ -74,6 +77,23 @@ fun MapLayersSheet(
         ) {
             for (k in MapKind.entries) {
                 KindRow(k, selected = k == kind, onClick = { onKind(k) })
+            }
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = TouchTarget)
+                    .clickable(onClick = onDownloadMaps)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Icon(SentrekIcons.Download, contentDescription = null)
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.map_download_title), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.map_download_hint), style = MaterialTheme.typography.bodyMedium)
+                }
+                Icon(SentrekIcons.ChevronRight, contentDescription = null)
             }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             Text(stringResource(R.string.map_layers_title), style = MaterialTheme.typography.titleSmall)

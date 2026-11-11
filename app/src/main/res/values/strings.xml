@@ -3,9 +3,7 @@
     <string name="app_name" translatable="false">Sentrek</string>
     <string name="zoom_in">Zoom in</string>
     <string name="zoom_out">Zoom out</string>
-    <string name="bar_maps">Maps</string>
-    <string name="bar_library">Library</string>
-    <string name="bar_emergency">SOS</string>
+    <string name="bar_library">Saved</string>
     <string name="gps_barometer_altitude">%s (barometer)</string>
     <string name="feature_go_to">Take me there</string>
     <string name="goto_arrived">You’re there</string>
@@ -50,7 +48,6 @@
     <string name="bar_places">Places</string>
     <string name="bar_record">Record</string>
     <string name="bar_stop">Stop</string>
-    <string name="bar_paused">Paused</string>
     <string name="my_location">My location</string>
     <string name="gps_off">GPS off. Tap to turn on</string>
     <string name="gps_searching">Searching for GPS…</string>
@@ -80,7 +77,6 @@
     <string name="record_paused">Paused</string>
     <string name="record_stop_title">Stop recording?</string>
     <string name="record_paused_title">Recording paused</string>
-    <string name="record_pause">Pause</string>
     <string name="record_resume">Resume</string>
     <string name="record_save">Save track</string>
     <string name="record_save_confirm">Save</string>
@@ -198,7 +194,7 @@
     <string name="settings_alerts_page">Alerts on the trail</string>
     <string name="settings_emergency_page">Emergency</string>
     <string name="settings_sos">SOS</string>
-    <string name="settings_sos_hint">Find it in Library › SOS. It shows where you are in big text, with buttons to call or text for help.</string>
+    <string name="settings_sos_hint">A red button on the map, above the lock. It shows where you are in big text, with buttons to call or text for help. Turn it off to hide the button.</string>
     <string name="settings_emergency_number">Number to call</string>
     <string name="settings_emergency_number_hint">The number the SOS screen calls. 112 in Europe, 911 in North America, or mountain rescue, or a friend.</string>
     <string name="settings_emergency_sms">Emergency SMS</string>
@@ -269,12 +265,12 @@
     <string name="map_reminder_update">Update now</string>
     <string name="map_update_failed_title">Maps could not be updated</string>
     <plurals name="map_update_failed_text">
-        <item quantity="one">Updating %1$d area failed %2$d times in a row. Its current map stays as it is. Try again on a good Wi-Fi connection, from Library › Maps.</item>
-        <item quantity="other">Updating %1$d areas failed %2$d times in a row. Their current maps stay as they are. Try again on a good Wi-Fi connection, from Library › Maps.</item>
+        <item quantity="one">Updating %1$d area failed %2$d times in a row. Its current map stays as it is. Try again on a good Wi-Fi connection, from the map button › Download maps.</item>
+        <item quantity="other">Updating %1$d areas failed %2$d times in a row. Their current maps stay as they are. Try again on a good Wi-Fi connection, from the map button › Download maps.</item>
     </plurals>
     <string name="map_update_failed_ok">OK</string>
     <string name="map_reminder_later">Not now</string>
-    <string name="map_reminder_offline">No connection: update from Library › Maps once online.</string>
+    <string name="map_reminder_offline">No connection: update from the map button › Download maps once online.</string>
     <string name="settings_advanced">Advanced</string>
     <string name="settings_data">Your data</string>
     <string name="settings_data_hint">Saves your tracks, places and photos in one file you can keep somewhere safe. Restoring only adds what’s missing. It never overwrites anything.</string>
@@ -303,9 +299,9 @@
     <string name="lock_hint">Locked. Hold the lock to unlock.</string>
     <string name="search_open">Search</string>
     <string name="search_back">Back to the map</string>
-    <string name="search_hint">Places, tracks, huts, peaks…</string>
+    <string name="search_hint">Places, towns, peaks, coordinates…</string>
     <string name="search_clear">Clear</string>
-    <string name="search_intro">Search your places, your tracks and the named points of the downloaded areas. Works offline.</string>
+    <string name="search_intro">Search your places and tracks, and the towns, mountains, huts and springs of the downloaded areas. Works offline. Coordinates work too, pasted from a text message.</string>
     <string name="search_reading">Reading the downloaded areas…</string>
     <string name="search_nothing">Nothing found. On the map, only downloaded areas can be searched.</string>
     <string name="search_places">Your places</string>
@@ -342,7 +338,7 @@
     <string name="peaks_title">Peaks around</string>
     <string name="peaks_working">Working out the view…</string>
     <string name="peaks_no_position">No position yet. Go outside, or allow location, and try again.</string>
-    <string name="peaks_no_data">No peaks to show here. Download this area in Library › Maps, or connect to the internet.</string>
+    <string name="peaks_no_data">No peaks to show here. Download this area (map button › Download maps), or connect to the internet.</string>
     <string name="peaks_direction">Looking %s</string>
     <string name="peaks_no_compass">no compass</string>
     <string name="peaks_follow_compass">Follow the compass</string>
@@ -473,15 +469,14 @@
     <string name="guide_step">%1$d of %2$d</string>
     <string name="guide_skip">Skip</string>
     <string name="guide_next">Next</string>
-    <string name="guide_start">Start</string>
     <string name="guide_download_title">Download before you go</string>
-    <string name="guide_download_text">The map works without signal in the areas you download. Open Library › Maps and tap the squares of the places you hike in. Downloaded areas also get trail difficulty, marked routes, springs and huts.</string>
+    <string name="guide_download_text">The map works without signal in the areas you download. Tap the squares of the places you hike in: they also get trail difficulty, marked routes, springs and huts. You’ll find it again under the map button, top right.</string>
     <string name="guide_press_title">Hold your finger on the map</string>
-    <string name="guide_press_text">Hold your finger on a trail, a peak, a hut, a river or a lake to see what it is: its name, difficulty, the routes on it and the weather there. On an empty spot, you can save it as a place.</string>
+    <string name="guide_press_text">Hold your finger on a trail, a peak, a hut, a river or a lake to see what it is: its name, difficulty, the routes on it and the weather there. On an empty spot: the way there, the weather, or save it as a place.</string>
     <string name="guide_location_title">Your position</string>
     <string name="guide_location_text">Tap the round button on the right to see where you are and keep the map on you. Tap it again to turn the map with the way you walk. Hold it for your coordinates and height.</string>
     <string name="guide_walk_title">Plan, follow, record</string>
-    <string name="guide_walk_text">Plan draws a route along the trails as you tap. In Library › Tracks, Follow guides you along a route and tells you what’s left. Record keeps your track, with the screen off too. SOS is in Library, with your position in big text.</string>
+    <string name="guide_walk_text">Plan draws a route along the trails as you tap. In Saved › Tracks, Follow guides you along a route and tells you what’s left. Record keeps your track, with the screen off too. The red SOS button shows your position in big text.</string>
     <string name="settings_show_guide">Show the first-run guide</string>
     <string name="map_kind_hiking">Hiking</string>
     <string name="map_kind_cycling">Cycling</string>
@@ -539,4 +534,34 @@
     <string name="feature_route_cai_mtb">Difficulty (CAI MTB)</string>
     <string name="feature_route_mtb_scale">Difficulty (MTB scale)</string>
     <string name="map_choose_current">Map and layers · %s</string>
+    <string name="bar_pause">Pause</string>
+    <string name="bar_resume">Resume</string>
+    <string name="sos_open">Open SOS</string>
+    <string name="sos_locked_hint">Locked. Hold SOS to open it.</string>
+    <string name="map_download_title">Download maps</string>
+    <string name="map_download_hint">To use the map without signal: pick the areas you hike in</string>
+    <string name="guide_later">Later</string>
+    <string name="guide_download_now">Download maps</string>
+    <string name="search_position">Position</string>
+    <string name="search_position_go">Take me there</string>
+    <string name="kind_city">City</string>
+    <string name="kind_town">Town</string>
+    <string name="kind_village">Village</string>
+    <string name="kind_hamlet">Hamlet</string>
+    <string name="kind_suburb">Suburb</string>
+    <string name="kind_spot">Spot on the map</string>
+    <string name="feature_tag_water">Drinking water</string>
+    <string name="feature_tag_fireplace">Fireplace</string>
+    <string name="feature_tag_beds">Beds</string>
+    <string name="feature_tag_mattress">Mattresses</string>
+    <string name="feature_tag_toilets">Toilets</string>
+    <string name="feature_tag_reservation">Booking</string>
+    <string name="feature_tag_fee">Fee</string>
+    <string name="feature_tag_opening_hours">Open</string>
+    <string name="feature_tag_phone">Phone</string>
+    <string name="feature_tag_seasonal">Seasonal</string>
+    <string name="feature_yes">Yes</string>
+    <string name="feature_no">No</string>
+    <string name="peaks_high">%1$s high</string>
+    <string name="peaks_away">%1$s away</string>
 </resources>

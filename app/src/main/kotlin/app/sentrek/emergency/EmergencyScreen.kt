@@ -64,6 +64,7 @@ import app.sentrek.ui.Format
 import app.sentrek.ui.MapButton
 import app.sentrek.ui.SentrekIcons
 import app.sentrek.ui.TouchTarget
+import app.sentrek.ui.EmergencyColors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -177,9 +178,10 @@ fun EmergencyScreen(
             // First, and without data: 112 unless the user chose another number in Settings.
             Button(
                 onClick = { dial(context, number) },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                modifier = wide,
-            ) { Text(stringResource(R.string.emergency_call, number), style = MaterialTheme.typography.titleLarge) }
+                // The strongest thing on the screen, on every theme.
+                colors = ButtonDefaults.buttonColors(containerColor = EmergencyColors.container, contentColor = EmergencyColors.content),
+                modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget * 1.4f),
+            ) { Text(stringResource(R.string.emergency_call, number), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
 
             // No signal: the call above may not get out. Where it last did.
             lastSignal?.let { spot ->

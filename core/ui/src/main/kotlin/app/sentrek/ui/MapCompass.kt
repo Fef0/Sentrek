@@ -60,6 +60,7 @@ fun MapCompass(
         shape = CircleShape,
         color = colors.surface,
         contentColor = colors.onSurface,
+        border = mapButtonBorder,
         shadowElevation = 4.dp,
     ) {
         Box(contentAlignment = Alignment.Center) {

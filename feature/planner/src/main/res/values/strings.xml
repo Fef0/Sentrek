@@ -25,4 +25,7 @@
     <string name="plan_discard_text">Unsaved changes will be lost.</string>
     <string name="plan_discard">Discard</string>
     <string name="plan_keep">Keep planning</string>
+    <string name="plan_reverse_short">Reverse</string>
+    <string name="plan_mode_trails">Along paths</string>
+    <string name="plan_mode_straight">Straight lines</string>
 </resources>

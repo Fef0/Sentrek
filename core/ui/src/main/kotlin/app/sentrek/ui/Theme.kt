@@ -18,6 +18,15 @@ import androidx.compose.ui.unit.sp
 /** Signal orange: readable on snow, rock and forest alike. */
 private val SignalOrange = Color(0xFFE85D04)
 
+/**
+ * Emergency red: the SOS button and the call for help, the same on every theme and map, and
+ * never the pale red of a dark theme's errors. White on it passes contrast in sunlight.
+ */
+object EmergencyColors {
+    val container = Color(0xFFC62828)
+    val content = Color.White
+}
+
 // High contrast on purpose: the app is read in direct sunlight.
 private val LightColors = lightColorScheme(
     primary = SignalOrange,

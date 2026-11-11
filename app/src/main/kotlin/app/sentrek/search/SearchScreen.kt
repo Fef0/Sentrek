@@ -59,6 +59,10 @@ import app.sentrek.record.placeKindLabel
 import app.sentrek.ui.Format
 import app.sentrek.ui.MapButton
 import app.sentrek.ui.SentrekIcons
+import app.sentrek.record.MapName
+import app.sentrek.home.kindName
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import app.sentrek.ui.TouchTarget
 import app.sentrek.ui.safeTopPadding
 import kotlinx.coroutines.launch
@@ -76,6 +80,8 @@ fun SearchScreen(
     onShowOnMap: (BoundingBox) -> Unit,
     /** Opens the peak finder. */
     onPeaks: () -> Unit,
+    /** A position typed or pasted: the map goes there, with the arrow pointing to it. */
+    onGoTo: (name: String, position: LatLon) -> Unit,
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
     val query by viewModel.query.collectAsStateWithLifecycle()
@@ -149,6 +155,15 @@ fun SearchScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
         ) {
+            section(R.string.search_position, listOfNotNull(results.position), key = { "c" }) { position ->
+                val coordinates = Format.coordinates(position.lat, position.lon)
+                ResultRow(
+                    badge = { RoundBadge(SentrekIcons.Place) },
+                    name = coordinates,
+                    details = listOfNotNull(stringResource(R.string.search_position_go), away(near, position)).joinToString(" · "),
+                    onClick = { onGoTo(coordinates, position) },
+                )
+            }
             section(R.string.search_places, results.places, key = { "p" + it.id }) { place ->
                 ResultRow(
                     badge = { PlaceBadge(RoutePlace.Kind.Saved(place.kind, place.displayColor), BADGE) },
@@ -173,18 +188,38 @@ fun SearchScreen(
                     onClick = { scope.launch { viewModel.show(track)?.let(onShowOnMap) } },
                 )
             }
-            section(R.string.search_map, results.points, key = { "m${it.kind}${it.position.lat}${it.position.lon}" }) { poi ->
-                val kind = RoutePlace.Kind.Osm(poi.kind)
-                ResultRow(
-                    badge = { PlaceBadge(kind, BADGE) },
-                    name = poi.name.orEmpty(),
-                    details = listOfNotNull(
-                        kindLabel(kind),
-                        poi.position.ele?.let(Format::elevation),
-                        away(near, poi.position),
-                    ).joinToString(" · "),
-                    onClick = { onShowOnMap(around(poi.position)) },
-                )
+            section(R.string.search_map, results.points, key = { "m${it.javaClass.simpleName}${it.name}${it.position.lat}${it.position.lon}" }) { hit ->
+                val context = LocalContext.current
+                when (hit) {
+                    is MapHit.Hiking -> {
+                        val kind = RoutePlace.Kind.Osm(hit.poi.kind)
+                        ResultRow(
+                            badge = { PlaceBadge(kind, BADGE) },
+                            name = hit.name,
+                            details = listOfNotNull(kindLabel(kind), hit.position.ele?.let(Format::elevation), away(near, hit.position))
+                                .joinToString(" · "),
+                            onClick = { onShowOnMap(around(hit.position)) },
+                        )
+                    }
+                    is MapHit.Named -> ResultRow(
+                        badge = {
+                            RoundBadge(
+                                when (hit.place.group) {
+                                    MapName.Group.Mountain -> SentrekIcons.Peak
+                                    MapName.Group.Water -> SentrekIcons.Water
+                                    else -> SentrekIcons.Place
+                                },
+                            )
+                        },
+                        name = hit.name,
+                        details = listOfNotNull(
+                            hit.place.kind.takeIf { it.isNotBlank() }?.let { kindName(context, it) },
+                            hit.position.ele?.let(Format::elevation),
+                            away(near, hit.position),
+                        ).joinToString(" · "),
+                        onClick = { onShowOnMap(around(hit.position)) },
+                    )
+                }
             }
             item { Box(Modifier.navigationBarsPadding()) }
         }
@@ -222,6 +257,19 @@ private fun ResultRow(badge: @Composable () -> Unit, name: String, details: Stri
                 Text(details, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
+    }
+}
+
+/** A town, a mountain or a typed position: no colour of its own, the theme's. */
+@Composable
+private fun RoundBadge(icon: ImageVector) {
+    Surface(
+        Modifier.size(BADGE),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.padding(6.dp))
     }
 }
 

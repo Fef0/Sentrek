@@ -14,27 +14,27 @@ RepoType: git
 Repo: https://github.com/Fef0/Sentrek.git
 
 Builds:
-  - versionName: 0.27.0
-    versionCode: 331
-    commit: 56e6afb07005a5e60f4bb5a96d6598f3340c4387
+  - versionName: 0.28.0
+    versionCode: 341
+    commit: 53aedc47c92d4acfd088dfaae5412a6198f8e459
     subdir: app
     gradle:
       - fdroid
     output: build/outputs/apk/fdroid/release/app-fdroid-armeabi-v7a-release-unsigned.apk
     binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-fdroid-armv7.apk
 
-  - versionName: 0.27.0
-    versionCode: 332
-    commit: 56e6afb07005a5e60f4bb5a96d6598f3340c4387
+  - versionName: 0.28.0
+    versionCode: 342
+    commit: 53aedc47c92d4acfd088dfaae5412a6198f8e459
     subdir: app
     gradle:
       - fdroid
     output: build/outputs/apk/fdroid/release/app-fdroid-arm64-v8a-release-unsigned.apk
     binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-fdroid-arm64.apk
 
-  - versionName: 0.27.0
-    versionCode: 334
-    commit: 56e6afb07005a5e60f4bb5a96d6598f3340c4387
+  - versionName: 0.28.0
+    versionCode: 344
+    commit: 53aedc47c92d4acfd088dfaae5412a6198f8e459
     subdir: app
     gradle:
       - fdroid
@@ -49,5 +49,5 @@ VercodeOperation:
   - 10*%c+1
   - 10*%c+2
   - 10*%c+4
-CurrentVersion: 0.27.0
-CurrentVersionCode: 334
+CurrentVersion: 0.28.0
+CurrentVersionCode: 344

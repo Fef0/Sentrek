@@ -1,0 +1,3 @@
+• Parchi e riserve naturali hanno il nome sulla mappa. Tieni premuto dentro uno per vedere in quali aree protette sei
+• Pianificatore: il pulsante bandiera divide un percorso in tappe, ognuna con distanza, salita e tempo, un numero sulla mappa e una bandiera sul profilo
+• Le fini delle tappe sono salvate come waypoint: compaiono tra i posti più avanti quando segui il percorso

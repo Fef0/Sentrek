@@ -1,0 +1,3 @@
+• Parks and nature reserves are named on the map. Long-press inside one to see which protected areas you're in
+• Planner: the flag button splits a route into sections, each with its distance, climb and time, a number on the map and a flag on the profile
+• Section ends are saved as waypoints: they show among the places ahead when you follow the route

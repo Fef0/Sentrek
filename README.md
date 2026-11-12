@@ -11,13 +11,13 @@ The name comes from *sentiero*, Italian for trail, and *trek*.
 <table>
   <tr>
     <td align="center"><img src="docs/media/map.gif" width="200" alt="Moving around the map"><br>The map</td>
-    <td align="center"><img src="docs/media/plan.gif" width="200" alt="Planning a route on the trails, saving it and opening it in the library"><br>Planning a route</td>
+    <td align="center"><img src="docs/media/plan.gif" width="200" alt="Planning a route on the trails, saving it and opening it in Routes"><br>Planning a route</td>
     <td align="center"><img src="docs/media/download.gif" width="200" alt="Downloading an area for offline use"><br>Downloading an area</td>
   </tr>
   <tr>
     <td align="center"><img src="docs/media/trail.gif" width="200" alt="Long-pressing a trail to see its route, difficulty and the weather"><br>Trail info and weather</td>
-    <td align="center"><img src="docs/media/follow.gif" width="200" alt="Following a route"><br>Following a route</td>
-    <td></td>
+    <td align="center"><img src="docs/media/follow.gif" width="200" alt="Following a route: what's left, the places ahead and the elevation profile"><br>Following a route</td>
+    <td align="center"><img src="docs/media/sos.gif" width="200" alt="The SOS screen: position in big text, call 112, send it by SMS"><br>SOS</td>
   </tr>
 </table>
 

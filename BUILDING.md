@@ -51,21 +51,23 @@ gradlew.bat assembleDebug      # Windows
 
 The first build downloads Gradle and the libraries, which can take ten minutes or more. Later builds are much faster.
 
-The APKs end up in `app/build/outputs/apk/debug/`. There's one per processor type, plus a universal one:
+This builds the app twice. The `github` build is the one on the Releases page: it can update itself from there. The `fdroid` build is the same app without the updater and without the permission to install apps, since F-Droid updates it. To build only one, use `assembleGithubDebug` or `assembleFdroidDebug`.
+
+The APKs end up in `app/build/outputs/apk/github/debug/` and `app/build/outputs/apk/fdroid/debug/`. There's one per processor type, plus a universal one:
 
 | File | For |
 |---|---|
-| `app-arm64-v8a-debug.apk` | Almost every phone made in the last ten years |
-| `app-armeabi-v7a-debug.apk` | Older 32-bit phones |
-| `app-x86_64-debug.apk` | The Android emulator on a PC |
-| `app-universal-debug.apk` | Any of the above (bigger) |
+| `app-github-arm64-v8a-debug.apk` | Almost every phone made in the last ten years |
+| `app-github-armeabi-v7a-debug.apk` | Older 32-bit phones |
+| `app-github-x86_64-debug.apk` | The Android emulator on a PC |
+| `app-github-universal-debug.apk` | Any of the above (bigger) |
 
 ## 4. Install it
 
 Turn on USB debugging on the phone, connect it, and run:
 
 ```sh
-./gradlew installDebug
+./gradlew installGithubDebug
 ```
 
 Or copy the APK to the phone and open it there. Android will ask you to allow installs from that app.
@@ -80,7 +82,7 @@ Debug builds are fine for trying things out, but they're slower. For real use, b
 ./gradlew assembleRelease
 ```
 
-Without a signing key, the APKs in `app/build/outputs/apk/release/` come out unsigned, and Android won't install them. To sign them:
+Without a signing key, the APKs in `app/build/outputs/apk/github/release/` and `app/build/outputs/apk/fdroid/release/` come out unsigned, and Android won't install them. To sign them:
 
 1. Create a key once, and keep it safe. Every future update has to be signed with the same key.
 

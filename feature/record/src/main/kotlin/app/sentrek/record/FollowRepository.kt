@@ -117,6 +117,10 @@ class FollowRepository @Inject constructor(
     private val _state = MutableStateFlow<Following?>(null)
     val state: StateFlow<Following?> = _state.asStateFlow()
 
+    /** A route followed now, or one from the last session still being loaded back. */
+    val active: Boolean
+        get() = _state.value != null || saved.exists()
+
     /** Set by [start] and [stop], so the route from the last session doesn't replace a newer choice. */
     private var chosen = false
 

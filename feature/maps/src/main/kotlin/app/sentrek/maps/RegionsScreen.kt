@@ -106,13 +106,26 @@ fun RegionsScreen(
     }
     // Without it the download still runs, only the progress notification is hidden.
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    // On mobile data the user hasn't allowed in Settings: asked before anything is fetched.
+    val overMobile = { action: () -> Unit ->
+        if (viewModel.onMobileData()) {
+            confirm = Confirmation(
+                title = context.getString(R.string.mobile_data_title),
+                text = context.getString(R.string.mobile_data_text),
+                confirmLabel = context.getString(R.string.mobile_data_download),
+                onConfirm = action,
+            )
+        } else {
+            action()
+        }
+    }
     val download = {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        viewModel.downloadSelected()
+        overMobile(viewModel::downloadSelected)
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -198,7 +211,7 @@ fun RegionsScreen(
             estimate = viewModel::estimate,
             extras = extras,
             onToggleExtra = viewModel::toggleExtra,
-            onSaveExtras = viewModel::saveExtras,
+            onSaveExtras = { if (viewModel.extrasToDownload()) overMobile(viewModel::saveExtras) else viewModel.saveExtras() },
             onDownload = download,
             onDelete = {
                 val count = selection.count { it in regions }
@@ -221,9 +234,9 @@ fun RegionsScreen(
                     onConfirm = viewModel::stopDownloads,
                 )
             },
-            onUpdate = viewModel::updateSelected,
-            onUpdateOld = viewModel::updateOld,
-            onRetryTrails = viewModel::retryTrails,
+            onUpdate = { overMobile(viewModel::updateSelected) },
+            onUpdateOld = { overMobile(viewModel::updateOld) },
+            onRetryTrails = { overMobile(viewModel::retryTrails) },
             onImport = { pickFile.launch(arrayOf("*/*")) },
             onShowImported = { showImported = true },
             modifier = Modifier.align(Alignment.BottomCenter),

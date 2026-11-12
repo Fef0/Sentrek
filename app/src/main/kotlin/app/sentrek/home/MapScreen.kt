@@ -76,6 +76,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import app.sentrek.R
+import app.sentrek.feature.maps.R as MapsR
 import app.sentrek.geo.overlay.MapKind
 import app.sentrek.map.MapExtras
 import app.sentrek.maps.TrailsDownload
@@ -1460,6 +1461,21 @@ private fun MapReminders(viewModel: HomeViewModel) {
     val recording by viewModel.recording.collectAsStateWithLifecycle()
     val oldMaps by viewModel.oldMaps.collectAsStateWithLifecycle()
     val failingMaps by viewModel.failingMaps.collectAsStateWithLifecycle()
+    // "Update" on mobile data the user hasn't allowed: asked once more, as on the Maps screen.
+    var askMobile by remember { mutableStateOf(false) }
+    val update = {
+        if (!viewModel.updateOldMaps()) Toast.makeText(context, R.string.map_reminder_offline, Toast.LENGTH_LONG).show()
+    }
+    if (askMobile) {
+        val confirmation = Confirmation(
+            title = stringResource(MapsR.string.mobile_data_title),
+            text = stringResource(MapsR.string.mobile_data_text),
+            confirmLabel = stringResource(MapsR.string.mobile_data_download),
+            onConfirm = update,
+        )
+        ConfirmDialog(confirmation) { askMobile = false }
+        return
+    }
     // Not mid-hike: only when nothing is being recorded. Failures first.
     if (failingMaps.isNotEmpty() && recording == null) {
         AlertDialog(
@@ -1485,9 +1501,7 @@ private fun MapReminders(viewModel: HomeViewModel) {
             text = { Text(stringResource(R.string.map_reminder_text)) },
             confirmButton = {
                 Button(
-                    onClick = {
-                        if (!viewModel.updateOldMaps()) Toast.makeText(context, R.string.map_reminder_offline, Toast.LENGTH_LONG).show()
-                    },
+                    onClick = { if (viewModel.onMobileData()) askMobile = true else update() },
                     modifier = Modifier.heightIn(min = TouchTarget),
                 ) { Text(stringResource(R.string.map_reminder_update)) }
             },

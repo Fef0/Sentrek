@@ -540,6 +540,25 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[AUTO_UPDATE_MAPS] = on }
     }
 
+    /** New versions from GitHub downloaded and installed by themselves (GitHub builds only). */
+    val autoUpdateApp: Flow<Boolean> =
+        prefs { it[AUTO_UPDATE_APP] ?: true }
+
+    suspend fun setAutoUpdateApp(on: Boolean) {
+        context.settings.edit { it[AUTO_UPDATE_APP] = on }
+    }
+
+    /**
+     * Big downloads on mobile data too. Off: map and app updates wait for Wi-Fi, and maps the
+     * user downloads ask first.
+     */
+    val useMobileData: Flow<Boolean> =
+        prefs { it[USE_MOBILE_DATA] ?: false }
+
+    suspend fun setUseMobileData(on: Boolean) {
+        context.settings.edit { it[USE_MOBILE_DATA] = on }
+    }
+
     /** A reminder at startup when downloaded maps are a few months old. */
     val mapUpdateReminders: Flow<Boolean> =
         prefs { it[MAP_REMINDERS] ?: true }
@@ -670,6 +689,8 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val SHOW_TRACK_ARROWS = booleanPreferencesKey("show_track_arrows")
         val MAP_REMINDERS = booleanPreferencesKey("map_reminders")
         val AUTO_UPDATE_MAPS = booleanPreferencesKey("auto_update_maps")
+        val AUTO_UPDATE_APP = booleanPreferencesKey("auto_update_app")
+        val USE_MOBILE_DATA = booleanPreferencesKey("use_mobile_data")
         val MAP_REMINDER_SNOOZED = longPreferencesKey("map_reminder_snoozed")
         val ROTATION_LOCKED = booleanPreferencesKey("rotation_locked")
         val DISTANCE_UNIT = stringPreferencesKey("distance_unit")

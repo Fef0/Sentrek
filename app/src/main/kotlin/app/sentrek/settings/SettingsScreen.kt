@@ -1,5 +1,10 @@
 package app.sentrek.settings
 
+import app.sentrek.update.UpdateCheck
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.foundation.layout.size
+import app.sentrek.update.AppUpdater
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.RadioButton
 import androidx.activity.compose.LocalActivity
@@ -113,7 +118,22 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val settings: SettingsRepository,
     private val backups: BackupRepository,
+    val updater: AppUpdater,
 ) : ViewModel() {
+    val autoUpdateApp: StateFlow<Boolean> =
+        settings.autoUpdateApp.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setAutoUpdateApp(on: Boolean) {
+        viewModelScope.launch { settings.setAutoUpdateApp(on) }
+    }
+
+    val useMobileData: StateFlow<Boolean> =
+        settings.useMobileData.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setUseMobileData(on: Boolean) {
+        viewModelScope.launch { settings.setUseMobileData(on) }
+    }
+
     fun backUp(target: Uri, onDone: (Boolean) -> Unit) {
         viewModelScope.launch { onDone(backups.backUp(target)) }
     }
@@ -446,7 +466,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
             SettingsPageId.Emergency -> EmergencySettings(viewModel, close)
             SettingsPageId.Advanced -> AdvancedSettings(viewModel, close)
             SettingsPageId.Data -> DataSettings(viewModel, close)
-            SettingsPageId.About -> AboutSettings(close) { viewModel.showGuide(); onBack() }
+            SettingsPageId.About -> AboutSettings(viewModel, close) { viewModel.showGuide(); onBack() }
         }
     }
     val powerMode by viewModel.powerMode.collectAsStateWithLifecycle()
@@ -845,9 +865,36 @@ private fun DataSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun AboutSettings(onBack: () -> Unit, onShowGuide: () -> Unit) {
+private fun AboutSettings(viewModel: SettingsViewModel, onBack: () -> Unit, onShowGuide: () -> Unit) {
     SettingsPage(stringResource(R.string.settings_about), onBack) {
         Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodyLarge)
+        // GitHub builds only: F-Droid updates the app itself.
+        if (viewModel.updater.available) {
+            val autoUpdate by viewModel.autoUpdateApp.collectAsStateWithLifecycle()
+            val waiting by viewModel.updater.waiting.collectAsStateWithLifecycle()
+            val activity = LocalActivity.current
+            ToggleRow(
+                title = stringResource(R.string.settings_auto_update_app),
+                hint = stringResource(R.string.settings_auto_update_app_hint),
+                checked = autoUpdate,
+                onChange = viewModel::setAutoUpdateApp,
+            )
+            val check by viewModel.updater.check.collectAsStateWithLifecycle()
+            val version = waiting
+            if (version != null && !check.busy) {
+                Button(
+                    onClick = { activity?.let(viewModel.updater::install) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget).padding(vertical = 4.dp),
+                ) { Text(stringResource(R.string.settings_install_update, version)) }
+            } else {
+                OutlinedButton(
+                    onClick = { viewModel.updater.checkNow() },
+                    enabled = !check.busy,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget).padding(vertical = 4.dp),
+                ) { Text(stringResource(R.string.settings_check_updates)) }
+            }
+            UpdateCheckStatus(check, onOverMobileData = { viewModel.updater.checkNow(overMobileData = true) })
+        }
         OutlinedButton(
             onClick = onShowGuide,
             modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget).padding(vertical = 4.dp),
@@ -857,6 +904,38 @@ private fun AboutSettings(onBack: () -> Unit, onShowGuide: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(top = 8.dp),
         )
+    }
+}
+
+/** Where "Check for updates" is at: a spinner, the download's progress, or what it found. */
+@Composable
+private fun UpdateCheckStatus(check: UpdateCheck, onOverMobileData: () -> Unit) {
+    val text = when (check) {
+        UpdateCheck.Idle -> return
+        UpdateCheck.Looking -> stringResource(R.string.update_looking)
+        is UpdateCheck.Downloading -> stringResource(R.string.update_downloading, check.version, (check.fraction * 100).toInt())
+        is UpdateCheck.Installing -> stringResource(R.string.update_installing, check.version)
+        is UpdateCheck.UpToDate -> stringResource(R.string.update_up_to_date, check.version)
+        is UpdateCheck.OnMobileData -> stringResource(R.string.update_on_mobile_data, check.version)
+        is UpdateCheck.AfterHike -> stringResource(R.string.update_after_hike, check.version)
+        UpdateCheck.Failed -> stringResource(R.string.update_failed)
+    }
+    Column(Modifier.padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (check is UpdateCheck.Looking || check is UpdateCheck.Installing) {
+                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            }
+            Text(text, style = MaterialTheme.typography.bodyMedium)
+        }
+        if (check is UpdateCheck.Downloading) {
+            LinearProgressIndicator(progress = { check.fraction }, modifier = Modifier.fillMaxWidth())
+        }
+        if (check is UpdateCheck.OnMobileData) {
+            OutlinedButton(
+                onClick = onOverMobileData,
+                modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget),
+            ) { Text(stringResource(R.string.update_download_anyway)) }
+        }
     }
 }
 
@@ -1134,6 +1213,15 @@ private fun AdvancedSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
                 ),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(vertical = 6.dp),
+            )
+
+            SectionTitle(stringResource(R.string.settings_downloads))
+            val useMobileData by viewModel.useMobileData.collectAsStateWithLifecycle()
+            ToggleRow(
+                title = stringResource(R.string.settings_mobile_data),
+                hint = stringResource(R.string.settings_mobile_data_hint),
+                checked = useMobileData,
+                onChange = viewModel::setUseMobileData,
             )
 
             SectionTitle(stringResource(R.string.settings_servers))

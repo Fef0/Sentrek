@@ -14,32 +14,32 @@ RepoType: git
 Repo: https://github.com/Fef0/Sentrek.git
 
 Builds:
-  - versionName: 0.26.0
-    versionCode: 321
-    commit: d422b0e3246836613739309f17ad0bb16f8f1fd5
+  - versionName: 0.27.0
+    versionCode: 331
+    commit: 56e6afb07005a5e60f4bb5a96d6598f3340c4387
     subdir: app
     gradle:
-      - yes
-    output: build/outputs/apk/release/app-armeabi-v7a-release-unsigned.apk
-    binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-armv7.apk
+      - fdroid
+    output: build/outputs/apk/fdroid/release/app-fdroid-armeabi-v7a-release-unsigned.apk
+    binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-fdroid-armv7.apk
 
-  - versionName: 0.26.0
-    versionCode: 322
-    commit: d422b0e3246836613739309f17ad0bb16f8f1fd5
+  - versionName: 0.27.0
+    versionCode: 332
+    commit: 56e6afb07005a5e60f4bb5a96d6598f3340c4387
     subdir: app
     gradle:
-      - yes
-    output: build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk
-    binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-arm64.apk
+      - fdroid
+    output: build/outputs/apk/fdroid/release/app-fdroid-arm64-v8a-release-unsigned.apk
+    binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-fdroid-arm64.apk
 
-  - versionName: 0.26.0
-    versionCode: 324
-    commit: d422b0e3246836613739309f17ad0bb16f8f1fd5
+  - versionName: 0.27.0
+    versionCode: 334
+    commit: 56e6afb07005a5e60f4bb5a96d6598f3340c4387
     subdir: app
     gradle:
-      - yes
-    output: build/outputs/apk/release/app-x86_64-release-unsigned.apk
-    binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-x86_64.apk
+      - fdroid
+    output: build/outputs/apk/fdroid/release/app-fdroid-x86_64-release-unsigned.apk
+    binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-fdroid-x86_64.apk
 
 AllowedAPKSigningKeys: 74e093678be51816e75b0870b663eaab89f6cd71e00b32c32719f2c796ec65d5
 
@@ -49,5 +49,5 @@ VercodeOperation:
   - 10*%c+1
   - 10*%c+2
   - 10*%c+4
-CurrentVersion: 0.26.0
-CurrentVersionCode: 324
+CurrentVersion: 0.27.0
+CurrentVersionCode: 334

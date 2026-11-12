@@ -1,0 +1,3 @@
+• New setting: Use mobile data (Settings › Advanced). Off, map updates wait for Wi-Fi, and maps you download on mobile data ask first
+• A phone's hotspot counts as mobile data
+• The version from the GitHub Releases page can now update itself. The F-Droid version is updated by F-Droid, as before

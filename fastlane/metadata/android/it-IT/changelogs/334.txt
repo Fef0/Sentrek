@@ -1,0 +1,3 @@
+• Nuova impostazione: Usa la rete mobile (Impostazioni › Avanzate). Spenta, gli aggiornamenti delle mappe aspettano il Wi-Fi, e le mappe che scarichi con la rete mobile chiedono prima
+• L'hotspot di un telefono conta come rete mobile
+• La versione dalla pagina Releases di GitHub ora si aggiorna da sola. La versione F-Droid la aggiorna F-Droid, come prima

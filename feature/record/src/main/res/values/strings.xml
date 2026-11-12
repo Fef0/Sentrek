@@ -263,4 +263,5 @@ Plan one on the map, or import a GPX or KML file.</string>
     <string name="stats_vs_signposts">Against signpost times</string>
     <string name="stats_speed_chart">Speed on each walk, while moving · tap a dot</string>
     <string name="stats_average">Average %s</string>
+    <string name="section_end">End of section %1$d</string>
 </resources>

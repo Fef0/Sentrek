@@ -261,4 +261,5 @@ Pianificane uno sulla mappa, o importa un file GPX o KML.</string>
     <string name="stats_vs_signposts">Rispetto ai cartelli</string>
     <string name="stats_speed_chart">Velocità in ogni escursione, in movimento · tocca un punto</string>
     <string name="stats_average">Media %s</string>
+    <string name="section_end">Fine tappa %1$d</string>
 </resources>

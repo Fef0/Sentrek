@@ -28,4 +28,7 @@
     <string name="plan_reverse_short">Reverse</string>
     <string name="plan_mode_trails">Along paths</string>
     <string name="plan_mode_straight">Straight lines</string>
+    <string name="plan_section_short">Section end</string>
+    <string name="plan_section">End a section at this point</string>
+    <string name="plan_section_number">Section %1$d</string>
 </resources>

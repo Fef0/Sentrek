@@ -123,6 +123,11 @@
     <string name="feature_elevation">Altitudine</string>
     <string name="feature_difficulty">Difficoltà (SAC)</string>
     <string name="feature_visibility">Visibilità del sentiero</string>
+    <plurals name="feature_protected_area">
+        <item quantity="one">Area protetta</item>
+        <item quantity="many">Aree protette</item>
+        <item quantity="other">Aree protette</item>
+    </plurals>
     <string name="feature_coordinates">Coordinate</string>
     <string name="feature_osm_tags">Dati OpenStreetMap</string>
     <string name="feature_open_osm">Vedi su openstreetmap.org</string>

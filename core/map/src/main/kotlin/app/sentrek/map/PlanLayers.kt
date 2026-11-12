@@ -1,5 +1,13 @@
 package app.sentrek.map
 
+import org.maplibre.android.style.layers.PropertyFactory.textIgnorePlacement
+import org.maplibre.android.style.layers.PropertyFactory.textAllowOverlap
+import org.maplibre.android.style.layers.PropertyFactory.textColor
+import org.maplibre.android.style.layers.PropertyFactory.textSize
+import org.maplibre.android.style.layers.PropertyFactory.textFont
+import org.maplibre.android.style.layers.PropertyFactory.textField
+import org.maplibre.android.style.expressions.Expression.has
+import org.maplibre.android.style.layers.SymbolLayer
 import app.sentrek.geo.LatLon
 import app.sentrek.geo.plan.PlanLeg
 import org.maplibre.android.style.expressions.Expression.eq
@@ -40,7 +48,8 @@ object PlanLayers {
     private const val STRAIGHT = "-straight"
     private const val COLOR = 0xFFD81B60.toInt()
 
-    fun sync(style: Style, points: List<LatLon>, legs: List<PlanLeg>, selected: Int?) {
+    /** [sectionEnds]: the indices of the points that end a section, numbered on the map. */
+    fun sync(style: Style, points: List<LatLon>, legs: List<PlanLeg>, selected: Int?, sectionEnds: List<Int> = emptyList()) {
         val line = legs.flatMap { it.pieces }.filter { (points, _) -> points.size >= 2 }.map { (points, onPath) ->
             Feature.fromGeometry(LineString.fromLngLats(points.map { Point.fromLngLat(it.lon, it.lat) })).apply {
                 addBooleanProperty("t", onPath)
@@ -48,13 +57,16 @@ object PlanLayers {
         }
         val handles = points.mapIndexed { i, p ->
             Feature.fromGeometry(Point.fromLngLat(p.lon, p.lat)).apply {
+                val section = sectionEnds.indexOf(i)
                 val role = when {
                     i == selected -> "selected"
                     i == 0 -> "start"
                     i == points.lastIndex && points.size > 1 -> "end"
+                    section >= 0 -> "section"
                     else -> "point"
                 }
                 addStringProperty("r", role)
+                if (section >= 0) addStringProperty("n", "${section + 1}")
             }
         } + legs.map { it.middle }.map { p ->
             Feature.fromGeometry(Point.fromLngLat(p.lon, p.lat)).apply { addStringProperty("r", "mid") }
@@ -66,6 +78,9 @@ object PlanLayers {
 
     /** Hides the plan without forgetting the layers (the planner was closed). */
     fun clear(style: Style) = sync(style, emptyList(), emptyList(), null)
+
+    private const val NUMBERS = "plan-section-numbers"
+    private val SECTION_COLOR = rgb(239, 108, 0)
 
     private fun setSource(style: Style, id: String, features: List<Feature>) {
         val collection = FeatureCollection.fromFeatures(features)
@@ -102,13 +117,14 @@ object PlanLayers {
         PlaceLayers.addBelow(
             style,
             CircleLayer(POINTS, POINTS).withProperties(
-                circleRadius(match(get("r"), literal(8f), stop("selected", 12f), stop("mid", 5f))),
+                circleRadius(match(get("r"), literal(8f), stop("selected", 12f), stop("section", 12f), stop("mid", 5f))),
                 circleColor(
                     match(
                         get("r"), rgb(255, 255, 255),
                         stop("start", rgb(46, 125, 50)),
                         stop("end", rgb(198, 40, 40)),
                         stop("selected", rgb(216, 27, 96)),
+                        stop("section", SECTION_COLOR),
                     ),
                 ),
                 circleOpacity(match(get("r"), literal(1f), stop("mid", 0.85f))),
@@ -118,10 +134,23 @@ object PlanLayers {
                         stop("start", rgb(255, 255, 255)),
                         stop("end", rgb(255, 255, 255)),
                         stop("selected", rgb(255, 255, 255)),
+                        stop("section", rgb(255, 255, 255)),
                     ),
                 ),
                 circleStrokeWidth(match(get("r"), literal(3f), stop("mid", 2f))),
             ),
+        )
+        // The section's number in its end point (the selected one too: the number stays).
+        PlaceLayers.addBelow(
+            style,
+            SymbolLayer(NUMBERS, POINTS).withProperties(
+                textField(get("n")),
+                textFont(arrayOf("Noto Sans Bold")),
+                textSize(12f),
+                textColor(rgb(255, 255, 255)),
+                textAllowOverlap(true),
+                textIgnorePlacement(true),
+            ).withFilter(has("n")),
         )
     }
 }

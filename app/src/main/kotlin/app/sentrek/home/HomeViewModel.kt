@@ -407,6 +407,8 @@ class HomeViewModel @Inject constructor(
 
     suspend fun trackProfile(track: SavedTrack) = tracks.profile(track)
 
+    suspend fun trackSections(track: SavedTrack) = tracks.sections(track)
+
     suspend fun weatherAt(at: LatLon): WeatherResult = weather.forecast(at)
 
     suspend fun trackWeather(track: SavedTrack): WeatherResult =

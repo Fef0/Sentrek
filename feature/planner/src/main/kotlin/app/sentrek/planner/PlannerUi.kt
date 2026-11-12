@@ -1,5 +1,16 @@
 package app.sentrek.planner
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
+import app.sentrek.geo.plan.SectionTotals
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -60,12 +71,62 @@ fun PlanPanel(stats: PlanStats?, editing: String?, modifier: Modifier = Modifier
                 Stat(stringResource(R.string.plan_time), Format.estimate(stats.millis), Modifier.weight(1f))
             }
             if (stats.hasElevation) {
-                ElevationProfile(stats.profile, Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp))
+                ElevationProfile(
+                    stats.profile,
+                    Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
+                    flags = sectionFlags(stats.sections, stats.profile),
+                )
             } else {
                 Text(
                     stringResource(R.string.plan_no_terrain),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = 4.dp),
+                )
+            }
+            // A long trek has many: they scroll, and the map stays in sight.
+            if (stats.sections.isNotEmpty()) {
+                SectionList(
+                    stats.sections,
+                    Modifier.padding(horizontal = 4.dp).heightIn(max = 112.dp).verticalScroll(rememberScrollState()),
+                )
+            }
+        }
+    }
+}
+
+/** The section ends' colour on the map (PlanLayers). */
+private val SECTION_ORANGE = Color(0xFFEF6C00)
+
+/**
+ * Where on [profile] each section but the last ends: the sections' lengths added up, fitted to
+ * the profile's length (they're measured on their own pieces, a few metres apart).
+ */
+fun sectionFlags(sections: List<SectionTotals>, profile: List<Pair<Double, Double>>): List<Double> {
+    val total = sections.sumOf { it.distance }
+    val length = profile.lastOrNull()?.first ?: return emptyList()
+    if (sections.size < 2 || total <= 0) return emptyList()
+    var along = 0.0
+    return sections.dropLast(1).map { along += it.distance; along / total * length }
+}
+
+/** A route's sections, one line each: its number, distance, climb, descent and time. */
+@Composable
+fun SectionList(sections: List<SectionTotals>, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        sections.forEachIndexed { i, s ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                // As on the map: the number in an orange dot, where the section ends.
+                val label = stringResource(R.string.plan_section_number, i + 1)
+                Box(
+                    Modifier.size(24.dp).background(SECTION_ORANGE, CircleShape).semantics { contentDescription = label },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("${i + 1}", color = Color.White, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                }
+                val climb = if (s.hasElevation) " · ↑ ${Format.elevation(s.ascent)} ↓ ${Format.elevation(s.descent)}" else ""
+                Text(
+                    "${Format.distance(s.distance)}$climb · ${Format.estimate(s.millis)}",
+                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
         }

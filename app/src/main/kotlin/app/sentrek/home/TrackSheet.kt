@@ -1,5 +1,8 @@
 package app.sentrek.home
 
+import app.sentrek.planner.SectionList
+import app.sentrek.planner.sectionFlags
+import app.sentrek.geo.plan.SectionTotals
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -65,9 +68,12 @@ fun TrackSheet(
     loadProfile: suspend (SavedTrack) -> List<Pair<Double, Double>>,
     /** The forecast at the track's highest point. */
     loadWeather: suspend () -> WeatherResult,
+    /** Each section's totals, for a route cut into sections in the planner. */
+    loadSections: suspend (SavedTrack) -> List<SectionTotals> = { emptyList() },
 ) {
     var choosingColor by remember { mutableStateOf(false) }
     val profile by produceState(emptyList<Pair<Double, Double>>(), track.id) { value = loadProfile(track) }
+    val sections by produceState(emptyList<SectionTotals>(), track) { value = loadSections(track) }
     val wide = Modifier.fillMaxWidth().heightIn(min = TouchTarget)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(
@@ -95,7 +101,8 @@ fun TrackSheet(
                 "${Format.distance(track.distance)} · $time · ↑ ${Format.elevation(track.ascent)} ↓ ${Format.elevation(track.descent)}",
                 style = MaterialTheme.typography.bodyLarge,
             )
-            ElevationProfile(profile, Modifier.fillMaxWidth().height(72.dp))
+            ElevationProfile(profile, Modifier.fillMaxWidth().height(72.dp), flags = sectionFlags(sections, profile))
+            if (sections.isNotEmpty()) SectionList(sections)
             TrackNote(track.note, track.photos, expanded = true, onExpand = null, photoSize = TouchTarget * 1.5f)
             WeatherSection(loadWeather, highest = true)
             if (isFollowed) {

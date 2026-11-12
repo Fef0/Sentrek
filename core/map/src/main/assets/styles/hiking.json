@@ -567,6 +567,25 @@
    }
   },
   {
+   "id": "park-name",
+   "type": "symbol",
+   "source": "openmaptiles",
+   "source-layer": "park",
+   "minzoom": 9,
+   "filter": ["==", ["geometry-type"], "Point"],
+   "layout": {
+    "text-field": ["coalesce", ["get", "name:latin"], ["get", "name"]],
+    "text-font": ["Noto Sans Italic"],
+    "text-size": 12,
+    "text-max-width": 8
+   },
+   "paint": {
+    "text-color": "#3f7a2e",
+    "text-halo-color": "#ffffff",
+    "text-halo-width": 1.5
+   }
+  },
+  {
    "id": "water-name",
    "type": "symbol",
    "source": "openmaptiles",

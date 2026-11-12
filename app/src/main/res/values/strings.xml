@@ -125,6 +125,10 @@
     <string name="feature_elevation">Elevation</string>
     <string name="feature_difficulty">Difficulty (SAC)</string>
     <string name="feature_visibility">Trail visibility</string>
+    <plurals name="feature_protected_area">
+        <item quantity="one">Protected area</item>
+        <item quantity="other">Protected areas</item>
+    </plurals>
     <string name="feature_coordinates">Coordinates</string>
     <string name="feature_osm_tags">OpenStreetMap data</string>
     <string name="feature_open_osm">View on openstreetmap.org</string>

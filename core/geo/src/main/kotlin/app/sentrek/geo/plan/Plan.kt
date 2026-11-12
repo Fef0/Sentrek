@@ -95,8 +95,72 @@ data class PlanLeg(
     fun reversed(): PlanLeg = PlanLeg(points.reversed(), onTrails, offPathStart = offPathEnd, offPathEnd = offPathStart)
 }
 
-/** A planned point. [onTrails]: the leg arriving here follows the paths on the map. */
-data class PlanPoint(val position: LatLon, val onTrails: Boolean)
+/**
+ * A planned point. [onTrails]: the leg arriving here follows the paths on the map.
+ * [sectionEnd]: a section of the route (a day, a stage) ends here and the next one starts.
+ */
+data class PlanPoint(val position: LatLon, val onTrails: Boolean, val sectionEnd: Boolean = false)
+
+/** A section's totals; [millis] at the planned pace. Without terrain [hasElevation] is false. */
+data class SectionTotals(
+    val distance: Double,
+    val ascent: Double,
+    val descent: Double,
+    val millis: Long,
+    val hasElevation: Boolean,
+)
+
+/** A route cut into sections at the points that end one. */
+object Sections {
+    /**
+     * The indices of the points ending a section, in order. The start can't end one, and the
+     * end of the route ends the last section anyway: a mark there (put while planning, before
+     * the next point) only counts once the route goes on.
+     */
+    fun ends(points: List<PlanPoint>): List<Int> = points.indices.filter { it in 1 until points.lastIndex && points[it].sectionEnd }
+
+    /**
+     * The legs of each section, as index ranges into the legs (leg i goes from point i to
+     * i + 1). Empty when the route isn't cut: one section is no sections.
+     */
+    fun legRanges(points: List<PlanPoint>): List<IntRange> {
+        val ends = ends(points)
+        if (ends.isEmpty()) return emptyList()
+        val bounds = listOf(0) + ends + points.lastIndex
+        return bounds.zipWithNext { from, to -> from until to }
+    }
+
+    /**
+     * Where [line] passes each of [ends], in order: the index of its nearest point after the
+     * previous end's, so a route that comes back past a section end is cut where it reaches it
+     * first. The ends of the line itself are not included.
+     */
+    fun cuts(line: List<LatLon>, ends: List<LatLon>): List<Int> {
+        val cuts = mutableListOf<Int>()
+        var from = 0
+        for (end in ends) {
+            if (from + 1 >= line.lastIndex) break
+            val d = (from + 1 until line.lastIndex).map { Geo.distance(line[it], end) }
+            val nearest = d.min()
+            // The first pass within reach of the nearest, then down to its closest point: on the
+            // way back the line may pass a few metres nearer, but the section ended the first time.
+            var best = d.indexOfFirst { it <= nearest + PASS_M }
+            while (best + 1 < d.size && d[best + 1] < d[best]) best++
+            cuts += from + 1 + best
+            from += 1 + best
+        }
+        return cuts
+    }
+
+    /** How much farther than the nearest point a first pass may be. */
+    private const val PASS_M = 30.0
+
+    /** [line] in pieces at [cuts], each sharing its first point with the end of the one before. */
+    fun <T> pieces(line: List<T>, cuts: List<Int>): List<List<T>> {
+        val bounds = listOf(0) + cuts + line.lastIndex
+        return bounds.zipWithNext { from, to -> line.subList(from, to + 1) }
+    }
+}
 
 /** A plan as saved with its route, to edit it again: its points and the legs as drawn. */
 data class SavedPlan(val points: List<PlanPoint>, val legs: List<PlanLeg>) {

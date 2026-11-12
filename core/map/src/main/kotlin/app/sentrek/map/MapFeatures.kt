@@ -45,6 +45,11 @@ data class MapFeatureInfo(
     /** A piste's OSM piste:difficulty (novice, easy…) and piste:grooming (classic, skating…). */
     val pisteDifficulty: String? = null,
     val pisteGrooming: String? = null,
+    /**
+     * The protected areas the spot is in (parks, reserves, Natura 2000…), by name. Overlapping
+     * ones all count: a reserve inside a park, a UNESCO site over both.
+     */
+    val protectedAreas: List<String> = emptyList(),
 ) {
     /** A river, stream or lake rather than a trail or a point. */
     val isWater: Boolean get() = intermittent != null
@@ -78,6 +83,7 @@ object MapFeatures {
     private const val BASE_SOURCE = "openmaptiles"
     private const val WATER_NAME_LAYER = "water_name"
     private const val PATH_NAME_LAYER = "transportation_name"
+    private const val PARK_LAYER = "park"
     private val PATH_KINDS = setOf("path", "track")
 
     /** How far a path's label line may stray from the path itself (z14 tiles, simplified). */
@@ -143,6 +149,22 @@ object MapFeatures {
             // Fords come with the base map, not the hiking overlay: looked up underneath.
             ford = trail != null && baseFord(map, near, layerIds),
         )
+    }
+
+    /**
+     * The names of the protected areas [at] is in, from the base map's park areas loaded now.
+     * Only the names: the tiles' "class" comes from free text and is often wrong (regional
+     * parks tagged national ones), so it isn't shown.
+     */
+    fun protectedAreas(map: MapLibreMap, at: LatLng): List<String> {
+        val source = map.style?.getSourceAs<VectorSource>(BASE_SOURCE) ?: return emptyList()
+        val point = Point.fromLngLat(at.longitude, at.latitude)
+        return source.querySourceFeatures(arrayOf(PARK_LAYER), null)
+            .filter { it.geometry() is Polygon || it.geometry() is MultiPolygon }
+            // An area is cut along the tile edges: the piece the spot is in is enough.
+            .filter { inside(point, it) }
+            .mapNotNull { properties(it).let { p -> p["name:latin"] ?: p["name"] }?.takeIf(String::isNotBlank) }
+            .distinct()
     }
 
     /**

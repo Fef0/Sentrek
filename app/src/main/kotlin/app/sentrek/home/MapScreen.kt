@@ -1,5 +1,6 @@
 package app.sentrek.home
 
+import app.sentrek.geo.plan.Sections
 import android.location.Location
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
@@ -708,7 +709,19 @@ fun MapScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalAlignment = Alignment.End,
             ) {
-                // Planning is a mode of its own: its two buttons say what they do, in words.
+                // Planning is a mode of its own: its buttons say what they do, in words.
+                val sectionTarget = plan.sectionTarget
+                if (plan.active && sectionTarget != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MapLabel(stringResource(PlannerR.string.plan_section_short))
+                        MapButton(
+                            icon = SentrekIcons.Flag,
+                            contentDescription = stringResource(PlannerR.string.plan_section),
+                            onClick = planner::toggleSection,
+                            active = plan.points.getOrNull(sectionTarget)?.sectionEnd == true,
+                        )
+                    }
+                }
                 if (plan.active && plan.points.size >= 2) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         MapLabel(stringResource(PlannerR.string.plan_reverse_short))
@@ -952,7 +965,8 @@ fun MapScreen(
             val info = MapFeatures.at(m, m.projection.toScreenLocation(pressedAt), latLng, pressRadiusPx, exactPressPx)
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             // Nothing there: the spot itself, to go to, save as a place or ask the weather of.
-            pressed = info ?: MapFeatureInfo(name = null, kind = SPOT, position = latLng, osmId = null)
+            pressed = (info ?: MapFeatureInfo(name = null, kind = SPOT, position = latLng, osmId = null))
+                .copy(protectedAreas = MapFeatures.protectedAreas(m, latLng))
             true
         }
         m.addOnMapLongClickListener(onLongPress)
@@ -1311,6 +1325,7 @@ private fun PressedSheet(
             onDismiss = { onClose() },
             loadProfile = viewModel::trackProfile,
             loadWeather = { viewModel.trackWeather(track) },
+            loadSections = viewModel::trackSections,
         )
         if (editingDetails) {
             TrackDetailsDialog(
@@ -1400,9 +1415,9 @@ private fun MapLayerEffects(
         // While dragging, legs that changed are straight until the finger lifts.
         val preview = planPreview
         if (preview != null) {
-            PlanLayers.sync(s, preview, preview.zipWithNext { a, b -> planner.knownLeg(a, b, onTrails = true) }, plan.selected)
+            PlanLayers.sync(s, preview, preview.zipWithNext { a, b -> planner.knownLeg(a, b, onTrails = true) }, plan.selected, Sections.ends(plan.points))
         } else {
-            PlanLayers.sync(s, plan.positions, planLegs, plan.selected)
+            PlanLayers.sync(s, plan.positions, planLegs, plan.selected, Sections.ends(plan.points))
         }
     }
 

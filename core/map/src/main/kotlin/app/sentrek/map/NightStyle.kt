@@ -22,6 +22,7 @@ import org.maplibre.android.maps.Style
 internal object NightStyle {
     private const val HALO = "#000000"
     private val textLayers = mapOf(
+        "park-name" to "#7fb069",
         "water-name" to "#6fb0e0",
         "path-name" to "#f08a90",
         "poi-hiking" to "#e8dccb",

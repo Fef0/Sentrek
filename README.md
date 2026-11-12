@@ -28,6 +28,7 @@ The name comes from *sentiero*, Italian for trail, and *trek*.
 - To use it offline, download squares from a grid. A square is about 55 × 55 km and takes around 30 MB.
 - Downloads carry on when you leave the app, with the progress on the map and in a notification. They wait for a connection and try again by themselves. An area is kept only once it has its map and all its details; Stop removes the ones not finished yet.
 - Map and app updates wait for Wi-Fi, and a download you start on mobile data asks first. Settings › Advanced › Use mobile data turns this off.
+- Parks and nature reserves are outlined and named. Long-press inside one to see which protected areas you're in.
 - You can colour steep slopes like an avalanche map, and colour trails by difficulty (SAC scale).
 - Long-press a trail to see its difficulty and the marked routes that use it, with length, climb, walking time and who looks after them. From there you can get the weather forecast for that spot, day by day or hour by hour.
 - You can also open your own `.mbtiles` and `.pmtiles` files.
@@ -37,6 +38,7 @@ The name comes from *sentiero*, Italian for trail, and *trek*.
 - Tap the map to add points and the route follows the paths between them. This works offline too, in downloaded areas.
 - You see distance, climb, descent, walking time and the elevation profile while you plan.
 - Drag a point to move it, or drag the middle of a segment to add one. Undo and redo are there. One button turns the route around.
+- Split a long route into sections (days, stages) with the flag button: each one gets its own distance, climb and time, and a mark on the map and on the profile. Section ends are saved as waypoints, so they show among the places ahead when you follow the route.
 - Save the route, or export it as GPX or KML.
 
 ### Routes and tracks

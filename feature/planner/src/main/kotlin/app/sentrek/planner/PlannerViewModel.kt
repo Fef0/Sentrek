@@ -11,6 +11,8 @@ import app.sentrek.geo.plan.PlanGeometry
 import app.sentrek.geo.plan.PlanLeg
 import app.sentrek.geo.plan.PlanPoint
 import app.sentrek.geo.plan.SavedPlan
+import app.sentrek.geo.plan.SectionTotals
+import app.sentrek.geo.plan.Sections
 import app.sentrek.geo.plan.TrailGraph
 import app.sentrek.geo.plan.TrailLine
 import app.sentrek.geo.route.HikingTime
@@ -74,6 +76,9 @@ data class PlanState(
     val editing: SavedTrack? = null,
 ) {
     val positions: List<LatLon> get() = points.map { it.position }
+
+    /** The point the section button marks: the selected one, or the last; never the start. */
+    val sectionTarget: Int? get() = (selected ?: points.lastIndex).takeIf { it > 0 }
 }
 
 /**
@@ -90,6 +95,8 @@ data class PlanStats(
     val profile: List<Pair<Double, Double>>,
     /** The legs every ~30 m with terrain heights: what gets saved. */
     val dense: List<LatLon>,
+    /** Each section's totals, when the route is cut into sections; empty otherwise. */
+    val sections: List<SectionTotals> = emptyList(),
 )
 
 @HiltViewModel
@@ -139,8 +146,8 @@ class PlannerViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val stats: StateFlow<PlanStats?> = legs
-        .mapLatest { legs -> if (legs.isEmpty()) null else stats(join(legs)) }
+    val stats: StateFlow<PlanStats?> = combine(legs, _state.map { it.points }.distinctUntilChanged(), ::Pair)
+        .mapLatest { (legs, points) -> if (legs.isEmpty()) null else stats(join(legs)).copy(sections = sections(points, legs)) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     fun start() {
@@ -213,6 +220,18 @@ class PlannerViewModel @Inject constructor(
         val follow = editor.points.getOrNull(leg + 1)?.onTrails ?: return@edit null
         editor.insert(leg + 1, PlanPoint(if (follow) snap(p) else p, follow))
         leg + 1
+    }
+
+    /**
+     * Ends a section at the selected point, or at the last one when none is selected (the
+     * route goes on from there), or takes that end away again.
+     */
+    fun toggleSection() = edit {
+        val selected = _state.value.selected
+        val index = selected ?: editor.points.lastIndex
+        val point = editor.points.getOrNull(index)?.takeIf { index > 0 } ?: return@edit selected
+        editor.move(index, point.copy(sectionEnd = !point.sectionEnd))
+        selected
     }
 
     /** Removes the selected point, or the last one when none is selected. */
@@ -342,6 +361,15 @@ class PlannerViewModel @Inject constructor(
         val radius = source.snapRadiusM()
         val lines = source.lines(box(listOf(p), radius + 50))
         return withContext(Dispatchers.Default) { TrailGraph(lines).snap(p, radius) } ?: p
+    }
+
+    /** The totals of each section; empty while the legs don't match the points (being routed). */
+    private suspend fun sections(points: List<PlanPoint>, legs: List<PlanLeg>): List<SectionTotals> {
+        if (legs.size != points.size - 1) return emptyList()
+        return Sections.legRanges(points).map { range ->
+            val s = stats(join(legs.subList(range.first, range.last + 1)))
+            SectionTotals(s.distance, s.ascent, s.descent, s.millis, s.hasElevation)
+        }
     }
 
     private suspend fun stats(points: List<LatLon>): PlanStats {

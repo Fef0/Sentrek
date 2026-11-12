@@ -1,5 +1,8 @@
 package app.sentrek.record
 
+import app.sentrek.geo.route.HikingTime
+import app.sentrek.geo.plan.SectionTotals
+import app.sentrek.geo.plan.Sections
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -176,7 +179,7 @@ class TrackRepository @Inject constructor(
             id, title, start, stats.endTime.coerceAtLeast(start), stats.distance, stats.ascent, stats.descent,
             stats.activeMillis, imported, color, note.trim(), photos,
         )
-        write(track, segments, waypoints)
+        write(track, segments, if (plan != null) withSectionEnds(waypoints, plan) else waypoints)
         plan?.let { writePlan(track, it) }
         _tracks.update { (listOf(track) + it).sortedByDescending { t -> t.startTime } }
         track
@@ -327,7 +330,7 @@ class TrackRepository @Inject constructor(
                 val waypoints = runCatching { read(track).waypoints }.getOrDefault(emptyList())
                 val stats = TrackStats.of(segments, TrackStats.SMOOTH_CLIMB_THRESHOLD_M)
                 val edited = track.copy(distance = stats.distance, ascent = stats.ascent, descent = stats.descent, duration = 0)
-                write(edited, segments, waypoints)
+                write(edited, segments, withSectionEnds(waypoints, plan))
                 writePlan(edited, plan)
                 edited
             }.onFailure { Log.w(TAG, "Cannot save edited ${track.id}", it) }.getOrNull()
@@ -392,9 +395,47 @@ class TrackRepository @Inject constructor(
         }
     }
 
+    /**
+     * [waypoints] with the section ends of [plan] in place of the ones written before: a
+     * waypoint each, so they show on the map, among the places ahead when following, and in
+     * other apps the file goes to.
+     */
+    private fun withSectionEnds(waypoints: List<GpxWaypoint>, plan: SavedPlan): List<GpxWaypoint> =
+        waypoints.filter { it.type != SECTION_TYPE } + Sections.ends(plan.points).mapIndexed { n, i ->
+            GpxWaypoint(context.getString(R.string.section_end, n + 1), plan.points[i].position, type = SECTION_TYPE)
+        }
+
+    /**
+     * Each section's totals, for a route cut into sections in the planner; empty for any other.
+     * Its saved line is cut where it passes the section ends.
+     */
+    suspend fun sections(track: SavedTrack): List<SectionTotals> {
+        if (!track.imported) return emptyList()
+        val plan = plan(track) ?: return emptyList()
+        val ends = Sections.ends(plan.points).map { plan.points[it].position }
+        if (ends.isEmpty()) return emptyList()
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                val line = read(track).tracks.flatMap { it.segments }.flatten()
+                val positions = line.map(TrackPoint::position)
+                Sections.pieces(line, Sections.cuts(positions, ends)).map { piece ->
+                    val stats = TrackStats.of(listOf(piece), TrackStats.SMOOTH_CLIMB_THRESHOLD_M)
+                    val hasElevation = piece.all { it.position.ele != null }
+                    SectionTotals(
+                        distance = stats.distance,
+                        ascent = stats.ascent,
+                        descent = stats.descent,
+                        millis = HikingTime.millis(stats.distance, stats.ascent, stats.descent),
+                        hasElevation = hasElevation,
+                    )
+                }
+            }.onFailure { Log.w(TAG, "Cannot cut ${track.id} into sections", it) }.getOrDefault(emptyList())
+        }
+    }
+
     private fun writePlan(track: SavedTrack, plan: SavedPlan) {
         val json = JSONObject()
-            .put("points", JSONArray(plan.points.map { JSONArray(listOf(it.position.lat, it.position.lon, it.onTrails)) }))
+            .put("points", JSONArray(plan.points.map { JSONArray(listOf(it.position.lat, it.position.lon, it.onTrails, it.sectionEnd)) }))
             .put(
                 "legs",
                 JSONArray(
@@ -415,7 +456,7 @@ class TrackRepository @Inject constructor(
         val points = json.getJSONArray("points").let { a ->
             (0 until a.length()).map { i ->
                 val p = a.getJSONArray(i)
-                PlanPoint(LatLon(p.getDouble(0), p.getDouble(1)), p.getBoolean(2))
+                PlanPoint(LatLon(p.getDouble(0), p.getDouble(1)), p.getBoolean(2), sectionEnd = p.optBoolean(3))
             }
         }
         val legs = json.getJSONArray("legs").let { a ->
@@ -603,6 +644,9 @@ class TrackRepository @Inject constructor(
         private const val GPX = ".gpx"
         private const val SUMMARY = ".json"
         private const val PLAN = ".plan"
+
+        /** GPX `<type>` of the waypoints that mark where a section ends. */
+        const val SECTION_TYPE = "Sentrek section end"
         private const val CREATOR = "Sentrek"
 
         /** "<name>.gpx" (or [extension]), without characters that file systems reject (dates contain some). */

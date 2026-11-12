@@ -28,4 +28,7 @@
     <string name="plan_reverse_short">Inverti</string>
     <string name="plan_mode_trails">Lungo i sentieri</string>
     <string name="plan_mode_straight">In linea retta</string>
+    <string name="plan_section_short">Fine tappa</string>
+    <string name="plan_section">Fai finire una tappa in questo punto</string>
+    <string name="plan_section_number">Tappa %1$d</string>
 </resources>

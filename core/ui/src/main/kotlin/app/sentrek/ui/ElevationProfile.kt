@@ -47,6 +47,9 @@ import kotlinx.coroutines.delay
  *
  * Touching the profile (or sliding along it) shows the slope there, with height and distance;
  * it stays a few seconds after the finger lifts.
+ *
+ * [flags] (metres along): where the route's sections end, each a line with its number on top,
+ * in orange as on the map.
  */
 @Composable
 fun ElevationProfile(
@@ -55,6 +58,7 @@ fun ElevationProfile(
     here: Double? = null,
     hereLabel: String? = null,
     color: Color = MaterialTheme.colorScheme.primary,
+    flags: List<Double> = emptyList(),
 ) {
     if (profile.size < 2) return
     val low = profile.minOf { it.second }
@@ -65,6 +69,7 @@ fun ElevationProfile(
     val paper = MaterialTheme.colorScheme.surface
     val measurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelMedium.merge(TextStyle(fontWeight = FontWeight.Bold, color = ink))
+    val flagStyle = MaterialTheme.typography.labelSmall.merge(TextStyle(fontWeight = FontWeight.Bold, color = Color.White))
 
     // Metres along where the finger is (or was, a moment ago).
     var touched by remember(profile) { mutableStateOf<Double?>(null) }
@@ -102,7 +107,7 @@ fun ElevationProfile(
             // At least 50 m of range, so a flat walk doesn't look like a mountain.
             val range = (high - low).coerceAtLeast(50.0)
             // With a marker, leave room above the line for its label.
-            val top = if (here != null && hereLabel != null) 18.dp.toPx() else 0f
+            val top = if ((here != null && hereLabel != null) || flags.isNotEmpty()) 18.dp.toPx() else 0f
             val chart = size.height - top
             fun x(d: Double) = (d / length * size.width).toFloat().coerceIn(0f, size.width)
             fun at(d: Double, e: Double) = Offset(x(d), (top + chart - (e - low) / range * chart).toFloat())
@@ -131,6 +136,16 @@ fun ElevationProfile(
                 }
                 drawLine(color, Offset(split, top), Offset(split, size.height), strokeWidth = 2.dp.toPx())
                 dot(at(here, ProfileMath.heightAt(profile, here)), color)
+            }
+
+            flags.forEachIndexed { i, d ->
+                val fx = x(d)
+                val r = 8.dp.toPx()
+                drawLine(SECTION_FLAG, Offset(fx, r), Offset(fx, size.height), strokeWidth = 1.5.dp.toPx())
+                val cx = fx.coerceIn(r, size.width - r)
+                drawCircle(SECTION_FLAG, radius = r, center = Offset(cx, r))
+                val number = measurer.measure("${i + 1}", flagStyle)
+                drawText(number, topLeft = Offset(cx - number.size.width / 2f, r - number.size.height / 2f))
             }
 
             val t = touched
@@ -169,3 +184,6 @@ private fun DrawScope.label(measurer: TextMeasurer, text: String, style: TextSty
 }
 
 private const val TOUCH_LINGER_MS = 3_000L
+
+/** The section ends' orange, as on the map (PlanLayers). */
+private val SECTION_FLAG = Color(0xFFEF6C00)

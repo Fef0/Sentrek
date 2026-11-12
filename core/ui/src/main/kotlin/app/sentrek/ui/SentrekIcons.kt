@@ -96,6 +96,9 @@ object SentrekIcons {
         icon("Sentrek.Reverse", "M16,17.01V10h-2v7.01h-3L15,21l4,-3.99h-3zM9,3L5,6.99h3V14h2V6.99h3L9,3z")
     }
 
+    /** A flag: where a section of the route ends. */
+    val Flag: ImageVector by lazy { icon("Sentrek.Flag", "M14.4,6L14,4H5v17h2v-7h5.6l0.4,2h7V6z") }
+
     val Check: ImageVector by lazy { icon("Sentrek.Check", "M9,16.17L4.83,12l-1.42,1.41L9,19 21,7l-1.41,-1.41z") }
 
     val Close: ImageVector by lazy {

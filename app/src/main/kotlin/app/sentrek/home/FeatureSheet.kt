@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -121,6 +122,12 @@ fun FeatureSheet(
                     }
                     // On a path's card; a pressed ford is already named so in the title.
                     if (info.ford && info.kind != "ford") Fact(stringResource(R.string.feature_crossing), stringResource(R.string.feature_ford))
+                    if (info.protectedAreas.isNotEmpty()) {
+                        Fact(
+                            pluralStringResource(R.plurals.feature_protected_area, info.protectedAreas.size),
+                            info.protectedAreas.joinToString("\n"),
+                        )
+                    }
                     Fact(
                         stringResource(R.string.feature_coordinates),
                         Format.coordinates(info.position.latitude, info.position.longitude),

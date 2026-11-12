@@ -64,6 +64,9 @@
     <string name="import_failed">Importazione non riuscita</string>
     <string name="regions_up_to_date">Già aggiornate, niente da scaricare.</string>
     <string name="regions_offline">Nessuna rete. Connettiti a internet per scaricare le mappe.</string>
+    <string name="mobile_data_title">Sei sulla rete mobile</string>
+    <string name="mobile_data_text">Scaricare comunque le mappe? Impostazioni › Avanzate › Usa la rete mobile toglie questa domanda.</string>
+    <string name="mobile_data_download">Scarica</string>
     <string name="download_channel">Download delle mappe</string>
     <string name="download_notification_title">Download delle mappe</string>
     <string name="regions_maps_label">Mappe</string>

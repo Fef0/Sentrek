@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.sentrek.data.SettingsRepository
 import app.sentrek.feature.maps.R
 import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.RegionCell
@@ -12,8 +13,10 @@ import app.sentrek.geo.overlay.MapKind
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -22,7 +25,13 @@ class RegionsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: RegionRepository,
     private val importedMaps: ImportedMapsRepository,
+    settings: SettingsRepository,
 ) : ViewModel() {
+    private val useMobileData = settings.useMobileData.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** True when a download started now would go over mobile data the user hasn't allowed: asked first. */
+    fun onMobileData(): Boolean = isOnline(context) && !isUnmetered(context) && !useMobileData.value
+
     val regions: StateFlow<Map<RegionCell, RegionState>> = repository.state
     val status: StateFlow<DownloadStatus?> = repository.status
     val imported: StateFlow<List<ImportedMap>> = importedMaps.maps
@@ -79,12 +88,15 @@ class RegionsViewModel @Inject constructor(
     /** The selected areas on the phone get the extra maps chosen, and lose the others. */
     fun saveExtras() {
         val cells = _selection.value.filter { it in regions.value }
-        val adding = cells.any { (_extras.value - regions.value[it]?.extras?.keys.orEmpty()).isNotEmpty() }
-        if (adding && !isOnline(context)) return show(R.string.regions_offline)
+        if (extrasToDownload() && !isOnline(context)) return show(R.string.regions_offline)
         _message.value = null
         repository.setExtras(cells, _extras.value)
         clearSelection()
     }
+
+    /** Whether [saveExtras] would download something, not only take maps away. */
+    fun extrasToDownload(): Boolean = _selection.value.filter { it in regions.value }
+        .any { (_extras.value - regions.value[it]?.extras?.keys.orEmpty()).isNotEmpty() }
 
     /** Stops every download; see RegionRepository.stop. */
     fun stopDownloads() {

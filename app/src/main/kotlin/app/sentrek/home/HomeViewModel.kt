@@ -37,7 +37,7 @@ import app.sentrek.maps.DownloadStatus
 import app.sentrek.maps.MapDownload
 import app.sentrek.maps.TrailsDownload
 import app.sentrek.maps.RegionState
-import app.sentrek.maps.isOnWifi
+import app.sentrek.maps.isUnmetered
 import app.sentrek.maps.isOnline
 import app.sentrek.maps.onlineFlow
 import app.sentrek.geo.place.Place
@@ -111,16 +111,17 @@ class HomeViewModel @Inject constructor(
         }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     init {
-        // Automatic updates, as the areas get listed at startup: on Wi-Fi only, never during a
-        // hike, and each area once.
+        // Automatic updates, as the areas get listed at startup: on Wi-Fi only (unless mobile
+        // data is allowed), never during a hike, and each area once.
         viewModelScope.launch {
             val started = HashSet<RegionCell>()
+            val mobileData = settings.useMobileData.stateIn(viewModelScope)
             combine(regions.state, settings.autoUpdateMaps) { states, auto ->
                 val now = System.currentTimeMillis()
                 if (auto) states.values.filter { it.isOld(now, RegionState.AUTO_UPDATE_AFTER_MS) }.map(RegionState::cell) else emptyList()
             }.collect { due ->
                 val fresh = due - started
-                if (fresh.isEmpty() || !isOnWifi(context) || recorder.state.value != null) return@collect
+                if (fresh.isEmpty() || !(isUnmetered(context) || mobileData.value) || recorder.state.value != null) return@collect
                 started += fresh
                 regions.update(fresh)
             }
@@ -135,6 +136,12 @@ class HomeViewModel @Inject constructor(
     fun failingMapsSeen() {
         regions.forgetFailedUpdates(failingMaps.value)
     }
+
+    /** Mobile data allowed for downloads, else what the user starts asks first. */
+    val useMobileData: StateFlow<Boolean> = settings.useMobileData.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** True when a download started now would go over mobile data the user hasn't allowed. */
+    fun onMobileData(): Boolean = isOnline(context) && !isUnmetered(context) && !useMobileData.value
 
     /** False when offline: nothing was started. */
     fun updateOldMaps(): Boolean {

@@ -27,6 +27,7 @@ The name comes from *sentiero*, Italian for trail, and *trek*.
 - The map shows trails, marked routes with their signs, huts, springs, peaks and viewpoints. Contour lines and hill shading can be turned on in Settings › Map, and the map points turned off.
 - To use it offline, download squares from a grid. A square is about 55 × 55 km and takes around 30 MB.
 - Downloads carry on when you leave the app, with the progress on the map and in a notification. They wait for a connection and try again by themselves. An area is kept only once it has its map and all its details; Stop removes the ones not finished yet.
+- Map and app updates wait for Wi-Fi, and a download you start on mobile data asks first. Settings › Advanced › Use mobile data turns this off.
 - You can colour steep slopes like an avalanche map, and colour trails by difficulty (SAC scale).
 - Long-press a trail to see its difficulty and the marked routes that use it, with length, climb, walking time and who looks after them. From there you can get the weather forecast for that spot, day by day or hour by hour.
 - You can also open your own `.mbtiles` and `.pmtiles` files.
@@ -97,6 +98,7 @@ The app only goes online to:
 - load map and terrain tiles
 - get trail details (and pistes or cycle routes, if you pick those maps) for the areas you download
 - get the weather forecast, if you turn it on
+- look for a new version of the app on GitHub, if you installed it from the Releases page (you can turn this off in Settings › About)
 
 There's no tracking or analytics of any kind.
 
@@ -105,6 +107,8 @@ There's no tracking or analytics of any kind.
 You need Android 7.0 or newer.
 
 Download the APK from the [Releases](../../releases) page. The `arm64` file is the right one for nearly every phone, and `armv7` is for older 32-bit phones. If neither installs, use the `universal` one, which is bigger but works on any device.
+
+The app from the Releases page keeps itself up to date. It looks for a new version on GitHub, downloads it on Wi-Fi, checks that it's signed with the same key, and installs it while the app is closed, never during a recording or a followed route. The first time, Android asks you to allow installs from Sentrek. Some phones still ask before each install; then the app asks you when you open it. You can turn this off in Settings › About, where Check for updates looks for a new version right away and installs it.
 
 ## Building
 

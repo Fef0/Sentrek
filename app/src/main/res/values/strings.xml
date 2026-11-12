@@ -572,4 +572,24 @@
         <item quantity="other">%d map areas didn’t download · try again later</item>
     </plurals>
     <string name="map_download_open">Open Maps</string>
+    <string name="settings_auto_update_app">Update the app automatically</string>
+    <string name="settings_auto_update_app_hint">Looks for a new version on GitHub at most twice a day. It downloads on Wi-Fi and installs while Sentrek is closed, never during a recording or a followed route.</string>
+    <string name="settings_install_update">Install Sentrek %1$s</string>
+    <string name="settings_downloads">Downloads</string>
+    <string name="settings_mobile_data">Use mobile data</string>
+    <string name="settings_mobile_data_hint">For map and app updates, and the maps you download. Off: updates wait for Wi-Fi, and downloads you start ask first.</string>
+    <string name="update_ready_title">Sentrek %1$s is ready</string>
+    <string name="update_ready_text">Install it now? Sentrek closes while it installs.</string>
+    <string name="update_ready_permission">Android will ask you to allow installs from Sentrek. After that, updates install by themselves while Sentrek is closed.</string>
+    <string name="update_install">Install</string>
+    <string name="update_later">Later</string>
+    <string name="settings_check_updates">Check for updates</string>
+    <string name="update_looking">Looking for a new version…</string>
+    <string name="update_downloading">Downloading Sentrek %1$s · %2$d%%</string>
+    <string name="update_installing">Installing Sentrek %1$s…</string>
+    <string name="update_up_to_date">Sentrek %1$s is the latest version.</string>
+    <string name="update_on_mobile_data">Sentrek %1$s is out. You’re on mobile data.</string>
+    <string name="update_download_anyway">Download on mobile data</string>
+    <string name="update_after_hike">Sentrek %1$s is downloaded. You can install it once you stop recording or following the route.</string>
+    <string name="update_failed">Couldn’t reach GitHub. Try again later.</string>
 </resources>

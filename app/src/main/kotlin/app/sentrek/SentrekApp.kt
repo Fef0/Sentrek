@@ -6,6 +6,7 @@ import app.sentrek.map.MapEngine
 import app.sentrek.map.Server
 import app.sentrek.map.ServerRoutes
 import app.sentrek.ui.Format
+import app.sentrek.update.AppUpdater
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
@@ -16,6 +17,7 @@ import javax.inject.Inject
 class SentrekApp : Application() {
     @Inject lateinit var settings: SettingsRepository
     @Inject lateinit var powerAutoSwitch: PowerAutoSwitch
+    @Inject lateinit var updater: AppUpdater
 
     override fun onCreate() {
         super.onCreate()
@@ -26,6 +28,7 @@ class SentrekApp : Application() {
         // Read in the background: requests wait for it (ServerRoutes), the first screen doesn't.
         MainScope().launch(Dispatchers.IO) { settings.servers.collect { ServerRoutes.custom = routes(it) } }
         powerAutoSwitch.start(MainScope())
+        updater.start()
     }
 
     private fun routes(saved: Map<String, String>): Map<Server, String> = saved.mapNotNull { (name, address) ->

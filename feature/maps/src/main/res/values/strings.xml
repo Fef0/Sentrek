@@ -61,6 +61,9 @@
     <string name="import_failed">Import failed</string>
     <string name="regions_up_to_date">Already up to date, nothing to download.</string>
     <string name="regions_offline">No network. Connect to the internet to download maps.</string>
+    <string name="mobile_data_title">You’re on mobile data</string>
+    <string name="mobile_data_text">Download the maps anyway? Settings › Advanced › Use mobile data stops this question.</string>
+    <string name="mobile_data_download">Download</string>
     <string name="download_channel">Map downloads</string>
     <string name="download_notification_title">Downloading maps</string>
     <string name="regions_maps_label">Maps</string>

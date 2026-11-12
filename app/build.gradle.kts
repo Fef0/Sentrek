@@ -46,6 +46,20 @@ android {
         }
     }
 
+    // Two builds of the same app: "github" for the Releases page, which can update itself from
+    // there, and "fdroid", without the updater or its install permission (F-Droid updates it).
+    flavorDimensions += "store"
+    productFlavors {
+        create("github") {
+            dimension = "store"
+            isDefault = true
+            buildConfigField("String", "RELEASES_URL", "\"https://api.github.com/repos/Fef0/Sentrek/releases/latest\"")
+        }
+        create("fdroid") {
+            dimension = "store"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -124,6 +138,9 @@ dependencies {
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+
+    "githubImplementation"(libs.okhttp)
+    testImplementation(libs.junit)
 }
 
 /** "en" (res/values), then each translation's tag, from values-it, values-pt-rBR, values-b+sr+Latn. */

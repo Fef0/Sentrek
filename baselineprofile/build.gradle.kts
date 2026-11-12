@@ -19,6 +19,13 @@ android {
     }
 
     targetProjectPath = ":app"
+
+    // The same builds as the app's.
+    flavorDimensions += "store"
+    productFlavors {
+        create("github") { dimension = "store" }
+        create("fdroid") { dimension = "store" }
+    }
 }
 
 // Generated on a connected device or emulator: ./gradlew :app:generateBaselineProfile

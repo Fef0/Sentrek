@@ -1,5 +1,7 @@
 package app.sentrek
 
+import app.sentrek.update.AppUpdater
+import app.sentrek.update.UpdateDialog
 import app.sentrek.maps.DownloadNotifications
 import app.sentrek.search.PeaksScreen
 import app.sentrek.home.FirstRunGuide
@@ -110,6 +112,7 @@ private const val DARK_BAR_SCRIM = 0x66000000
 class MainActivity : ComponentActivity() {
     @Inject lateinit var settings: SettingsRepository
     @Inject lateinit var tracks: TrackRepository
+    @Inject lateinit var updater: AppUpdater
 
     /** True when the volume keys should zoom the map (glove mode, map screen). */
     private var volumeKeysZoom = false
@@ -317,6 +320,19 @@ class MainActivity : ComponentActivity() {
                                 Screen.Settings -> SettingsScreen(onBack = toMap)
                             }
                             }
+                        }
+                        // A new version that needs a yes: on the map, never mid-hike (installing closes the app).
+                        val update by updater.waiting.collectAsStateWithLifecycle()
+                        val recordingNow by home.recording.collectAsStateWithLifecycle()
+                        val followingNow by home.following.collectAsStateWithLifecycle()
+                        var updateLater by rememberSaveable { mutableStateOf<String?>(null) }
+                        val version = update
+                        if (version != null && version != updateLater && guideSeen && screen == Screen.Map && recordingNow == null && followingNow == null) {
+                            UpdateDialog(
+                                version = version,
+                                onInstall = { updateLater = version; updater.install(this@MainActivity) },
+                                onLater = { updateLater = version },
+                            )
                         }
                         if (!guideSeen) {
                             FirstRunGuide(

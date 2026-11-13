@@ -1,7 +1,10 @@
 package app.sentrek.record
 
 import android.util.Log
+import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.LatLon
+import app.sentrek.geo.overlay.NamedLine
+import app.sentrek.geo.overlay.NamedLines
 import app.sentrek.geo.overlay.VectorTile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -31,10 +34,15 @@ data class MapName(val name: String, val kind: String, val group: Group, val pos
 @Singleton
 class MapNames @Inject constructor(private val tiles: OfflineTiles) {
     private val lock = Mutex()
-    private var cached: List<MapName>? = null
+    private var cached: Pair<List<MapName>, List<NamedLine>>? = null
     private var cachedStamp = 0L
 
-    suspend fun all(): List<MapName> = withContext(Dispatchers.IO) {
+    suspend fun all(): List<MapName> = both().first
+
+    /** The paths and tracks the map names ("Sentiero del Monte…"), each in one piece. */
+    suspend fun paths(): List<NamedLine> = both().second
+
+    private suspend fun both(): Pair<List<MapName>, List<NamedLine>> = withContext(Dispatchers.IO) {
         lock.withLock {
             val stamp = tiles.count(OVERVIEW_ZOOM)
             cached?.takeIf { stamp == cachedStamp }?.let { return@withLock it }
@@ -42,8 +50,9 @@ class MapNames @Inject constructor(private val tiles: OfflineTiles) {
         }
     }
 
-    private fun read(): List<MapName> {
+    private fun read(): Pair<List<MapName>, List<NamedLine>> {
         val names = ArrayList<MapName>()
+        val paths = ArrayList<NamedLine>()
         runCatching {
             // Towns, mountains and lakes are all there at a zoom where an area is a few tiles.
             tiles.forEach(OVERVIEW_ZOOM) { x, y, bytes ->
@@ -57,21 +66,42 @@ class MapNames @Inject constructor(private val tiles: OfflineTiles) {
                 add(PEAKS, MapName.Group.Mountain) { true }
                 add(WATER_NAMES, MapName.Group.Water) { true }
             }
-            // The other named points only in the most detailed tiles.
+            // The other named points, and the paths' names, only in the most detailed tiles.
             tiles.forEach(DETAIL_ZOOM) { x, y, bytes ->
                 VectorTile.points(bytes, POIS) { !it["name"].isNullOrBlank() }.mapTo(names) { p ->
                     MapName(p.tags.getValue("name"), p.tags["subclass"] ?: p.tags["class"] ?: "", MapName.Group.Point, position(DETAIL_ZOOM, x, y, p))
                 }
+                VectorTile.lines(bytes, PATH_NAMES) { it["class"] in PATH_CLASSES && !it["name"].isNullOrBlank() }.mapNotNullTo(paths) { line ->
+                    box(DETAIL_ZOOM, x, y, line)?.let { NamedLine(NamedLines.clean(line.tags.getValue("name")), NamedLine.Kind.Path, it) }
+                }
             }
         }.onFailure { Log.w(TAG, "Cannot read the map's names", it) }
-        // A place near a tile edge is in both tiles.
-        return names.distinctBy { Triple(it.name, (it.position.lat * 200).toLong(), (it.position.lon * 200).toLong()) }
+        // A place near a tile edge is in both tiles; a path is cut at each edge.
+        return names.distinctBy { Triple(it.name, (it.position.lat * 200).toLong(), (it.position.lon * 200).toLong()) } to
+            NamedLines.merge(paths)
     }
 
-    private fun position(zoom: Int, x: Int, y: Int, p: VectorTile.Point): LatLon {
+    private fun box(zoom: Int, x: Int, y: Int, line: VectorTile.Line): BoundingBox? {
+        var south = 90.0
+        var north = -90.0
+        var west = 180.0
+        var east = -180.0
+        for (part in line.parts) {
+            for (i in 0 until part.size / 2) {
+                val p = position(zoom, x, y, part[2 * i], part[2 * i + 1], line.extent)
+                south = minOf(south, p.lat); north = maxOf(north, p.lat)
+                west = minOf(west, p.lon); east = maxOf(east, p.lon)
+            }
+        }
+        return if (south <= north) BoundingBox(south, west, north, east) else null
+    }
+
+    private fun position(zoom: Int, x: Int, y: Int, p: VectorTile.Point): LatLon = position(zoom, x, y, p.x, p.y, p.extent)
+
+    private fun position(zoom: Int, x: Int, y: Int, px: Int, py: Int, extent: Int): LatLon {
         val n = (1 shl zoom).toDouble()
-        val fx = (x + p.x.toDouble() / p.extent) / n
-        val fy = (y + p.y.toDouble() / p.extent) / n
+        val fx = (x + px.toDouble() / extent) / n
+        val fy = (y + py.toDouble() / extent) / n
         val lat = Math.toDegrees(atan(sinh(PI * (1 - 2 * fy))))
         return LatLon(lat.coerceIn(-90.0, 90.0), (fx * 360 - 180).coerceIn(-180.0, 180.0))
     }
@@ -84,6 +114,8 @@ class MapNames @Inject constructor(private val tiles: OfflineTiles) {
         const val PEAKS = "mountain_peak"
         const val WATER_NAMES = "water_name"
         const val POIS = "poi"
+        const val PATH_NAMES = "transportation_name"
+        val PATH_CLASSES = setOf("path", "track")
         val SETTLEMENTS = setOf("city", "town", "village", "hamlet", "suburb", "isolated_dwelling", "locality")
     }
 }

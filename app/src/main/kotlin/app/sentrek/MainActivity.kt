@@ -1,6 +1,7 @@
 package app.sentrek
 
 import app.sentrek.update.AppUpdater
+import app.sentrek.update.UpdateCheck
 import app.sentrek.update.UpdateDialog
 import app.sentrek.maps.DownloadNotifications
 import app.sentrek.search.PeaksScreen
@@ -301,10 +302,10 @@ class MainActivity : ComponentActivity() {
                                 Screen.Search -> SearchScreen(
                                     near = shownCamera.target?.let { LatLon(it.latitude, it.longitude) },
                                     onBack = toMap,
-                                    onShowOnMap = { box -> focus = box; screen = Screen.Map },
+                                    onShowOnMap = { box -> home.searchPin.value = null; focus = box; screen = Screen.Map },
                                     onPeaks = { screen = Screen.Peaks },
-                                    onGoTo = { name, position ->
-                                        home.goTo(GoTo(name, position))
+                                    onShowPosition = { position ->
+                                        home.searchPin.value = position
                                         focus = around(position)
                                         screen = Screen.Map
                                     },
@@ -321,17 +322,22 @@ class MainActivity : ComponentActivity() {
                             }
                             }
                         }
-                        // A new version that needs a yes: on the map, never mid-hike (installing closes the app).
-                        val update by updater.waiting.collectAsStateWithLifecycle()
+                        // A new version: asked once per opening, on the map, never mid-hike (installing closes the app).
+                        val update by updater.newVersion.collectAsStateWithLifecycle()
+                        val updateCheck by updater.check.collectAsStateWithLifecycle()
                         val recordingNow by home.recording.collectAsStateWithLifecycle()
                         val followingNow by home.following.collectAsStateWithLifecycle()
                         var updateLater by rememberSaveable { mutableStateOf<String?>(null) }
-                        val version = update
-                        if (version != null && version != updateLater && guideSeen && screen == Screen.Map && recordingNow == null && followingNow == null) {
+                        val newVersion = update
+                        if (newVersion != null && newVersion.version != updateLater && guideSeen && screen == Screen.Map &&
+                            recordingNow == null && followingNow == null && updateCheck !is UpdateCheck.Installing
+                        ) {
                             UpdateDialog(
-                                version = version,
-                                onInstall = { updateLater = version; updater.install(this@MainActivity) },
-                                onLater = { updateLater = version },
+                                update = newVersion,
+                                check = updateCheck,
+                                onUpdate = { updater.update(this@MainActivity) },
+                                onOverMobileData = { updater.update(this@MainActivity, overMobileData = true) },
+                                onLater = { updateLater = newVersion.version },
                             )
                         }
                         if (!guideSeen) {

@@ -3,6 +3,7 @@ package app.sentrek.maps
 import app.sentrek.geo.overlay.OverlayLineSource
 import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.overlay.MapKind
+import app.sentrek.geo.overlay.NamedLineSource
 import app.sentrek.geo.overlay.OverlayPoiSource
 import app.sentrek.geo.overlay.OverpassExtras
 import app.sentrek.geo.overlay.OverpassOverlay
@@ -137,4 +138,7 @@ internal abstract class TrailSourceModule {
 
     @Binds
     abstract fun bindLineSource(impl: RegionRepository): OverlayLineSource
+
+    @Binds
+    abstract fun bindNamedLineSource(impl: RegionRepository): NamedLineSource
 }

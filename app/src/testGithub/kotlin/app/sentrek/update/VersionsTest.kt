@@ -32,4 +32,11 @@ class VersionsTest {
         assertEquals("Sentrek-0.27.0-x86_64.apk", Versions.assetName("v0.27.0", 324))
         assertNull(Versions.assetName("v0.27.0", 323))
     }
+
+    @Test
+    fun `changes are the release's list`() {
+        val notes = "- Parks are named on the map.\n- Planner: the **flag** button.\n\nIf you have 0.27, it updates itself. `arm64` is for phones."
+        assertEquals(listOf("Parks are named on the map.", "Planner: the flag button."), Versions.changes(notes))
+        assertEquals(emptyList<String>(), Versions.changes(null))
+    }
 }

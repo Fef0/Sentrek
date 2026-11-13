@@ -11,11 +11,11 @@ import kotlinx.coroutines.flow.StateFlow
 /** F-Droid updates the app itself: nothing here. */
 private object NoUpdater : AppUpdater {
     override val available = false
-    override val waiting: StateFlow<String?> = MutableStateFlow(null)
+    override val newVersion: StateFlow<NewVersion?> = MutableStateFlow(null)
     override val check: StateFlow<UpdateCheck> = MutableStateFlow(UpdateCheck.Idle)
     override fun start() {}
-    override fun install(activity: Activity) {}
-    override fun checkNow(overMobileData: Boolean) {}
+    override fun update(activity: Activity, overMobileData: Boolean) {}
+    override fun checkNow() {}
 }
 
 @Module

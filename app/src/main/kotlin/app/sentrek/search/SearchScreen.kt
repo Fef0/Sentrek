@@ -3,7 +3,13 @@ package app.sentrek.search
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalDensity
+import app.sentrek.geo.overlay.NamedLine
+import app.sentrek.map.MapOverlays
+import app.sentrek.map.RouteMarks
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -20,7 +26,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -80,8 +88,8 @@ fun SearchScreen(
     onShowOnMap: (BoundingBox) -> Unit,
     /** Opens the peak finder. */
     onPeaks: () -> Unit,
-    /** A position typed or pasted: the map goes there, with the arrow pointing to it. */
-    onGoTo: (name: String, position: LatLon) -> Unit,
+    /** A position typed or pasted: the map shows it, marked. */
+    onShowPosition: (LatLon) -> Unit,
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
     val query by viewModel.query.collectAsStateWithLifecycle()
@@ -124,6 +132,9 @@ fun SearchScreen(
         }
 
         val blank = query.isBlank()
+        // Still reading the areas, or the results are for what was typed before.
+        val busy = !blank && (!pointsReady || results.query != query)
+        if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         // Finding a place by name, or naming a place in sight: one screen for both.
         if (blank) {
             OutlinedButton(
@@ -136,17 +147,21 @@ fun SearchScreen(
         }
         if (blank || results.isEmpty) {
             Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-                Text(
-                    stringResource(
-                        when {
-                            blank -> R.string.search_intro
-                            !pointsReady -> R.string.search_reading
-                            else -> R.string.search_nothing
-                        },
-                    ),
-                    style = MaterialTheme.typography.titleMedium,
-                    textAlign = TextAlign.Center,
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    if (busy) CircularProgressIndicator()
+                    Text(
+                        stringResource(
+                            when {
+                                blank -> R.string.search_intro
+                                !pointsReady -> R.string.search_reading
+                                busy -> R.string.search_searching
+                                else -> R.string.search_nothing
+                            },
+                        ),
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
             return@Column
         }
@@ -161,7 +176,7 @@ fun SearchScreen(
                     badge = { RoundBadge(SentrekIcons.Place) },
                     name = coordinates,
                     details = listOfNotNull(stringResource(R.string.search_position_go), away(near, position)).joinToString(" · "),
-                    onClick = { onGoTo(coordinates, position) },
+                    onClick = { onShowPosition(position) },
                 )
             }
             section(R.string.search_places, results.places, key = { "p" + it.id }) { place ->
@@ -186,6 +201,22 @@ fun SearchScreen(
                         Format.distance(track.distance),
                     ).joinToString(" · "),
                     onClick = { scope.launch { viewModel.show(track)?.let(onShowOnMap) } },
+                )
+            }
+            section(R.string.search_paths, results.paths, key = { "l${it.kind}${it.routeId ?: it.name}${it.box.south}${it.box.west}" }) { line ->
+                ResultRow(
+                    badge = { PathBadge(line) },
+                    name = line.name,
+                    details = listOfNotNull(
+                        when (line.kind) {
+                            NamedLine.Kind.Ferrata -> stringResource(R.string.kind_via_ferrata) +
+                                (line.grade?.takeIf { it > 0 }?.let { " · " + MapOverlays.HUSLER_GRADES[it] } ?: "")
+                            NamedLine.Kind.Route -> stringResource(R.string.search_path_route) + (line.ref?.takeIf { it != line.name }?.let { " · $it" } ?: "")
+                            NamedLine.Kind.Path -> stringResource(R.string.search_path_path)
+                        },
+                        away(near, line.middle),
+                    ).joinToString(" · "),
+                    onClick = { onShowOnMap(line.box) },
                 )
             }
             section(R.string.search_map, results.points, key = { "m${it.javaClass.simpleName}${it.name}${it.position.lat}${it.position.lon}" }) { hit ->
@@ -274,6 +305,36 @@ private fun RoundBadge(icon: ImageVector) {
 }
 
 /** From the middle of the map the user came from. */
+/** A via ferrata: in the colours opposite the screen's (as on the day and night maps), with its grade; a route: its waymark; a path: a walker. */
+@Composable
+private fun PathBadge(line: NamedLine) {
+    val density = LocalDensity.current.density
+    val mark = remember(line.mark, density) {
+        line.mark?.let { RouteMarks.image(RouteMarks.PREFIX + it, density)?.asImageBitmap() }
+    }
+    when {
+        line.kind == NamedLine.Kind.Ferrata -> Surface(
+            Modifier.size(BADGE),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.inverseSurface,
+            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                val grade = line.grade?.takeIf { it > 0 }?.let { MapOverlays.HUSLER_GRADES[it] }
+                if (grade != null) {
+                    Text(grade, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                } else {
+                    Icon(SentrekIcons.Hiking, contentDescription = null, modifier = Modifier.padding(6.dp))
+                }
+            }
+        }
+        mark != null -> Box(Modifier.size(BADGE), contentAlignment = Alignment.Center) {
+            Image(mark, contentDescription = null, modifier = Modifier.size(BADGE * 0.9f))
+        }
+        else -> RoundBadge(SentrekIcons.Hiking)
+    }
+}
+
 private fun away(near: LatLon?, p: LatLon): String? = near?.let { Format.distance(Geo.distance(it, p)) }
 
 private val BADGE: Dp

@@ -12,6 +12,9 @@ import app.sentrek.geo.RegionCell
 import app.sentrek.geo.RegionGrid
 import app.sentrek.geo.overlay.MapKind
 import app.sentrek.geo.overlay.OverlayPoi
+import app.sentrek.geo.overlay.NamedLine
+import app.sentrek.geo.overlay.NamedLineSource
+import app.sentrek.geo.overlay.NamedLines
 import app.sentrek.geo.overlay.OverlayPoiSource
 import app.sentrek.geo.overlay.OverlayPois
 import app.sentrek.map.MapEngine
@@ -115,7 +118,7 @@ class RegionRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val trailSource: TrailOverlaySource,
     private val connectivity: Connectivity,
-) : OverlayPoiSource, OverlayLineSource {
+) : OverlayPoiSource, OverlayLineSource, NamedLineSource {
     private val offline = OfflineManager.getInstance(context)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val trailsDir = File(context.filesDir, "trails").apply {
@@ -320,6 +323,18 @@ class RegionRepository @Inject constructor(
                     .onFailure { Log.w(TAG, "Cannot read lines of ${file.name}", it) }
                     .getOrDefault(emptyList())
             }
+    }
+
+    /** The via ferratas and waymarked routes of the downloaded areas, for search; a route over several areas in one piece. */
+    override suspend fun namedLines(): List<NamedLine> = withContext(Dispatchers.IO) {
+        val files = trailsDir.listFiles { f -> f.name.endsWith(OVERLAY_SUFFIX) }.orEmpty()
+        NamedLines.merge(
+            files.flatMap { file ->
+                runCatching { file.bufferedReader().use { NamedLines.read(it) } }
+                    .onFailure { Log.w(TAG, "Cannot read names of ${file.name}", it) }
+                    .getOrDefault(emptyList())
+            },
+        )
     }
 
     /** Downloads [cells]: the map, the hiking details, and those of [extras]. */

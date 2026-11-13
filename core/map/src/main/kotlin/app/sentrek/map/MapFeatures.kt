@@ -31,6 +31,8 @@ data class MapFeatureInfo(
     /** SAC grade 1–6 and visibility 1–6 (0 = unknown), for trails only. */
     val sacGrade: Int? = null,
     val visibility: Int? = null,
+    /** A via ferrata's grade 0–6 (OSM via_ferrata_scale), -1 when it has none; null off a via ferrata. */
+    val ferrataGrade: Int? = null,
     val tags: Map<String, String> = emptyMap(),
     /** A saved track shown on the map (its line, or one of its waypoints). */
     val trackId: String? = null,
@@ -68,6 +70,8 @@ data class MapRoute(
 
 /** Finds the map feature under a long press. */
 object MapFeatures {
+    /** The kind of a long-pressed via ferrata. */
+    const val VIA_FERRATA = "via_ferrata"
     /** Base style layers with points worth describing (hiking.json). */
     private val BASE_POINT_LAYERS = setOf("poi-hiking", "poi-landmarks", "poi-detail", "peak")
 
@@ -137,10 +141,16 @@ object MapFeatures {
             return found?.let { if (it.kind in PATH_KINDS || it.kind == CYCLEWAY) it.copy(name = pathName(map, screen, radiusPx)) else it }
         }
         val props = trail?.let(::properties).orEmpty()
+        val ferrata = props["f"]?.toDoubleOrNull()?.toInt()
         return MapFeatureInfo(
-            // The hiking overlay has no names: the base map's, as drawn along the path.
-            name = if (trail != null) pathName(map, screen, radiusPx) else null,
-            kind = if (trail != null) "path" else "route",
+            // The hiking overlay has no names but for via ferratas: the base map's, as drawn along the path.
+            name = props["n"] ?: if (trail != null && ferrata == null) pathName(map, screen, radiusPx) else null,
+            kind = when {
+                ferrata != null -> VIA_FERRATA
+                trail != null -> "path"
+                else -> "route"
+            },
+            ferrataGrade = ferrata,
             position = at,
             osmId = props["id"],
             sacGrade = props["s"]?.toIntOrNull(),

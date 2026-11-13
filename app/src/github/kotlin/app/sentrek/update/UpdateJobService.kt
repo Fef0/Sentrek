@@ -13,7 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** Runs [GitHubUpdater]'s check and install when Android lets it (network, app out of sight). */
+/** Runs [GitHubUpdater]'s check when Android lets it (network). */
 @AndroidEntryPoint
 class UpdateJobService : JobService() {
     @Inject lateinit var updater: GitHubUpdater
@@ -23,16 +23,13 @@ class UpdateJobService : JobService() {
 
     override fun onStartJob(params: JobParameters): Boolean {
         running[params.jobId] = scope.launch {
-            when (params.jobId) {
-                GitHubUpdater.JOB_CHECK -> updater.check()
-                GitHubUpdater.JOB_INSTALL -> updater.installInBackground()
-            }
+            if (params.jobId == GitHubUpdater.JOB_CHECK) updater.check()
             jobFinished(params, false)
         }
         return true
     }
 
-    /** Stopped mid-way (the Wi-Fi went): the check is tried again, the install waits for the next time out of sight. */
+    /** Stopped mid-way (the Wi-Fi went): the check is tried again. */
     override fun onStopJob(params: JobParameters): Boolean {
         running.remove(params.jobId)?.cancel()
         return params.jobId == GitHubUpdater.JOB_CHECK

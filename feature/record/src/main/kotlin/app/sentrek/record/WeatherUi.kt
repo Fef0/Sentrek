@@ -109,6 +109,15 @@ private fun ForecastDays(weather: Weather, highest: Boolean, onRetry: () -> Unit
                 color = MaterialTheme.colorScheme.error,
             )
         }
+        weather.avalanche?.let { AvalancheCard(it) }
+        // Offline, the forecast says so already.
+        if (weather.avalancheFailed && !weather.offline) {
+            Text(
+                stringResource(R.string.avalanche_failed),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
         val today = remember { ISO.format(Date()) }
         // A forecast saved days ago starts in the past: those days are over.
         val days = forecast.days.filterIndexed { i, day -> day.date >= today || (i == 0 && !weather.offline) }

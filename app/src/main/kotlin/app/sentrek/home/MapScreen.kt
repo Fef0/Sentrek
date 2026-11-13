@@ -92,6 +92,7 @@ import app.sentrek.geo.RegionGrid
 import app.sentrek.geo.place.Place
 import app.sentrek.geo.place.PlaceKind
 import app.sentrek.map.LocalNightMap
+import app.sentrek.map.SearchPin
 import app.sentrek.map.FollowMode
 import app.sentrek.map.MapFeatureInfo
 import app.sentrek.maps.RegionState
@@ -964,6 +965,7 @@ fun MapScreen(
             val latLng = pressedAt.wrap()
             val info = MapFeatures.at(m, m.projection.toScreenLocation(pressedAt), latLng, pressRadiusPx, exactPressPx)
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            viewModel.searchPin.value = null
             // Nothing there: the spot itself, to go to, save as a place or ask the weather of.
             pressed = (info ?: MapFeatureInfo(name = null, kind = SPOT, position = latLng, osmId = null))
                 .copy(protectedAreas = MapFeatures.protectedAreas(m, latLng))
@@ -1378,9 +1380,9 @@ private fun MapLayerEffects(
     val mapKind by viewModel.mapKind.collectAsStateWithLifecycle()
     val extraFiles by viewModel.extraFiles.collectAsStateWithLifecycle()
     val night = LocalNightMap.current
-    LaunchedEffect(style, rasters, overlays, overlaysVersion, showDifficulty, showMapPoints, mapKind, extraFiles) {
+    LaunchedEffect(style, rasters, overlays, overlaysVersion, showDifficulty, showMapPoints, mapKind, extraFiles, night) {
         style?.let {
-            MapOverlays.sync(it, rasters, overlays, showDifficulty, mapKind)
+            MapOverlays.sync(it, rasters, overlays, showDifficulty, mapKind, night)
             // After the overlays, so pistes are drawn over the trails.
             MapExtras.sync(it, mapKind, extraFiles.first, night)
             // After the overlays: their point layers are made anew there.
@@ -1442,6 +1444,11 @@ private fun MapLayerEffects(
     LaunchedEffect(style, goTo, here) {
         val s = style ?: return@LaunchedEffect
         GoToLayer.sync(s, here?.takeIf { goTo != null }, goTo?.position)
+    }
+
+    val searchPin by viewModel.searchPin.collectAsStateWithLifecycle()
+    LaunchedEffect(style, searchPin) {
+        style?.let { SearchPin.sync(it, searchPin) }
     }
 
     LaunchedEffect(style, places) {

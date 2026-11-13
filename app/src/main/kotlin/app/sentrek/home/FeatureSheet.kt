@@ -36,6 +36,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.sentrek.R
 import app.sentrek.geo.overlay.SacScale
+import app.sentrek.geo.overlay.ViaFerrataScale
+import app.sentrek.map.MapFeatures
+import app.sentrek.map.MapOverlays
 import app.sentrek.geo.overlay.TrailVisibility
 import app.sentrek.map.MapFeatureInfo
 import app.sentrek.map.MapRoute
@@ -103,6 +106,16 @@ fun FeatureSheet(
                     info.sacGrade?.let { grade ->
                         val name = SacScale.entries.firstOrNull { it.grade == grade }?.osm?.let { kindName(context, it) }
                         Fact(stringResource(R.string.feature_difficulty), listOfNotNull("T$grade", name).joinToString(" · "))
+                    }
+                    info.ferrataGrade?.let { grade ->
+                        val text = if (grade < 0) {
+                            stringResource(R.string.ferrata_ungraded)
+                        } else {
+                            // The letter climbers use (none for 0), the words, and where it sits on the scale.
+                            listOf(MapOverlays.HUSLER_GRADES[grade], stringResource(FERRATA_GRADES[grade]))
+                                .filter(String::isNotEmpty).joinToString(" · ") + " ($grade/${ViaFerrataScale.MAX})"
+                        }
+                        Fact(stringResource(R.string.feature_ferrata_difficulty), text)
                     }
                     info.pisteDifficulty?.let { d ->
                         Fact(stringResource(R.string.feature_piste_difficulty), PISTE_DIFFICULTY[d]?.let { stringResource(it) } ?: humanize(d))
@@ -366,6 +379,13 @@ private val KIND_NAMES = mapOf(
     "zip_line" to R.string.kind_zip_line,
     "goods" to R.string.kind_goods,
     "cycleway" to R.string.kind_cycleway,
+    MapFeatures.VIA_FERRATA to R.string.kind_via_ferrata,
+)
+
+/** OSM via_ferrata_scale 0–6, in words. */
+private val FERRATA_GRADES = listOf(
+    R.string.ferrata_grade_0, R.string.ferrata_grade_1, R.string.ferrata_grade_2, R.string.ferrata_grade_3,
+    R.string.ferrata_grade_4, R.string.ferrata_grade_5, R.string.ferrata_grade_6,
 )
 
 /** A piste's difficulty, with the colour the winter map gives it. */

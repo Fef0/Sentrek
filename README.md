@@ -30,7 +30,9 @@ The name comes from *sentiero*, Italian for trail, and *trek*.
 - Map and app updates wait for Wi-Fi, and a download you start on mobile data asks first. Settings › Advanced › Use mobile data turns this off.
 - Parks and nature reserves are outlined and named. Long-press inside one to see which protected areas you're in.
 - You can colour steep slopes like an avalanche map, and colour trails by difficulty (SAC scale).
+- Via ferratas are drawn as on paper maps, with their grade (A to F) along the line. Long-press one to see its name and difficulty. The planner only routes over a via ferrata when there's no walking way round.
 - Long-press a trail to see its difficulty and the marked routes that use it, with length, climb, walking time and who looks after them. From there you can get the weather forecast for that spot, day by day or hour by hour.
+- With the weather forecast comes the avalanche bulletin, where one is published for that spot: the danger level, by height or elevation band, the avalanche problems with the slopes they're on, tomorrow's level once it's out, and the full text. Bulletins come from the European warning services (EAWS, through avalanche.report), Avalanche Canada (Parks Canada included) and the US avalanche centers (avalanche.org), in the app's language when the service publishes in it. A bulletin you looked up is kept, so you still have it without signal while it's valid.
 - You can also open your own `.mbtiles` and `.pmtiles` files.
 - Besides hiking, there's a cycling map (waymarked cycle and mountain bike routes, cycleways) and a winter map (pistes by difficulty, cross-country and ski touring runs, lift names, in winter colours). The button under the compass switches between them and turns the map layers on and off. When you download an area you choose which of these maps it gets.
 
@@ -83,8 +85,8 @@ You can also set a turnaround alarm.
 - "Peaks around" tells you the names of the mountains you can see.
 
 ### Search
-- One search box for your places and tracks, and the towns, peaks, lakes, huts, springs and other named points of the downloaded areas. It works offline.
-- Paste coordinates (from a text message, say) and it takes you there.
+- One search box for your places and tracks, and the towns, peaks, lakes, huts, springs, paths, marked routes (by name or number) and via ferratas of the downloaded areas. It works offline.
+- Paste coordinates (from a text message, say) and the map shows that spot.
 
 ### Your own servers
 Sentrek gets its data from free public services, so it doesn't depend on a server of mine. If one of them shuts down or changes its rules, you can host your own copy and point the app to it in Settings › Advanced › Servers. This works for:
@@ -99,7 +101,7 @@ Everything you save (tracks, routes, places, photos) stays on your phone. You ca
 The app only goes online to:
 - load map and terrain tiles
 - get trail details (and pistes or cycle routes, if you pick those maps) for the areas you download
-- get the weather forecast, if you turn it on
+- get the weather forecast and the avalanche bulletin, when you ask for the forecast
 - look for a new version of the app on GitHub, if you installed it from the Releases page (you can turn this off in Settings › About)
 
 There's no tracking or analytics of any kind.
@@ -110,7 +112,9 @@ You need Android 7.0 or newer.
 
 Download the APK from the [Releases](../../releases) page. The `arm64` file is the right one for nearly every phone, and `armv7` is for older 32-bit phones. If neither installs, use the `universal` one, which is bigger but works on any device.
 
-The app from the Releases page keeps itself up to date. It looks for a new version on GitHub, downloads it on Wi-Fi, checks that it's signed with the same key, and installs it while the app is closed, never during a recording or a followed route. The first time, Android asks you to allow installs from Sentrek. Some phones still ask before each install; then the app asks you when you open it. You can turn this off in Settings › About, where Check for updates looks for a new version right away and installs it.
+The app from the Releases page tells you when there's a new version. It looks on GitHub at most twice a day, on Wi-Fi, and shows a notification. Nothing is downloaded until you tap Update: then it downloads the new version, checks that it's signed with the same key, and hands it to Android's installer, which asks you to confirm and lets you open Sentrek again when it's done. It never updates during a recording or a followed route. The first time, Android asks you to allow updates from Sentrek. You can turn the notifications off in Settings › About, where Check for updates looks for a new version right away.
+
+> **Google Play Protect may block this version.** Play Protect flags apps that can both send text messages (Sentrek's SOS and position messages) and install apps (the updater), and it may block installing or updating Sentrek, saying it may be harmful. If you'd rather avoid that, install one of the `fdroid` files from the same Releases page instead: it's the same app without the updater, so Play Protect doesn't flag it. You update it by downloading the new `fdroid` file yourself. Both versions are signed with the same key, so you can switch from one to the other without losing your data.
 
 ## Building
 
@@ -129,6 +133,7 @@ cd Sentrek
 - Terrain: Mapzen terrain tiles on [AWS Open Data](https://registry.opendata.aws/terrain-tiles/)
 - Trail details: [Overpass API](https://overpass-api.de/) (FOSSGIS, VK Maps, private.coffee)
 - Weather: [Open-Meteo](https://open-meteo.com/)
+- Avalanche bulletins: the [European avalanche warning services](https://www.avalanches.org/) through [avalanche.report](https://avalanche.report/), [Avalanche Canada](https://avalanche.ca/) and the US avalanche centers through [avalanche.org](https://avalanche.org/). Each bulletin names the service that wrote it.
 - Map icons: [OpenStreetMap Carto](https://github.com/gravitystorm/openstreetmap-carto) (CC0)
 - Map rendering: [MapLibre Native](https://github.com/maplibre/maplibre-native)
 

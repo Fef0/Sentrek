@@ -7,7 +7,10 @@ import app.sentrek.geo.LatLon
 import app.sentrek.geo.weather.Forecast
 import app.sentrek.map.MapEngine
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.Request
 import java.io.File
@@ -17,7 +20,15 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /** A forecast and when it was fetched; [offline] when the network failed and it is the saved copy. */
-data class Weather(val forecast: Forecast, val fetchedAt: Long, val offline: Boolean = false)
+data class Weather(
+    val forecast: Forecast,
+    val fetchedAt: Long,
+    val offline: Boolean = false,
+    /** The avalanche bulletin for the place, where and when there is one. */
+    val avalanche: Avalanche? = null,
+    /** The avalanche bulletin couldn't be fetched, and none is saved for here. */
+    val avalancheFailed: Boolean = false,
+)
 
 sealed interface WeatherResult {
     data class Shown(val weather: Weather) : WeatherResult
@@ -34,11 +45,31 @@ sealed interface WeatherResult {
  * files, so a forecast looked up at home is still there on the mountain without signal.
  */
 @Singleton
-class WeatherRepository @Inject constructor(@ApplicationContext private val context: Context) {
+class WeatherRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val avalanches: AvalancheRepository,
+) {
     private val dir by lazy { File(context.filesDir, "weather").apply { mkdirs() } }
 
     /** The forecast at [at] (for its height too, when known): fresh if possible, else the saved one. */
-    suspend fun forecast(at: LatLon): WeatherResult = withContext(Dispatchers.IO) {
+    suspend fun forecast(at: LatLon): WeatherResult = coroutineScope {
+        // Both at once: the bulletin takes a request or two of its own.
+        val avalanche = async { avalanches.at(at) }
+        when (val result = weather(at)) {
+            is WeatherResult.Shown -> {
+                val bulletin = avalanche.await()
+                WeatherResult.Shown(
+                    result.weather.copy(
+                        avalanche = (bulletin as? AvalancheResult.Shown)?.avalanche,
+                        avalancheFailed = bulletin == AvalancheResult.Failed,
+                    ),
+                )
+            }
+            else -> result.also { avalanche.cancel() }
+        }
+    }
+
+    private suspend fun weather(at: LatLon): WeatherResult = withContext(Dispatchers.IO) {
         val url = Forecast.url(at.lat, at.lon, at.ele)
         val file = File(dir, name(at))
         val offline = try {
@@ -47,6 +78,12 @@ class WeatherRepository @Inject constructor(@ApplicationContext private val cont
         } catch (e: IOException) {
             Log.d(TAG, "No forecast: ${e.message}")
             true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // An answer that can't be read, say: never a crash, the saved one or nothing.
+            Log.w(TAG, "No forecast", e)
+            false
         }
         // Offline, a forecast saved for somewhere close by (a summit up the same trail) still helps.
         val saved = (file.takeIf { it.exists() } ?: if (offline) nearest(at) else null)

@@ -871,7 +871,7 @@ private fun AboutSettings(viewModel: SettingsViewModel, onBack: () -> Unit, onSh
         // GitHub builds only: F-Droid updates the app itself.
         if (viewModel.updater.available) {
             val autoUpdate by viewModel.autoUpdateApp.collectAsStateWithLifecycle()
-            val waiting by viewModel.updater.waiting.collectAsStateWithLifecycle()
+            val newVersion by viewModel.updater.newVersion.collectAsStateWithLifecycle()
             val activity = LocalActivity.current
             ToggleRow(
                 title = stringResource(R.string.settings_auto_update_app),
@@ -880,10 +880,11 @@ private fun AboutSettings(viewModel: SettingsViewModel, onBack: () -> Unit, onSh
                 onChange = viewModel::setAutoUpdateApp,
             )
             val check by viewModel.updater.check.collectAsStateWithLifecycle()
-            val version = waiting
-            if (version != null && !check.busy) {
+            val version = newVersion?.version
+            if (version != null) {
                 Button(
-                    onClick = { activity?.let(viewModel.updater::install) },
+                    onClick = { activity?.let { viewModel.updater.update(it) } },
+                    enabled = !check.busy,
                     modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget).padding(vertical = 4.dp),
                 ) { Text(stringResource(R.string.settings_install_update, version)) }
             } else {
@@ -893,7 +894,7 @@ private fun AboutSettings(viewModel: SettingsViewModel, onBack: () -> Unit, onSh
                     modifier = Modifier.fillMaxWidth().heightIn(min = TouchTarget).padding(vertical = 4.dp),
                 ) { Text(stringResource(R.string.settings_check_updates)) }
             }
-            UpdateCheckStatus(check, onOverMobileData = { viewModel.updater.checkNow(overMobileData = true) })
+            UpdateCheckStatus(check, onOverMobileData = { activity?.let { viewModel.updater.update(it, overMobileData = true) } })
         }
         OutlinedButton(
             onClick = onShowGuide,
@@ -917,7 +918,7 @@ private fun UpdateCheckStatus(check: UpdateCheck, onOverMobileData: () -> Unit) 
         is UpdateCheck.Installing -> stringResource(R.string.update_installing, check.version)
         is UpdateCheck.UpToDate -> stringResource(R.string.update_up_to_date, check.version)
         is UpdateCheck.OnMobileData -> stringResource(R.string.update_on_mobile_data, check.version)
-        is UpdateCheck.AfterHike -> stringResource(R.string.update_after_hike, check.version)
+        is UpdateCheck.AfterHike -> stringResource(R.string.update_after_hike)
         UpdateCheck.Failed -> stringResource(R.string.update_failed)
     }
     Column(Modifier.padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -2,6 +2,8 @@ package app.sentrek.update
 
 import android.app.Activity
 import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.job.JobInfo
 import android.app.job.JobScheduler
@@ -15,11 +17,14 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.FileProvider
 import androidx.core.content.IntentCompat
 import androidx.core.content.pm.PackageInfoCompat
 import app.sentrek.BuildConfig
+import app.sentrek.R
 import app.sentrek.data.SettingsRepository
-import app.sentrek.maps.RegionRepository
 import app.sentrek.maps.isUnmetered
 import app.sentrek.record.FollowRepository
 import app.sentrek.record.RecordingRepository
@@ -39,18 +44,16 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
-import java.lang.ref.WeakReference
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Checks the latest GitHub release now and then, downloads the APK for this phone's CPU (on
- * Wi-Fi, unless mobile data is allowed), and installs it over this one.
- *
- * It installs only with the app in the background for a few minutes, and never while recording,
- * following a route or downloading maps: installing closes the app. From Android 12, once the
- * user has allowed installs from Sentrek, that needs nobody; otherwise the app asks when opened.
+ * Looks at the latest GitHub release now and then (on Wi-Fi, unless mobile data is allowed)
+ * and says when there is a new version: a notification, and a question when the app is open.
+ * Only when the user says update, the APK for this phone's CPU is downloaded, checked, and
+ * handed to Android's installer, which asks to confirm and offers to open the app again after.
+ * Never during a recording or a followed route: installing closes the app.
  */
 @Singleton
 class GitHubUpdater @Inject constructor(
@@ -59,7 +62,6 @@ class GitHubUpdater @Inject constructor(
     // Lazy: made at app start, before the map engine these need is ready.
     private val recorder: Lazy<RecordingRepository>,
     private val follow: Lazy<FollowRepository>,
-    private val regions: Lazy<RegionRepository>,
 ) : AppUpdater {
     override val available = true
 
@@ -74,26 +76,20 @@ class GitHubUpdater @Inject constructor(
     private val _check = MutableStateFlow<UpdateCheck>(UpdateCheck.Idle)
     override val check: StateFlow<UpdateCheck> = _check.asStateFlow()
 
-    /** The check the user asked for, while it runs. */
-    private var manual: Job? = null
+    private val _newVersion = MutableStateFlow<NewVersion?>(null)
+    override val newVersion: StateFlow<NewVersion?> = _newVersion.asStateFlow()
+
+    /** The update or check the user asked for, while it runs. */
+    private var running: Job? = null
     private val fetching = Any()
 
-    private val _waiting = MutableStateFlow<String?>(null)
-    override val waiting: StateFlow<String?> = _waiting.asStateFlow()
+    /** The latest release seen, for its download links. */
+    @Volatile private var release: Release? = null
 
     @Volatile private var enabled = false
     @Volatile private var mobileData = false
 
-    /** Activities started: 0 with the app in the background. */
-    @Volatile private var shown = 0
-
-    /** The activity on screen, for the confirmation Android may ask for. */
-    @Volatile private var resumed: WeakReference<Activity>? = null
-
-    /** Android wanted a yes for this version after all: the app asks, even if it could install alone. */
-    @Volatile private var needsYes: String? = null
-
-    /** Sent to Android's "install unknown apps" page: installs once back, if allowed. */
+    /** Sent to Android's "install unknown apps" page: goes on once back, if allowed. */
     @Volatile private var askedPermission = false
 
     /** The version downloaded and checked, if its file is still there. */
@@ -102,89 +98,118 @@ class GitHubUpdater @Inject constructor(
 
     override fun start() {
         (context.applicationContext as Application).registerActivityLifecycleCallbacks(Callbacks())
+        // The install job of versions that installed by themselves: no more.
+        jobs.cancel(OLD_JOB_INSTALL)
+        forgetInstalled()
+        _newVersion.value = prefs.getString(KEY_FOUND, null)?.takeIf { Versions.isNewer(it, BuildConfig.VERSION_NAME) }
+            ?.let { NewVersion(it, prefs.getString(KEY_CHANGES, null)?.split('\n')?.filter(String::isNotBlank).orEmpty()) }
         scope.launch {
             combine(settings.autoUpdateApp, settings.useMobileData, ::Pair).collect { (on, mobile) ->
                 enabled = on
                 mobileData = mobile
-                if (on) {
-                    forgetInstalled()
-                    refreshWaiting()
-                    scheduleCheck()
-                } else {
-                    turnOff()
-                }
+                if (on) scheduleCheck() else jobs.cancel(JOB_CHECK)
             }
         }
     }
 
-    override fun install(activity: Activity) {
-        val version = ready ?: return
+    override fun update(activity: Activity, overMobileData: Boolean) {
+        val version = _newVersion.value?.version ?: return
+        if (running?.isActive == true) return
         // Installing closes the app: not in the middle of a hike.
         if (hiking()) {
             _check.value = UpdateCheck.AfterHike(version)
+            return
+        }
+        if (ready != version && !overMobileData && !mobileData && !isUnmetered(context)) {
+            _check.value = UpdateCheck.OnMobileData(version)
             return
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
             askedPermission = true
             val page = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
             runCatching { activity.startActivity(page) }.onFailure { askedPermission = false }
-            _check.value = UpdateCheck.Idle
             return
         }
-        _waiting.value = null
-        _check.value = UpdateCheck.Installing(version)
-        scope.launch { commit(silent = canInstallAlone()) }
+        running = scope.launch {
+            _check.value = UpdateCheck.Downloading(version, 0f)
+            val latest = release?.takeIf { it.version == version } ?: runCatching { latest() }.getOrNull()
+            if (latest == null) {
+                _check.value = UpdateCheck.Failed
+                return@launch
+            }
+            // A newer one came out since: that one, and the screens say so.
+            if (latest.version != version) found(latest, notify = false)
+            if (!fetch(latest) { _check.value = UpdateCheck.Downloading(latest.version, it) }) {
+                _check.value = UpdateCheck.Failed
+                return@launch
+            }
+            _check.value = UpdateCheck.Installing(latest.version)
+            withContext(Dispatchers.Main) { openInstaller(activity) }
+        }
     }
 
-    override fun checkNow(overMobileData: Boolean) {
-        if (manual?.isActive == true) return
-        manual = scope.launch {
+    override fun checkNow() {
+        if (running?.isActive == true) return
+        running = scope.launch {
             _check.value = UpdateCheck.Looking
-            val release = runCatching { latest() }.getOrNull()
-            if (release == null) {
+            val latest = runCatching { latest() }.getOrNull()
+            if (latest == null) {
                 _check.value = UpdateCheck.Failed
                 return@launch
             }
             prefs.edit().putLong(KEY_CHECKED, System.currentTimeMillis()).apply()
-            val version = release.version
-            if (!Versions.isNewer(version, BuildConfig.VERSION_NAME)) {
+            if (!Versions.isNewer(latest.version, BuildConfig.VERSION_NAME)) {
                 _check.value = UpdateCheck.UpToDate(BuildConfig.VERSION_NAME)
                 return@launch
             }
-            if (ready != version && !overMobileData && !mobileData && !isUnmetered(context)) {
-                _check.value = UpdateCheck.OnMobileData(version)
-                return@launch
-            }
-            _check.value = UpdateCheck.Downloading(version, 0f)
-            if (!fetch(release) { _check.value = UpdateCheck.Downloading(version, it) }) {
-                _check.value = UpdateCheck.Failed
-                return@launch
-            }
-            val activity = resumed?.get()
-            if (activity == null) {
-                _check.value = UpdateCheck.Idle
-                refreshWaiting()
-                return@launch
-            }
-            withContext(Dispatchers.Main) { install(activity) }
+            found(latest, notify = false)
+            _check.value = UpdateCheck.Idle
         }
     }
 
-    /** The check job: the latest release, downloaded if newer and right for this phone. */
+    /** The check job: the latest release, told about if newer. */
     fun check() {
         if (!enabled || !(mobileData || isUnmetered(context))) return
-        val release = runCatching { latest() }.getOrNull() ?: return
+        val latest = runCatching { latest() }.getOrNull() ?: return
         prefs.edit().putLong(KEY_CHECKED, System.currentTimeMillis()).apply()
-        val version = release.version
-        if (!Versions.isNewer(version, BuildConfig.VERSION_NAME) || version == prefs.getString(KEY_SKIP, null)) return
-        if (!fetch(release)) return
-        refreshWaiting()
-        if (shown == 0 && canInstallAlone()) scheduleInstall(SOON_MS)
+        if (Versions.isNewer(latest.version, BuildConfig.VERSION_NAME)) found(latest, notify = true)
+    }
+
+    /** A newer version is out: the app asks when open; with [notify], a notification once per version. */
+    private fun found(latest: Release, notify: Boolean) {
+        release = latest
+        prefs.edit().putString(KEY_FOUND, latest.version).putString(KEY_CHANGES, latest.changes.joinToString("\n")).apply()
+        _newVersion.value = NewVersion(latest.version, latest.changes)
+        if (notify && prefs.getString(KEY_NOTIFIED, null) != latest.version) {
+            prefs.edit().putString(KEY_NOTIFIED, latest.version).apply()
+            notifyNew(latest.version)
+        }
+    }
+
+    private fun notifyNew(version: String) {
+        val manager = NotificationManagerCompat.from(context)
+        if (!manager.areNotificationsEnabled()) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.getSystemService(NotificationManager::class.java).createNotificationChannel(
+                NotificationChannel(CHANNEL_ID, context.getString(R.string.update_channel), NotificationManager.IMPORTANCE_DEFAULT),
+            )
+        }
+        val openApp = context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {
+            PendingIntent.getActivity(context, 0, it, PendingIntent.FLAG_IMMUTABLE)
+        }
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_sentrek_monochrome)
+            .setContentTitle(context.getString(R.string.update_new_title, version))
+            .setContentText(context.getString(R.string.update_new_notification))
+            .setContentIntent(openApp)
+            .setAutoCancel(true)
+            .build()
+        runCatching { manager.notify(NOTIFICATION_ID, notification) }
     }
 
     /**
      * [release]'s APK for this phone, downloaded and checked unless it's here already; false if
-     * it couldn't be. One at a time: the check job and the button share the file.
+     * it couldn't be.
      */
     private fun fetch(release: Release, progress: (Float) -> Unit = {}): Boolean = synchronized(fetching) {
         val version = release.version
@@ -192,82 +217,60 @@ class GitHubUpdater @Inject constructor(
         val asset = Versions.assetName(version, installedCode())?.let(release.assets::get) ?: return false
         if (!download(asset, progress)) return false
         if (!fits(apk)) {
-            // Not this app, not newer, or signed by someone else: never installed, not fetched again.
+            // Not this app, not newer, or signed by someone else: never installed.
             apk.delete()
-            prefs.edit().putString(KEY_SKIP, version).apply()
             return false
         }
         prefs.edit().putString(KEY_READY, version).apply()
         return true
     }
 
-    /** The install job: only if the app is still out of sight and nothing would be cut short. */
-    fun installInBackground() {
-        if (!enabled || shown > 0 || ready == null || ready == needsYes || !canInstallAlone()) return
-        if (busy()) return scheduleInstall(BUSY_RETRY_MS)
-        commit(silent = true)
+    /**
+     * Android's installer, with the downloaded file: it asks to confirm, installs, and offers
+     * to open the app again (installing closes it). Where there's no such screen, a session
+     * install, which asks too.
+     */
+    private fun openInstaller(activity: Activity) {
+        val file = apk.takeIf { it.exists() } ?: return
+        val uri = runCatching { FileProvider.getUriForFile(context, "${context.packageName}.update", file) }.getOrElse {
+            _check.value = UpdateCheck.Failed
+            return
+        }
+        @Suppress("DEPRECATION")
+        val intent = Intent(Intent.ACTION_INSTALL_PACKAGE)
+            .setDataAndType(uri, APK_TYPE)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            .putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+            .putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, context.packageName)
+        val opened = runCatching { activity.startActivity(intent) }.isSuccess
+        if (!opened) scope.launch { commit() }
     }
 
-    /** What Android says about an install, from [InstallResultReceiver]. */
+    /** What Android says about a session install, from [InstallResultReceiver]. */
     fun onResult(intent: Intent) {
         when (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                 val confirm = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_INTENT, Intent::class.java) ?: return
-                val activity = resumed?.get()
-                if (activity != null) {
-                    runCatching { activity.startActivity(confirm) }
-                } else {
-                    needsYes = ready
-                    refreshWaiting()
-                }
-            }
-            // The file can't go over this app: not tried again.
-            PackageInstaller.STATUS_FAILURE_INCOMPATIBLE,
-            PackageInstaller.STATUS_FAILURE_CONFLICT,
-            PackageInstaller.STATUS_FAILURE_INVALID -> {
-                prefs.edit().putString(KEY_SKIP, ready).remove(KEY_READY).apply()
-                apk.delete()
-                _waiting.value = null
-                _check.value = UpdateCheck.Failed
+                confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                runCatching { context.startActivity(confirm) }
             }
             PackageInstaller.STATUS_SUCCESS -> Unit
-            // Stopped by the phone (Play Protect, on an app it doesn't know, can only ask with the
-            // app open), or a "no", or a full disk: the app asks first next time.
-            else -> {
-                needsYes = ready
-                refreshWaiting()
-                _check.value = UpdateCheck.Idle
-            }
+            PackageInstaller.STATUS_FAILURE_ABORTED -> _check.value = UpdateCheck.Idle
+            else -> _check.value = UpdateCheck.Failed
         }
     }
-
-    private fun busy(): Boolean = hiking() || regions.get().status.value != null
 
     private fun hiking(): Boolean = recorder.get().state.value != null || follow.get().active
 
-    /** From Android 12 an app can update itself without asking, once allowed to install apps. */
-    private fun canInstallAlone(): Boolean =
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && context.packageManager.canRequestPackageInstalls()
-
-    private fun refreshWaiting() {
-        _waiting.value = ready?.takeIf { !canInstallAlone() || it == needsYes }
-    }
-
-    /** The update is in: its file goes. */
+    /** The update is in: its file and the notice go. */
     private fun forgetInstalled() {
-        val version = prefs.getString(KEY_READY, null) ?: return
-        if (!apk.exists() || !Versions.isNewer(version, BuildConfig.VERSION_NAME)) {
+        val version = prefs.getString(KEY_READY, null)
+        if (version != null && (!apk.exists() || !Versions.isNewer(version, BuildConfig.VERSION_NAME))) {
             apk.delete()
             prefs.edit().remove(KEY_READY).apply()
         }
-    }
-
-    private fun turnOff() {
-        jobs.cancel(JOB_CHECK)
-        jobs.cancel(JOB_INSTALL)
-        apk.delete()
-        prefs.edit().remove(KEY_READY).apply()
-        _waiting.value = null
+        val found = prefs.getString(KEY_FOUND, null)
+        if (found != null && !Versions.isNewer(found, BuildConfig.VERSION_NAME)) prefs.edit().remove(KEY_FOUND).apply()
     }
 
     private fun scheduleCheck() {
@@ -278,16 +281,9 @@ class GitHubUpdater @Inject constructor(
         runCatching { jobs.schedule(job) }
     }
 
-    private fun scheduleInstall(delayMs: Long) {
-        val job = JobInfo.Builder(JOB_INSTALL, ComponentName(context, UpdateJobService::class.java))
-            .setMinimumLatency(delayMs)
-            .build()
-        runCatching { jobs.schedule(job) }
-    }
-
     private class Asset(val url: String, val size: Long)
 
-    private class Release(val version: String, val assets: Map<String, Asset>)
+    private class Release(val version: String, val assets: Map<String, Asset>, val changes: List<String>)
 
     private fun request(url: String) = Request.Builder()
         .url(url)
@@ -304,7 +300,7 @@ class GitHubUpdater @Inject constructor(
             val assets = (0 until list.length()).map(list::getJSONObject).associate {
                 it.getString("name") to Asset(it.getString("browser_download_url"), it.optLong("size"))
             }
-            return Release(json.getString("tag_name").trim().removePrefix("v"), assets)
+            return Release(json.getString("tag_name").trim().removePrefix("v"), assets, Versions.changes(json.optString("body")))
         }
     }
 
@@ -358,7 +354,7 @@ class GitHubUpdater @Inject constructor(
     private fun installedCode(): Long =
         context.packageManager.info(context.packageName, archive = false)?.let(PackageInfoCompat::getLongVersionCode) ?: 0
 
-    private fun commit(silent: Boolean) {
+    private fun commit() {
         val file = apk.takeIf { it.exists() } ?: return
         runCatching {
             val installer = context.packageManager.packageInstaller
@@ -368,10 +364,7 @@ class GitHubUpdater @Inject constructor(
                 setAppPackageName(context.packageName)
                 setSize(file.length())
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    setRequireUserAction(
-                        if (silent) PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED
-                        else PackageInstaller.SessionParams.USER_ACTION_UNSPECIFIED,
-                    )
+                    setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED)
                 }
             }
             val id = installer.createSession(params)
@@ -390,32 +383,21 @@ class GitHubUpdater @Inject constructor(
     }
 
     private inner class Callbacks : Application.ActivityLifecycleCallbacks {
-        override fun onActivityStarted(activity: Activity) {
-            shown++
-            jobs.cancel(JOB_INSTALL)
-        }
-
         override fun onActivityResumed(activity: Activity) {
-            resumed = WeakReference(activity)
-            refreshWaiting()
             if (askedPermission) {
                 askedPermission = false
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && context.packageManager.canRequestPackageInstalls()) install(activity)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && context.packageManager.canRequestPackageInstalls()) update(activity)
             }
-        }
-
-        override fun onActivityPaused(activity: Activity) {
-            if (resumed?.get() === activity) resumed = null
+            // Back from the installer without installing: nothing is going on any more.
+            if (_check.value is UpdateCheck.Installing) _check.value = UpdateCheck.Idle
         }
 
         override fun onActivityStopped(activity: Activity) {
-            shown = (shown - 1).coerceAtLeast(0)
-            if (shown > 0 || !enabled) return
-            scheduleCheck()
-            // A few minutes out of sight first: not while the user is in a file picker or the camera.
-            if (ready != null && canInstallAlone()) scheduleInstall(HIDDEN_MS)
+            if (enabled) scheduleCheck()
         }
 
+        override fun onActivityStarted(activity: Activity) {}
+        override fun onActivityPaused(activity: Activity) {}
         override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
         override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
         override fun onActivityDestroyed(activity: Activity) {}
@@ -423,16 +405,21 @@ class GitHubUpdater @Inject constructor(
 
     companion object {
         const val JOB_CHECK = 7101
-        const val JOB_INSTALL = 7102
+
+        /** Earlier versions' background install. */
+        private const val OLD_JOB_INSTALL = 7102
 
         private const val KEY_CHECKED = "checked"
         private const val KEY_READY = "ready"
-        private const val KEY_SKIP = "skip"
+        private const val KEY_FOUND = "found"
+        private const val KEY_NOTIFIED = "notified"
+        private const val KEY_CHANGES = "changes"
 
+        private const val CHANNEL_ID = "updates"
+        private const val NOTIFICATION_ID = 7
+
+        private const val APK_TYPE = "application/vnd.android.package-archive"
         private const val CHECK_EVERY_MS = 12 * 60 * 60 * 1000L
-        private const val HIDDEN_MS = 5 * 60 * 1000L
-        private const val SOON_MS = 60 * 1000L
-        private const val BUSY_RETRY_MS = 30 * 60 * 1000L
     }
 }
 

@@ -32,6 +32,8 @@ object MapTrails {
         "primary" to 3.0,
     )
 
+    private const val FERRATA_COST = 3.0
+
     /** Must run on the main thread (MapLibre). */
     fun lines(style: Style, box: BoundingBox): List<TrailLine> {
         val base = style.getSourceAs<VectorSource>(SOURCE)?.querySourceFeatures(arrayOf(LAYER), null).orEmpty()
@@ -39,10 +41,11 @@ object MapTrails {
                 val cost = COST[feature.getStringProperty("class")] ?: return@flatMap emptyList()
                 lines(feature, box, cost)
             }
-        // Overlay trails are all footpaths; its points are skipped by lines().
+        // Overlay trails are all footpaths, but via ferratas: taken only when there's no
+        // walking way round, since they need gear. Its points are skipped by lines().
         val overlay = style.sources.filter { MapOverlays.isOverlaySource(it.id) }
             .filterIsInstance<GeoJsonSource>()
-            .flatMap { source -> source.querySourceFeatures(null).flatMap { lines(it, box, 1.0) } }
+            .flatMap { source -> source.querySourceFeatures(null).flatMap { lines(it, box, if (it.hasProperty("f")) FERRATA_COST else 1.0) } }
         return base + overlay
     }
 

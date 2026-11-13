@@ -386,6 +386,9 @@ class HomeViewModel @Inject constructor(
         _goTo.value = target
     }
 
+    /** A position found with search, marked on the map until the next search or long press. */
+    val searchPin = MutableStateFlow<LatLon?>(null)
+
     fun place(id: String): Place? = placeRepository.find(id)
 
     fun addPlace(place: Place) {

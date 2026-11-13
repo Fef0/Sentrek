@@ -1,5 +1,7 @@
 package app.sentrek
 
+import android.app.Activity
+import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -9,6 +11,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.Build
+import android.os.Bundle
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -16,8 +19,17 @@ import androidx.core.content.ContextCompat
 import app.sentrek.data.AutoPower
 import app.sentrek.data.PowerMode
 import app.sentrek.data.SettingsRepository
+import app.sentrek.record.FollowRepository
+import app.sentrek.record.RecordingRepository
+import dagger.Lazy
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -32,20 +44,45 @@ import javax.inject.Singleton
  * Advanced has the levels), and says so in a notification. Only on the way down and off the
  * charger: a mode turned off by hand stays off until the battery has been charged above its
  * level again. Battery saver also follows the phone's own: on with it, and off with it when
- * that's why it came on. Runs while the app does (open, recording or following): when it matters.
+ * that's why it came on. Only while the app is in use (a screen open, a recording or a route
+ * followed): closed, the process may linger a while, but the battery isn't watched any more.
  */
 @Singleton
 class PowerAutoSwitch @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settings: SettingsRepository,
+    // Lazy: made after the map engine they need is ready.
+    private val recorder: Lazy<RecordingRepository>,
+    private val follow: Lazy<FollowRepository>,
 ) {
     private data class Battery(val percent: Int, val charging: Boolean, val phoneSaver: Boolean)
 
+    /** Screens started: 0 with the app closed or in the background. */
+    private val shown = MutableStateFlow(0)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun start(scope: CoroutineScope) {
+        (context.applicationContext as Application).registerActivityLifecycleCallbacks(Screens())
         scope.launch {
-            combine(battery(), settings.autoPower, settings.powerMode) { b, auto, mode -> Triple(b, auto, mode) }
-                .collect { (b, auto, mode) -> check(b, auto, mode) }
+            val inUse = combine(
+                shown.map { it > 0 },
+                recorder.get().state.map { it != null },
+                follow.get().state.map { it != null },
+            ) { open, recording, following -> open || recording || following }.distinctUntilChanged()
+            inUse.flatMapLatest { on ->
+                if (on) combine(battery(), settings.autoPower, settings.powerMode) { b, auto, mode -> Triple(b, auto, mode) } else emptyFlow()
+            }.collect { (b, auto, mode) -> check(b, auto, mode) }
         }
+    }
+
+    private inner class Screens : Application.ActivityLifecycleCallbacks {
+        override fun onActivityStarted(activity: Activity) = shown.update { it + 1 }
+        override fun onActivityStopped(activity: Activity) = shown.update { (it - 1).coerceAtLeast(0) }
+        override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+        override fun onActivityResumed(activity: Activity) {}
+        override fun onActivityPaused(activity: Activity) {}
+        override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+        override fun onActivityDestroyed(activity: Activity) {}
     }
 
     private suspend fun check(battery: Battery, auto: AutoPower, mode: PowerMode) {

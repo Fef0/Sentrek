@@ -34,4 +34,14 @@ object Versions {
         }
         return "Sentrek-${version.trim().removePrefix("v")}-$cpu.apk"
     }
+
+    /**
+     * What a release changes, from its notes: the list it starts with ("- …"), as written,
+     * without the markdown marks. The paragraphs after it (how to install) are left out.
+     */
+    fun changes(notes: String?): List<String> = notes.orEmpty().lines()
+        .map { it.trim() }
+        .filter { it.startsWith("- ") || it.startsWith("* ") }
+        .map { it.drop(2).replace("**", "").replace("`", "").trim() }
+        .filter { it.isNotEmpty() }
 }

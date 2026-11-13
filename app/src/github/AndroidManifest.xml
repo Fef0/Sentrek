@@ -1,10 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Installs the new versions it downloads from the GitHub releases. -->
+    <!-- Hands the new versions it downloads from the GitHub releases to Android's installer. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!-- Android 12+: its own updates without asking each time. -->
-    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
 
     <application>
         <service
@@ -14,5 +12,14 @@
         <receiver
             android:name=".update.InstallResultReceiver"
             android:exported="false" />
+        <provider
+            android:name=".update.UpdateFileProvider"
+            android:authorities="${applicationId}.update"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/update_paths" />
+        </provider>
     </application>
 </manifest>

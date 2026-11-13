@@ -44,6 +44,15 @@ object VectorTile {
             Point(f.tags, first[0], first[1], f.extent)
         }
 
+    /** One line feature: its tags and parts (x, y pairs in tile units, 0 to [extent]). */
+    class Line(val tags: Map<String, String>, val parts: List<IntArray>, val extent: Int)
+
+    /** The lines of [layer] in the tile [bytes] (uncompressed) that [keep] accepts. */
+    fun lines(bytes: ByteArray, layer: String, keep: (Map<String, String>) -> Boolean): List<Line> =
+        features(bytes, layer).mapNotNull { f ->
+            if (f.type != LINESTRING || f.geometry == null || !keep(f.tags)) null else Line(f.tags, rings(f.geometry), f.extent)
+        }
+
     private class Feature(val type: Int, val tags: Map<String, String>, val geometry: Reader?, val extent: Int)
 
     private fun features(bytes: ByteArray, layer: String): List<Feature> {
@@ -225,6 +234,7 @@ object VectorTile {
     private const val LENGTH = 2
     private const val FIXED32 = 5
     private const val POINT = 1
+    private const val LINESTRING = 2
     private const val POLYGON = 3
     private const val MOVE_TO = 1
     private const val LINE_TO = 2

@@ -92,3 +92,11 @@ enum class PoiKind(val icon: String, val minZoom: Int, val onMap: Boolean = true
         val MOUNTAIN_SHELTERS = setOf("basic_hut", "weather_shelter", "lean_to", "rock_shelter")
     }
 }
+
+/** OSM `via_ferrata_scale`: 0 (very easy) to 6 (beyond extremely difficult). */
+object ViaFerrataScale {
+    const val MAX = 6
+
+    /** The grade, from "3" or "3+" (a half grade counts as the grade below); null when unreadable. */
+    fun fromOsm(value: String?): Int? = value?.trim()?.firstOrNull()?.digitToIntOrNull()?.takeIf { it in 0..MAX }
+}

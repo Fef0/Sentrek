@@ -46,6 +46,30 @@ class OverpassOverlayTest {
     }
 
     @Test
+    fun `via ferratas carry their grade and name`() {
+        val input = """{"elements":[
+            {"type":"trail","id":1,"geometry":{"type":"LineString","coordinates":[[7.0,46.0],[7.1,46.1]]},"tags":{"hw":"via_ferrata","vf":"3","nm":"Ferrata \"Rino\" Pisetta","sac":"","vis":""}},
+            {"type":"trail","id":2,"geometry":{"type":"LineString","coordinates":[[7.0,46.0],[7.1,46.1]]},"tags":{"hw":"via_ferrata","vf":"","nm":"","sac":"","vis":""}},
+            {"type":"trail","id":3,"geometry":{"type":"LineString","coordinates":[[7.0,46.0],[7.1,46.1]]},"tags":{"hw":"path","vf":"2+","sac":"alpine_hiking","vis":""}},
+            {"type":"trail","id":4,"geometry":{"type":"LineString","coordinates":[[7.0,46.0],[7.1,46.1]]},"tags":{"hw":"path","vf":"","sac":"","vis":""}}
+        ]}"""
+        val out = StringWriter()
+        assertEquals(4, OverpassOverlay.convert(input.reader(), out))
+        val json = out.toString()
+        assertTrue(json.contains(""""properties":{"v":0,"f":3,"n":"Ferrata \"Rino\" Pisetta","id":"way/1"}"""))
+        assertTrue(json.contains(""""properties":{"v":0,"f":-1,"id":"way/2"}"""))
+        assertTrue(json.contains(""""properties":{"s":4,"v":0,"f":2,"id":"way/3"}"""))
+        assertTrue(json.contains(""""properties":{"v":0,"id":"way/4"}"""))
+    }
+
+    @Test
+    fun `query asks for via ferratas`() {
+        val q = OverpassOverlay.query(BoundingBox(45.5, 7.5, 46.0, 8.0))
+        assertTrue(q.contains("""way["highway"="via_ferrata"]"""))
+        assertTrue(q.contains("vf=t[\"via_ferrata_scale\"]"))
+    }
+
+    @Test
     fun `query targets the cell bbox and asks for points`() {
         val q = OverpassOverlay.query(BoundingBox(45.5, 7.5, 46.0, 8.0))
         assertTrue(q.contains("[bbox:45.5,7.5,46.0,8.0]"))

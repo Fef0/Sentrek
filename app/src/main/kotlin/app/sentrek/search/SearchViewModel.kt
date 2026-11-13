@@ -6,6 +6,9 @@ import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.CoordinateParser
 import app.sentrek.geo.Geo
 import app.sentrek.geo.LatLon
+import app.sentrek.geo.overlay.NamedLine
+import app.sentrek.geo.overlay.NamedLineSource
+import app.sentrek.geo.overlay.NamedLines
 import app.sentrek.geo.overlay.OverlayPoi
 import app.sentrek.geo.overlay.OverlayPoiSource
 import app.sentrek.geo.place.Place
@@ -46,14 +49,18 @@ sealed interface MapHit {
 
 /** What a search found, each group best first. */
 data class SearchResults(
+    /** What was typed when these were found: the screen shows it's busy until they match. */
+    val query: String = "",
     val places: List<Place> = emptyList(),
     val tracks: List<SavedTrack> = emptyList(),
     /** Everything named on the map: the hiking details' points and the map's own names, together. */
     val points: List<MapHit> = emptyList(),
+    /** Via ferratas, waymarked routes and named paths. */
+    val paths: List<NamedLine> = emptyList(),
     /** The text read as a position: pasted from a text message, say. */
     val position: LatLon? = null,
 ) {
-    val isEmpty: Boolean get() = places.isEmpty() && tracks.isEmpty() && points.isEmpty() && position == null
+    val isEmpty: Boolean get() = places.isEmpty() && tracks.isEmpty() && points.isEmpty() && paths.isEmpty() && position == null
 }
 
 /** One search over the saved places, the tracks and the named points of the downloaded areas. */
@@ -63,6 +70,7 @@ class SearchViewModel @Inject constructor(
     private val trackRepository: TrackRepository,
     private val pois: OverlayPoiSource,
     private val mapNames: MapNames,
+    private val namedLines: NamedLineSource,
 ) : ViewModel() {
     val query = MutableStateFlow("")
 
@@ -75,6 +83,9 @@ class SearchViewModel @Inject constructor(
     /** The towns and mountains of the map's own tiles, with their names normalized; read once per visit. */
     private val names = MutableStateFlow<List<Pair<String, MapName>>>(emptyList())
 
+    /** Via ferratas, routes and named paths, with their names normalized; read once per visit. */
+    private val lines = MutableStateFlow<List<Pair<String, NamedLine>>>(emptyList())
+
     /** False while the downloaded areas are being read. */
     val pointsReady = MutableStateFlow(false)
 
@@ -84,13 +95,13 @@ class SearchViewModel @Inject constructor(
         query.debounce(DEBOUNCE_MS),
         placeRepository.places,
         trackRepository.tracks,
-        combine(points, names, ::Pair),
+        combine(points, names, lines, ::Triple),
         near,
-    ) { q, places, tracks, (points, names), near ->
+    ) { q, places, tracks, (points, names, lines), near ->
         val position = CoordinateParser.parse(q)
-        if (position != null) return@combine SearchResults(position = position)
+        if (position != null) return@combine SearchResults(q, position = position)
         val words = TextMatch.words(q)
-        if (words.isEmpty()) return@combine SearchResults()
+        if (words.isEmpty()) return@combine SearchResults(q)
         // Hiking points first where both have the same thing: theirs is the richer card.
         val hiking = points.mapNotNull { (name, poi) -> TextMatch.score(name, words)?.let { Triple(it, MapHit.Hiking(poi) as MapHit, poi.position) } }
         val named = names.mapNotNull { (name, place) -> TextMatch.score(name, words)?.let { Triple(it, MapHit.Named(place) as MapHit, place.position) } }
@@ -98,6 +109,7 @@ class SearchViewModel @Inject constructor(
                 hiking.none { (_, h, p) -> h.name.equals(hit.name, ignoreCase = true) && Geo.distance(p, at) < SAME_PLACE_M }
             }
         SearchResults(
+            query = q,
             places = places
                 .mapNotNull { p -> score(words, p.name, p.note)?.let { it to p } }
                 .sortedWith(compareBy({ it.first }, { near?.let { n -> Geo.distance(n, it.second.position) } ?: 0.0 }))
@@ -108,6 +120,14 @@ class SearchViewModel @Inject constructor(
                 .take(MAX_EACH).map { it.second },
             points = (hiking + named)
                 .sortedWith(compareBy({ it.first }, { near?.let { n -> Geo.distance(n, it.third) } ?: 0.0 }))
+                .take(MAX_EACH).map { it.second },
+            paths = lines
+                .mapNotNull { (text, line) ->
+                    // "via ferrata" finds every via ferrata, after those named so.
+                    (TextMatch.score(text, words) ?: if (line.kind == NamedLine.Kind.Ferrata) TextMatch.score("$FERRATA $text", words)?.plus(KIND_PENALTY) else null)
+                        ?.let { it to line }
+                }
+                .sortedWith(compareBy({ it.first }, { near?.let { n -> Geo.distance(n, it.second.middle) } ?: 0.0 }))
                 .take(MAX_EACH).map { it.second },
         )
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SearchResults())
@@ -122,6 +142,12 @@ class SearchViewModel @Inject constructor(
                 // Overlapping areas list the same point twice.
                 .distinctBy { (name, poi) -> Triple(name, (poi.position.lat * 1e4).toLong(), (poi.position.lon * 1e4).toLong()) }
             names.value = mapNames.all().map { TextMatch.normalize(it.name) to it }
+            val special = NamedLines.withoutRepeats(runCatching { namedLines.namedLines() }.getOrDefault(emptyList()))
+            // A path the map names that is a via ferrata or a route already found: that one, richer.
+            val paths = mapNames.paths().filter { p ->
+                special.none { it.name.equals(p.name, ignoreCase = true) && NamedLines.close(it.box, p.box) }
+            }
+            lines.value = (special + paths).map { TextMatch.normalize(it.searchText) to it }
             pointsReady.value = true
         }
     }
@@ -138,6 +164,8 @@ class SearchViewModel @Inject constructor(
         const val DEBOUNCE_MS = 200L
         const val MAX_EACH = 30
         const val NOTE_PENALTY = 10
+        const val KIND_PENALTY = 5
+        const val FERRATA = "via ferrata"
 
         /** A town or peak this close to a point of the same name is that point. */
         const val SAME_PLACE_M = 1_000.0

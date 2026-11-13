@@ -52,6 +52,7 @@ import org.maplibre.android.style.layers.PropertyFactory.textHaloColor
 import org.maplibre.android.style.layers.PropertyFactory.textHaloWidth
 import org.maplibre.android.style.layers.PropertyFactory.textOffset
 import org.maplibre.android.style.layers.PropertyFactory.textOptional
+import org.maplibre.android.style.layers.PropertyFactory.textRotationAlignment
 import org.maplibre.android.style.layers.PropertyFactory.textSize
 import org.maplibre.android.style.layers.PropertyFactory.visibility
 import org.maplibre.android.style.layers.PropertyValue
@@ -82,6 +83,8 @@ data class RasterOverlay(val id: String, val url: String)
  *    - hiking points (huts, water, caves, guideposts, crosses…) as icons, from lower zooms
  *      than the base tiles allow. Inside downloaded areas the base tiles' own copies of these
  *      points are hidden, so nothing is drawn twice;
+ *    - via ferratas (`f`), dark lines with cross ticks as on paper maps, their grade along
+ *      them from zoom 13;
  *    - waymarked routes, under the trails like the base style's, never broken (roads
  *      included) and with their waymark along the line from zoom 12. The base tiles' own
  *      routes are hidden there.
@@ -94,6 +97,13 @@ object MapOverlays {
     private const val OVERVIEW = "-overview"
     private const val PLAIN_PATH = "-path"
     private const val PLAIN_TRACK = "-track"
+    private const val FERRATA = "-ferrata"
+    private const val FERRATA_TICKS = "-ferrata-ticks"
+    private const val FERRATA_GRADE = "-ferrata-grade"
+    private const val FERRATA_GRADE_ZOOM = 13f
+
+    /** The grade labels, 0 to 6, on the Hüsler scale climbers use across the Alps: A to F (0 has none). */
+    val HUSLER_GRADES = listOf("", "A", "B", "C", "D", "E", "F")
 
     /** Thin solid lines below this, dashed ones (like the base style's) from here. */
     private const val DETAIL_ZOOM = 12f
@@ -128,7 +138,7 @@ object MapOverlays {
     internal fun isOverlaySource(id: String) = id.startsWith(TRAILS)
 
     internal fun isTrailLayer(id: String) =
-        id.startsWith(TRAILS) && listOf(CLEAR, FAINT, OVERVIEW, PLAIN_PATH, PLAIN_TRACK).any(id::endsWith)
+        id.startsWith(TRAILS) && listOf(CLEAR, FAINT, OVERVIEW, PLAIN_PATH, PLAIN_TRACK, FERRATA, FERRATA_TICKS).any(id::endsWith)
 
     internal fun isRouteLayer(id: String) = id.startsWith(TRAILS) && id.endsWith(ROUTES)
 
@@ -137,7 +147,14 @@ object MapOverlays {
      * points. On the other maps than [MapKind.Hiking], hiking routes and difficulty colours
      * are hidden: those maps draw their own routes ([MapExtras]).
      */
-    fun sync(style: Style, rasters: List<RasterOverlay>, overlays: Map<String, File>, showDifficulty: Boolean, kind: MapKind = MapKind.Hiking) {
+    fun sync(
+        style: Style,
+        rasters: List<RasterOverlay>,
+        overlays: Map<String, File>,
+        showDifficulty: Boolean,
+        kind: MapKind = MapKind.Hiking,
+        night: Boolean = false,
+    ) {
         val hiking = kind == MapKind.Hiking
         @Suppress("NAME_SHADOWING") val showDifficulty = showDifficulty && hiking
         // Layers are cheap to rebuild and that keeps the order right; sources (parsed
@@ -176,6 +193,9 @@ object MapOverlays {
                 style.addLayerBelow(trailLayer(sourceId, sourceId + CLEAR, faint = false), BELOW_LAYER)
                 style.addLayerBelow(trailLayer(sourceId, sourceId + FAINT, faint = true), BELOW_LAYER)
             }
+            style.addLayerBelow(ferrataLayer(sourceId, sourceId + FERRATA, night), BELOW_LAYER)
+            style.addLayerBelow(ferrataTicks(sourceId, sourceId + FERRATA_TICKS, night), BELOW_LAYER)
+            style.addLayerBelow(ferrataGrade(sourceId, sourceId + FERRATA_GRADE, night), BELOW_LAYER)
             // Below every label: names and points win the space, the marks repeat anyway.
             if (hiking) style.addLayerBelow(markLayer(sourceId, sourceId + MARKS), BELOW_LAYER)
             // One layer per zoom tier (filters can't use zoom). Symbols collide with base labels
@@ -290,8 +310,61 @@ object MapOverlays {
             )
         }
 
-    /** Paths and tracks, not the route lines laid over them. */
-    private fun trailLines() = all(eq(geometryType(), literal("LineString")), not(has(OverpassOverlay.NETWORK)))
+    /** Paths and tracks, not the route lines laid over them, nor via ferratas (drawn apart). */
+    private fun trailLines() = all(eq(geometryType(), literal("LineString")), not(has(OverpassOverlay.NETWORK)), not(has(FERRATA_GRADE_KEY)))
+
+    private const val FERRATA_GRADE_KEY = "f"
+
+    private fun ferrataColor(night: Boolean) = if (night) "#e6e6e6" else "#1f1f1f"
+
+    private fun ferrataLines() = all(eq(geometryType(), literal("LineString")), has(FERRATA_GRADE_KEY))
+
+    /** The line itself, thin and solid, from as far out as the trails. */
+    private fun ferrataLayer(sourceId: String, layerId: String, night: Boolean) =
+        LineLayer(layerId, sourceId).apply {
+            minZoom = OVERVIEW_ZOOM
+            setFilter(ferrataLines())
+            setProperties(
+                lineColor(ferrataColor(night)),
+                lineWidth(interpolate(linear(), zoom(), stop(OVERVIEW_ZOOM, 0.8f), stop(14, 2f), stop(17, 3f))),
+                lineCap(Property.LINE_CAP_ROUND),
+                lineJoin(Property.LINE_JOIN_ROUND),
+            )
+        }
+
+    /** Short ticks across the line, "+ + +": a wide line of very short dashes. */
+    private fun ferrataTicks(sourceId: String, layerId: String, night: Boolean) =
+        LineLayer(layerId, sourceId).apply {
+            minZoom = DETAIL_ZOOM
+            setFilter(ferrataLines())
+            setProperties(
+                lineColor(ferrataColor(night)),
+                lineWidth(interpolate(linear(), zoom(), stop(DETAIL_ZOOM, 5f), stop(14, 8f), stop(17, 11f))),
+                // In line widths: a tick a quarter as long as the line is wide, every 2.5 widths.
+                lineDasharray(arrayOf(0.22f, 2.5f)),
+                lineCap(Property.LINE_CAP_BUTT),
+            )
+        }
+
+    /** The grade along the line, in a halo so it reads over the ticks. */
+    private fun ferrataGrade(sourceId: String, layerId: String, night: Boolean) =
+        SymbolLayer(layerId, sourceId).apply {
+            minZoom = FERRATA_GRADE_ZOOM
+            setFilter(all(ferrataLines(), gte(get(FERRATA_GRADE_KEY), literal(0))))
+            setProperties(
+                symbolPlacement(Property.SYMBOL_PLACEMENT_LINE),
+                symbolSpacing(260f),
+                // Upright, whichever way the line runs: a letter on its side is hard to read.
+                textRotationAlignment(Property.TEXT_ROTATION_ALIGNMENT_VIEWPORT),
+                textField(match(get(FERRATA_GRADE_KEY), literal(""), *HUSLER_GRADES.mapIndexed { i, g -> stop(literal(i), literal(g)) }.toTypedArray())),
+                textFont(arrayOf("Noto Sans Bold")),
+                textSize(12f),
+                textOptional(true),
+                textColor(if (night) "#000000" else "#ffffff"),
+                textHaloColor(ferrataColor(night)),
+                textHaloWidth(3f),
+            )
+        }
 
     /** Routes look like the base style's (night colours included): its paint is copied. */
     private fun routeLayer(style: Style, sourceId: String, layerId: String) =
@@ -326,7 +399,7 @@ object MapOverlays {
         LineLayer(layerId, sourceId).apply {
             minZoom = DETAIL_ZOOM
             val visibility = if (faint) gte(get("v"), literal(4)) else lt(get("v"), literal(4))
-            setFilter(all(eq(geometryType(), literal("LineString")), has("s"), visibility))
+            setFilter(all(eq(geometryType(), literal("LineString")), has("s"), not(has(FERRATA_GRADE_KEY)), visibility))
             setProperties(
                 lineColor(difficultyColor()),
                 lineWidth(interpolate(linear(), zoom(), stop(DETAIL_ZOOM, 1.8f), stop(14, 3f), stop(17, 5f))),

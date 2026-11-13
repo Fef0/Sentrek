@@ -15,6 +15,8 @@ import kotlin.math.roundToLong
  * request returns both, converted into one compact GeoJSON file:
  * - trail lines (every footpath and track): `s` = SAC grade 1–6 (absent when ungraded),
  *   `v` = visibility 1–6 (0 when unknown), `t` = 1 on tracks, `id` = "way/…";
+ *   via ferratas also have `f` = their grade 0–6 ([ViaFerrataScale]; -1 when ungraded) and
+ *   `n` = their name, which the base tiles don't have;
  * - hiking points (huts, water, caves, guideposts, crosses, named peaks and passes…):
  *   `k` = [PoiKind.icon], `n` = name,
  *   `id` = "node/…" (or way/relation), plus every other OSM tag of the point except mapper
@@ -37,8 +39,11 @@ object OverpassOverlay {
             // Every path and track, graded or not, so they show when zoomed out; footways and
             // steps only when graded, which leaves out pavements.
             "(way[\"highway\"~\"^(path|bridleway|track)$\"];" +
-            "way[\"highway\"~\"^(footway|steps)$\"][\"sac_scale\"];);" +
-            "convert trail ::id=id(),hw=t[\"highway\"],sac=t[\"sac_scale\"],vis=t[\"trail_visibility\"],::geom=geom();" +
+            "way[\"highway\"~\"^(footway|steps)$\"][\"sac_scale\"];" +
+            // Via ferratas: their own kind of way, or a path with a ferrata grade.
+            "way[\"highway\"=\"via_ferrata\"];way[\"via_ferrata_scale\"];);" +
+            "convert trail ::id=id(),hw=t[\"highway\"],sac=t[\"sac_scale\"],vis=t[\"trail_visibility\"]," +
+            "vf=t[\"via_ferrata_scale\"],nm=t[\"name\"],::geom=geom();" +
             "out geom;" +
             "(" +
             "nwr[\"natural\"~\"^(cave_entrance|spring)$\"];" +
@@ -240,7 +245,15 @@ object OverpassOverlay {
         val id = e.id?.let { ""","id":"way/$it"""" }.orEmpty()
         val grade = sac?.let { """"s":${it.grade},""" }.orEmpty()
         val track = if (e.tags["hw"] == "track") ""","t":1""" else ""
-        return """{"type":"Feature","properties":{$grade"v":$vis$track$id},""" +
+        val ferrata = if (e.tags["hw"] == "via_ferrata" || !e.tags["vf"].isNullOrBlank()) {
+            val name = e.tags["nm"]?.trim()?.takeIf { it.isNotEmpty() && it.length <= MAX_NAME }?.let { n ->
+                StringWriter().also { w -> JsonWriter(w).use { it.value(n) } }.toString()
+            }
+            ""","f":${ViaFerrataScale.fromOsm(e.tags["vf"]) ?: -1}""" + (name?.let { ""","n":$it""" } ?: "")
+        } else {
+            ""
+        }
+        return """{"type":"Feature","properties":{$grade"v":$vis$track$ferrata$id},""" +
             """"geometry":{"type":"LineString","coordinates":[$coords]}}"""
     }
 

@@ -1,0 +1,5 @@
+• Pianificazione: più breve, più facile o meno salita, evitando vie ferrate o strade, salvato con ogni percorso
+• Altre strade per una tappa, da scegliere; tieni premuto su un sentiero per chiuderlo
+• Le strade contano come i sentieri, così i percorsi non fanno più lunghi giri per evitarle
+• Legenda della mappa e griglia UTM o latitudine/longitudine
+• I sentieri mostrano il fondo e chi li cura

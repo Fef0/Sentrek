@@ -1,0 +1,5 @@
+• Planner: shortest, easiest or least climb, avoid via ferratas or roads, saved with each route
+• Other ways for a leg, to pick from; long-press a path to close it
+• Roads count like paths when planning, so routes no longer go far round to avoid them
+• Map legend, and a UTM or latitude/longitude grid
+• Paths show their surface and who looks after them

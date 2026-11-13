@@ -1,0 +1,5 @@
+• Avalanche bulletin with the weather forecast: Europe, Canada and the US, in your language where the service has it
+• Via ferratas on the map with their grade (A–F)
+• Search finds paths, marked routes and via ferratas; coordinates just show the spot
+• New versions are announced, and installed only when you say so
+• Battery saver no longer watches the battery after you close the app

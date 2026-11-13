@@ -1,5 +1,9 @@
 package app.sentrek.home
 
+import app.sentrek.ui.MapButton
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.AnimatedVisibility
 import app.sentrek.ui.SentrekIcons
 import app.sentrek.maps.DownloadOutcome
 import app.sentrek.maps.DownloadStatus
@@ -293,6 +297,41 @@ fun MapLabel(text: String, modifier: Modifier = Modifier) {
             .padding(horizontal = 12.dp, vertical = 6.dp),
     )
 }
+
+/**
+ * A map button whose [label] (what it does, or the mode it's in) shows only for a moment after
+ * a long press on it: kept hidden, it would cover the map. The button says it to screen
+ * readers all the same.
+ */
+@Composable
+fun HintedMapButton(
+    label: String,
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    active: Boolean = false,
+) {
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(shown) {
+        if (shown) {
+            delay(HINT_SHOWN_MS)
+            shown = false
+        }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        AnimatedVisibility(visible = shown, enter = fadeIn(), exit = fadeOut()) { MapLabel(label) }
+        MapButton(
+            icon = icon,
+            contentDescription = contentDescription,
+            onClick = onClick,
+            active = active,
+            onLongClick = { shown = true },
+            longClickLabel = label,
+        )
+    }
+}
+
+private const val HINT_SHOWN_MS = 2_500L
 
 /** A short note over the map. With [progress] (0 to 1), a ring filling up in place of the icon. */
 @Composable

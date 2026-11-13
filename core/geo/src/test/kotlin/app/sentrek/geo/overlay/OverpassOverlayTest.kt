@@ -46,6 +46,19 @@ class OverpassOverlayTest {
     }
 
     @Test
+    fun `trails keep their surface and operator`() {
+        val input = """{"elements":[
+            {"type":"trail","id":1,"geometry":{"type":"LineString","coordinates":[[7.0,46.0],[7.1,46.1]]},"tags":{"sac":"hiking","vis":"","su":"gravel","op":"CAI \"Biella\""}},
+            {"type":"trail","id":2,"geometry":{"type":"LineString","coordinates":[[7.0,46.0],[7.1,46.1]]},"tags":{"sac":"","vis":"","su":"","op":" "}}
+        ]}"""
+        val out = StringWriter()
+        assertEquals(2, OverpassOverlay.convert(input.reader(), out))
+        val json = out.toString()
+        assertTrue(json, json.contains(""""properties":{"s":1,"v":0,"su":"gravel","op":"CAI \"Biella\"","id":"way/1"}"""))
+        assertTrue(json.contains(""""properties":{"v":0,"id":"way/2"}"""))
+    }
+
+    @Test
     fun `via ferratas carry their grade and name`() {
         val input = """{"elements":[
             {"type":"trail","id":1,"geometry":{"type":"LineString","coordinates":[[7.0,46.0],[7.1,46.1]]},"tags":{"hw":"via_ferrata","vf":"3","nm":"Ferrata \"Rino\" Pisetta","sac":"","vis":""}},

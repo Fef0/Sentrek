@@ -10,6 +10,7 @@ import app.sentrek.geo.plan.PlanEditor
 import app.sentrek.geo.plan.PlanGeometry
 import app.sentrek.geo.plan.PlanLeg
 import app.sentrek.geo.plan.PlanPoint
+import app.sentrek.geo.plan.RouteOptions
 import app.sentrek.geo.plan.SavedPlan
 import app.sentrek.geo.plan.SectionTotals
 import app.sentrek.geo.plan.Sections
@@ -55,7 +56,14 @@ enum class PlanBlock(val message: Int) {
 
 /** Where the planner finds paths to follow: the lines of the map around a box. */
 interface TrailSource {
+    /** The lines the map has loaded in [box]: quick, but only about what's on screen. */
     suspend fun lines(box: BoundingBox): List<TrailLine>
+
+    /**
+     * Every path and track of the downloaded areas in [box], read from their files: slower,
+     * for when the map's own lines have no way through.
+     */
+    suspend fun areaLines(box: BoundingBox): List<TrailLine> = emptyList()
 
     /** How far from a tap a path still counts as meant, in metres (depends on the zoom). */
     fun snapRadiusM(): Double
@@ -74,11 +82,34 @@ data class PlanState(
     val followTrails: Boolean = true,
     /** The saved route being edited; null for a new one. */
     val editing: SavedTrack? = null,
+    /** How legs along the paths pick their way; saved with the route. */
+    val options: RouteOptions = RouteOptions(),
+    /** The options or a leg's way were changed since the plan was opened: there's something to save. */
+    val optionsChanged: Boolean = false,
+    /** Other ways for one leg, to pick from; null when none are asked for. */
+    val choices: LegChoices? = null,
+    /** Goes up when a leg is swapped for another way, so the legs are drawn again. */
+    val routing: Int = 0,
 ) {
     val positions: List<LatLon> get() = points.map { it.position }
 
     /** The point the section button marks: the selected one, or the last; never the start. */
     val sectionTarget: Int? get() = (selected ?: points.lastIndex).takeIf { it > 0 }
+
+    /**
+     * The leg "other ways" works on: the one arriving at the selected point, or the last leg
+     * when none is selected; only when it follows paths.
+     */
+    val choiceLeg: Int? get() = (selected ?: points.lastIndex).takeIf { it > 0 && points.getOrNull(it)?.onTrails == true }?.let { it - 1 }
+}
+
+/**
+ * Other ways for leg [leg] (from point [leg] to the next), the best first; [loading] while
+ * they're looked for. [shown]: the one looked at, drawn as the plan's own line.
+ */
+data class LegChoices(val leg: Int, val ways: List<Way>, val loading: Boolean = false, val shown: Int = 0) {
+    /** One way: the leg as it would be drawn, and its totals. */
+    data class Way(val leg: PlanLeg, val distance: Double, val ascent: Double, val descent: Double, val millis: Long, val hasElevation: Boolean)
 }
 
 /**
@@ -132,15 +163,25 @@ class PlannerViewModel @Inject constructor(
     /** Routed legs by their ends; null: no way along the paths. */
     private val routes = HashMap<Pair<LatLon, LatLon>, PlanLeg?>()
 
+    private val _routingLegs = MutableStateFlow(false)
+
+    /** Legs are being worked out along the paths: the totals and profile are about to change. */
+    val routingLegs: StateFlow<Boolean> = _routingLegs.asStateFlow()
+
     /** Straight or already known legs at once, then the routed ones. */
     @OptIn(ExperimentalCoroutinesApi::class)
     val legs: StateFlow<List<PlanLeg>> = _state
-        .map { it.points }
+        .map { Triple(it.points, it.options, it.routing) }
         .distinctUntilChanged()
-        .transformLatest { points ->
+        .transformLatest { (points, _, _) ->
             emit(points.zipWithNext { a, b -> knownLeg(a, b) })
             if (points.zipWithNext().any { (a, b) -> b.onTrails && (a.position to b.position) !in routes }) {
-                emit(points.zipWithNext { a, b -> leg(a, b) })
+                _routingLegs.value = true
+                try {
+                    emit(points.zipWithNext { a, b -> leg(a, b) })
+                } finally {
+                    _routingLegs.value = false
+                }
             }
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -164,7 +205,8 @@ class PlannerViewModel @Inject constructor(
 
     fun discard() {
         editor.reset(emptyList())
-        _state.value = _state.value.copy(editing = null)
+        routes.clear()
+        _state.value = _state.value.copy(editing = null, options = RouteOptions(), optionsChanged = false, choices = null)
         publish(selected = null, active = false)
     }
 
@@ -190,7 +232,7 @@ class PlannerViewModel @Inject constructor(
             }
             edits.withLock {
                 editor.reset(plan.points)
-                _state.value = _state.value.copy(active = true, editing = track, followTrails = true)
+                _state.value = _state.value.copy(active = true, editing = track, followTrails = true, options = plan.options, optionsChanged = false)
                 publish(selected = null)
             }
             onOpened(true)
@@ -279,6 +321,99 @@ class PlannerViewModel @Inject constructor(
         null
     }
 
+    /** How legs along the paths pick their way: they're all routed again. */
+    fun setOptions(options: RouteOptions) = edit {
+        if (options != _state.value.options) {
+            routes.clear()
+            _state.value = _state.value.copy(options = options, optionsChanged = true, choices = null)
+        }
+        _state.value.selected
+    }
+
+    /** Closes the path at [p] (moved onto the nearest path in reach): no leg may pass there. */
+    fun avoid(p: LatLon) = edit {
+        val spot = snap(p)
+        val options = _state.value.options
+        routes.clear()
+        _state.value = _state.value.copy(options = options.copy(avoided = options.avoided + spot), optionsChanged = true, choices = null)
+        _state.value.selected
+    }
+
+    /** Opens the avoided spot [index] again. */
+    fun allow(index: Int) = edit {
+        val options = _state.value.options
+        if (index in options.avoided.indices) {
+            routes.clear()
+            _state.value = _state.value.copy(
+                options = options.copy(avoided = options.avoided.filterIndexed { i, _ -> i != index }),
+                optionsChanged = true,
+                choices = null,
+            )
+        }
+        _state.value.selected
+    }
+
+    /** Looks for other ways along the paths for the leg arriving at the selected point. */
+    fun findOtherWays() {
+        val state = _state.value
+        val leg = state.choiceLeg ?: return
+        val a = state.points[leg].position
+        val b = state.points[leg + 1].position
+        _state.value = state.copy(choices = LegChoices(leg, emptyList(), loading = true))
+        viewModelScope.launch {
+            val source = trails
+            val ways = if (source == null) {
+                emptyList()
+            } else {
+                val options = state.options
+                // As for the leg itself: the wider search when the close one finds nothing.
+                var found = emptyList<List<LatLon>>()
+                for (wide in listOf(false, true)) {
+                    val graph = graph(source, a, b, wide)
+                    val heights = heights(graph, options)
+                    found = withContext(Dispatchers.Default) { graph.alternatives(a, b, CONNECT_M, options, heights) }
+                    if (found.isNotEmpty()) break
+                }
+                found.map { path ->
+                    val way = leg(a, b, path)
+                    val s = stats(way.points)
+                    LegChoices.Way(way, s.distance, s.ascent, s.descent, s.millis, s.hasElevation)
+                }
+            }
+            // Only for the plan they were asked for: an edit meanwhile drops them.
+            if (_state.value.points == state.points && _state.value.choices?.leg == leg) {
+                _state.value = _state.value.copy(choices = LegChoices(leg, ways))
+            }
+        }
+    }
+
+    /** Keeps way [index] of the choices for its leg. */
+    fun chooseWay(index: Int) {
+        val choices = _state.value.choices ?: return
+        val way = choices.ways.getOrNull(index) ?: return
+        val points = _state.value.points
+        val a = points.getOrNull(choices.leg)?.position ?: return
+        val b = points.getOrNull(choices.leg + 1)?.position ?: return
+        routes[a to b] = way.leg
+        _state.value = _state.value.copy(choices = null, routing = _state.value.routing + 1, optionsChanged = true)
+    }
+
+    /** Draws way [index] as the leg, to look at it before keeping it. */
+    fun showWay(index: Int) {
+        val choices = _state.value.choices ?: return
+        if (index in choices.ways.indices) _state.value = _state.value.copy(choices = choices.copy(shown = index))
+    }
+
+    fun dismissChoices() {
+        _state.value = _state.value.copy(choices = null)
+    }
+
+    /** The terrain's height at each of [graph]'s points, when [options] count climbing. */
+    private suspend fun heights(graph: TrailGraph, options: RouteOptions): DoubleArray? {
+        if (!options.needsHeights) return null
+        return elevation.withElevation(graph.nodes).map { it.ele ?: Double.NaN }.toDoubleArray()
+    }
+
     /** The leg from [a] to [b] as it is known now, for drawing while a point is dragged. */
     fun knownLeg(a: LatLon, b: LatLon, onTrails: Boolean): PlanLeg = knownLeg(PlanPoint(a, false), PlanPoint(b, onTrails))
 
@@ -289,7 +424,7 @@ class PlannerViewModel @Inject constructor(
             if (legs.isEmpty()) return@launch
             val dense = stats.value?.dense?.takeIf { it.size >= 2 } ?: PlanGeometry.densify(join(legs))
             val segments = listOf(dense.map { TrackPoint(it, 0) })
-            val plan = SavedPlan(_state.value.points, legs)
+            val plan = SavedPlan(_state.value.points, legs, _state.value.options)
             val editing = _state.value.editing
             val track = if (editing != null) {
                 val replaced = tracks.replace(editing, segments, plan) ?: return@launch
@@ -318,7 +453,10 @@ class PlannerViewModel @Inject constructor(
     }
 
     private fun publish(selected: Int?, active: Boolean = _state.value.active) {
+        val points = editor.points
         _state.value = _state.value.copy(
+            // Other ways were for the legs as they were.
+            choices = _state.value.choices?.takeIf { points == _state.value.points },
             active = active,
             points = editor.points,
             selected = selected?.takeIf { it in editor.points.indices },
@@ -346,9 +484,33 @@ class PlannerViewModel @Inject constructor(
      */
     private suspend fun route(a: LatLon, b: LatLon): PlanLeg? {
         val source = trails ?: return null
+        val options = _state.value.options
+        for (wide in listOf(false, true)) {
+            val graph = graph(source, a, b, wide)
+            val heights = heights(graph, options)
+            val path = withContext(Dispatchers.Default) { graph.route(a, b, CONNECT_M, options, heights) }
+            if (path != null) return leg(a, b, path)
+        }
+        return null
+    }
+
+    /**
+     * The network around [a] and [b]: the map's lines close around them, or ([wide]) a wider
+     * area with the downloaded areas' own paths, for a way round that leaves the screen.
+     */
+    private suspend fun graph(source: TrailSource, a: LatLon, b: LatLon, wide: Boolean): TrailGraph {
         val span = Geo.distance(a, b)
-        val lines = source.lines(box(listOf(a, b), max(MIN_MARGIN_M, span * 0.5)))
-        val path = withContext(Dispatchers.Default) { TrailGraph(lines).route(a, b, CONNECT_M) } ?: return null
+        val lines = if (wide) {
+            val box = box(listOf(a, b), max(WIDE_MARGIN_M, span * 1.5))
+            source.lines(box) + source.areaLines(box)
+        } else {
+            source.lines(box(listOf(a, b), max(MIN_MARGIN_M, span * 0.5)))
+        }
+        return withContext(Dispatchers.Default) { TrailGraph(lines) }
+    }
+
+    /** [path] as a leg from [a] to [b]: ends off the path join it in a straight line. */
+    private fun leg(a: LatLon, b: LatLon, path: List<LatLon>): PlanLeg {
         val offStart = Geo.distance(a, path.first()) > ON_PATH_M
         val offEnd = Geo.distance(b, path.last()) > ON_PATH_M
         val points = listOfNotNull(a.takeIf { offStart }) + path + listOfNotNull(b.takeIf { offEnd })
@@ -404,6 +566,9 @@ class PlannerViewModel @Inject constructor(
         /** How far an off-path point looks for a path to join. */
         private const val CONNECT_M = 300.0
         private const val MIN_MARGIN_M = 500.0
+
+        /** The wider search's margin around a leg, at least. */
+        private const val WIDE_MARGIN_M = 3_000.0
 
         /** The legs end to end, without repeating the shared points. */
         fun join(legs: List<PlanLeg>): List<LatLon> =

@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import app.sentrek.geo.CoordinateGrid
 import app.sentrek.geo.overlay.MapKind
 import app.sentrek.geo.units.Units
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -508,6 +509,14 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[SHOW_HILLSHADE] = show }
     }
 
+    /** Lines of a coordinate grid over the map: none, UTM or latitude and longitude. */
+    val coordinateGrid: Flow<CoordinateGrid.Kind> =
+        prefs { p -> CoordinateGrid.Kind.entries.firstOrNull { it.name == p[COORDINATE_GRID] } ?: CoordinateGrid.Kind.Off }
+
+    suspend fun setCoordinateGrid(kind: CoordinateGrid.Kind) {
+        context.settings.edit { it[COORDINATE_GRID] = kind.name }
+    }
+
     /** Huts, springs, peaks and the other points of the map data; off, only the map itself. */
     val showMapPoints: Flow<Boolean> =
         prefs { it[SHOW_MAP_POINTS] ?: true }
@@ -686,6 +695,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val SHOW_SLOPES = booleanPreferencesKey("show_slopes")
         val SHOW_HILLSHADE = booleanPreferencesKey("show_hillshade")
         val SHOW_MAP_POINTS = booleanPreferencesKey("show_map_points")
+        val COORDINATE_GRID = stringPreferencesKey("coordinate_grid")
         val SHOW_TRACK_ARROWS = booleanPreferencesKey("show_track_arrows")
         val MAP_REMINDERS = booleanPreferencesKey("map_reminders")
         val AUTO_UPDATE_MAPS = booleanPreferencesKey("auto_update_maps")

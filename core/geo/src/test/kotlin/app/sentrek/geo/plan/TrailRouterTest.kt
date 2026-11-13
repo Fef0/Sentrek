@@ -86,4 +86,79 @@ class TrailRouterTest {
         val route = must(TrailGraph(listOf(east, west)).route(m(0.0, 0.0), m(1000.0, 0.0), 30.0))
         assertEquals(5, route.size)
     }
+
+    /** Two ways from (0,0) to (1000,0): straight across a T5 ridge, or around through a T2 valley 1400 m long. */
+    private fun ridgeAndValley(): TrailGraph = TrailGraph(
+        listOf(
+            TrailLine(listOf(m(0.0, 0.0), m(500.0, 0.0), m(1000.0, 0.0)), grade = 5),
+            TrailLine(listOf(m(0.0, 0.0), m(200.0, -400.0), m(800.0, -400.0), m(1000.0, 0.0)), grade = 2),
+        ),
+    )
+
+    @Test
+    fun `easiest keeps to the lower grade`() {
+        val graph = ridgeAndValley()
+        val shortest = must(graph.route(m(0.0, 0.0), m(1000.0, 0.0), 30.0))
+        assertEquals(1000.0, Geo.length(shortest), 2.0)
+        val easiest = must(graph.route(m(0.0, 0.0), m(1000.0, 0.0), 30.0, RouteOptions(RouteOptions.Profile.Easiest)))
+        assertTrue(Geo.length(easiest) > 1300)
+    }
+
+    @Test
+    fun `least climb goes round the hill`() {
+        // The direct way crosses a 200 m high point; the way round stays flat.
+        val graph = TrailGraph(
+            listOf(
+                TrailLine(listOf(m(0.0, 0.0), m(500.0, 0.0), m(1000.0, 0.0))),
+                TrailLine(listOf(m(0.0, 0.0), m(200.0, -400.0), m(800.0, -400.0), m(1000.0, 0.0))),
+            ),
+        )
+        val heights = graph.nodes.map { if (Geo.distance(it, m(500.0, 0.0)) < 1) 200.0 else 0.0 }.toDoubleArray()
+        val direct = must(graph.route(m(0.0, 0.0), m(1000.0, 0.0), 30.0, RouteOptions(), heights))
+        assertEquals(1000.0, Geo.length(direct), 2.0)
+        val flat = must(graph.route(m(0.0, 0.0), m(1000.0, 0.0), 30.0, RouteOptions(RouteOptions.Profile.LeastClimb), heights))
+        assertTrue(Geo.length(flat) > 1300)
+    }
+
+    @Test
+    fun `via ferratas and avoided spots are left out`() {
+        val graph = TrailGraph(
+            listOf(
+                TrailLine(listOf(m(0.0, 0.0), m(1000.0, 0.0)), cost = 3.0, ferrata = true),
+                TrailLine(listOf(m(0.0, 0.0), m(500.0, 2000.0), m(1000.0, 0.0))),
+            ),
+        )
+        // 1000 m of via ferrata at 3 per metre still beats 4100 m of path.
+        assertEquals(1000.0, Geo.length(must(graph.route(m(0.0, 0.0), m(1000.0, 0.0), 30.0))), 2.0)
+        val noFerrata = must(graph.route(m(0.0, 0.0), m(1000.0, 0.0), 30.0, RouteOptions(avoidFerratas = true)))
+        assertTrue(Geo.length(noFerrata) > 4000)
+        // The path round closed too: no way at all.
+        assertNull(graph.route(m(0.0, 0.0), m(1000.0, 0.0), 30.0, RouteOptions(avoidFerratas = true, avoided = listOf(m(500.0, 2000.0)))))
+        // Closing the via ferrata in the middle does the same as avoiding it.
+        val closed = must(graph.route(m(0.0, 0.0), m(1000.0, 0.0), 30.0, RouteOptions(avoided = listOf(m(500.0, 10.0)))))
+        assertTrue(Geo.length(closed) > 4000)
+    }
+
+    @Test
+    fun `other ways are really other ways`() {
+        // Three parallel ways: 1000, about 1180 and 1430 m long, and one far too long.
+        val lines = listOf(0.0, 150.0, 300.0, 3000.0).map { off ->
+            TrailLine(listOf(m(0.0, 0.0), m(100.0, off), m(900.0, off), m(1000.0, 0.0)))
+        }
+        val ways = TrailGraph(lines).alternatives(m(0.0, 0.0), m(1000.0, 0.0), 30.0)
+        assertEquals(3, ways.size)
+        val lengths = ways.map { Geo.length(it) }
+        assertEquals(lengths.sorted(), lengths)
+        assertTrue(lengths.last() < 1700)
+    }
+
+    @Test
+    fun `roads are taken when shorter, unless avoided`() {
+        val road = TrailLine(listOf(m(0.0, 0.0), m(1000.0, 0.0)), road = true)
+        val trail = TrailLine(listOf(m(0.0, 0.0), m(100.0, 300.0), m(900.0, 300.0), m(1000.0, 0.0)))
+        val graph = TrailGraph(listOf(road, trail))
+        assertEquals(1000.0, Geo.length(must(graph.route(m(0.0, 0.0), m(1000.0, 0.0), 30.0))), 2.0)
+        val paths = must(graph.route(m(0.0, 0.0), m(1000.0, 0.0), 30.0, RouteOptions(avoidRoads = true)))
+        assertTrue(Geo.length(paths) > 1100)
+    }
 }

@@ -130,25 +130,25 @@ object MapExtras {
     // Winter
 
     private fun downhillColor(night: Boolean): Expression = match(
-        get("pd"), literal("#757575"),
-        stop("novice", "#2e9d3a"),
-        stop("easy", "#1e5bd8"),
-        stop("intermediate", "#d32f2f"),
+        get("pd"), literal(MapColors.PISTE_OTHER),
+        stop("novice", MapColors.PISTE_NOVICE),
+        stop("easy", MapColors.PISTE_EASY),
+        stop("intermediate", MapColors.PISTE_INTERMEDIATE),
         // Black runs on the night map's dark ground: light grey.
-        stop("advanced", if (night) "#e0e0e0" else "#111111"),
-        stop("expert", if (night) "#e0e0e0" else "#111111"),
-        stop("freeride", "#ef6c00"),
-        stop("extreme", "#ef6c00"),
+        stop("advanced", MapColors.pisteAdvanced(night)),
+        stop("expert", MapColors.pisteAdvanced(night)),
+        stop("freeride", MapColors.PISTE_FREERIDE),
+        stop("extreme", MapColors.PISTE_FREERIDE),
     )
 
     private fun pisteColor(night: Boolean): Expression = match(
-        get("pt"), literal("#757575"),
+        get("pt"), literal(MapColors.PISTE_OTHER),
         stop("downhill", downhillColor(night)),
-        stop("nordic", "#00897b"),
-        stop("skitour", "#7b1fa2"),
-        stop("sled", "#795548"),
-        stop("sleigh", "#795548"),
-        stop("hike", "#c0262d"),
+        stop("nordic", MapColors.PISTE_NORDIC),
+        stop("skitour", MapColors.PISTE_SKITOUR),
+        stop("sled", MapColors.PISTE_SLED),
+        stop("sleigh", MapColors.PISTE_SLED),
+        stop("hike", MapColors.PISTE_HIKE),
     )
 
     private fun lines() = eq(geometryType(), literal("LineString"))
@@ -216,12 +216,12 @@ object MapExtras {
     // Cycling
 
     private fun cycleColor(): Expression = match(
-        get(OverpassExtras.NETWORK), literal("#3949ab"),
-        stop("icn", "#d81b60"),
-        stop("ncn", "#d81b60"),
-        stop("rcn", "#00838f"),
-        stop("lcn", "#3949ab"),
-        stop(OverpassExtras.MTB, "#a67c00"),
+        get(OverpassExtras.NETWORK), literal(MapColors.CYCLE_LOCAL),
+        stop("icn", MapColors.CYCLE_NATIONAL),
+        stop("ncn", MapColors.CYCLE_NATIONAL),
+        stop("rcn", MapColors.CYCLE_REGIONAL),
+        stop("lcn", MapColors.CYCLE_LOCAL),
+        stop(OverpassExtras.MTB, MapColors.CYCLE_MTB),
     )
 
     /** Wide and see-through, as the hiking routes: the trail on it stays readable. */
@@ -230,7 +230,7 @@ object MapExtras {
         setFilter(lines())
         setProperties(
             lineColor(cycleColor()),
-            lineOpacity(0.5f),
+            lineOpacity(MapColors.CYCLE_OPACITY),
             lineWidth(interpolate(linear(), zoom(), stop(8, 1.5f), stop(14, 7f), stop(17, 11f))),
             lineCap(Property.LINE_CAP_ROUND),
             lineJoin(Property.LINE_JOIN_ROUND),
@@ -258,7 +258,7 @@ object MapExtras {
         minZoom = 12f
         setFilter(all(eq(get("class"), literal("path")), eq(get("subclass"), literal("cycleway")), not(eq(get("brunnel"), literal("tunnel")))))
         setProperties(
-            lineColor("#1565c0"),
+            lineColor(MapColors.CYCLEWAY),
             lineWidth(interpolate(linear(), zoom(), stop(12, 1f), stop(14, 2f), stop(17, 3.5f))),
         )
     }

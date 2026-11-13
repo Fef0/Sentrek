@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.draw.alpha
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -35,9 +37,13 @@ import app.sentrek.feature.planner.R
 import app.sentrek.ui.ElevationProfile
 import app.sentrek.ui.Format
 
-/** Totals of the route being planned and its elevation profile; a hint until there are two points. */
+/**
+ * Totals of the route being planned and its elevation profile; a hint until there are two
+ * points. While legs are worked out along the paths ([routing]) the numbers are faded under a
+ * spinner: they're about to change.
+ */
 @Composable
-fun PlanPanel(stats: PlanStats?, editing: String?, modifier: Modifier = Modifier) {
+fun PlanPanel(stats: PlanStats?, editing: String?, modifier: Modifier = Modifier, routing: Boolean = false) {
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
@@ -46,6 +52,13 @@ fun PlanPanel(stats: PlanStats?, editing: String?, modifier: Modifier = Modifier
         contentColor = MaterialTheme.colorScheme.onSurface,
         shadowElevation = 4.dp,
     ) {
+        if (stats == null && editing == null && routing) {
+            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.5.dp)
+                Text(stringResource(R.string.plan_routing), style = MaterialTheme.typography.bodyLarge)
+            }
+            return@Surface
+        }
         if (stats == null && editing == null) {
             Text(
                 stringResource(R.string.plan_hint),
@@ -64,18 +77,27 @@ fun PlanPanel(stats: PlanStats?, editing: String?, modifier: Modifier = Modifier
                 )
             }
             if (stats == null) return@Column
-            Row {
+            val faded = if (routing) Modifier.alpha(0.3f) else Modifier
+            Row(faded) {
                 Stat(stringResource(R.string.plan_distance), Format.distance(stats.distance), Modifier.weight(1f))
                 Stat(stringResource(R.string.plan_ascent), if (stats.hasElevation) "↑ " + Format.elevation(stats.ascent) else "–", Modifier.weight(1f))
                 Stat(stringResource(R.string.plan_descent), if (stats.hasElevation) "↓ " + Format.elevation(stats.descent) else "–", Modifier.weight(1f))
                 Stat(stringResource(R.string.plan_time), Format.estimate(stats.millis), Modifier.weight(1f))
             }
             if (stats.hasElevation) {
-                ElevationProfile(
-                    stats.profile,
-                    Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
-                    flags = sectionFlags(stats.sections, stats.profile),
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    ElevationProfile(
+                        stats.profile,
+                        Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp).then(faded),
+                        flags = sectionFlags(stats.sections, stats.profile),
+                    )
+                    if (routing) CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp)
+                }
+            } else if (routing) {
+                Row(Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.5.dp)
+                    Text(stringResource(R.string.plan_routing), style = MaterialTheme.typography.bodyMedium)
+                }
             } else {
                 Text(
                     stringResource(R.string.plan_no_terrain),

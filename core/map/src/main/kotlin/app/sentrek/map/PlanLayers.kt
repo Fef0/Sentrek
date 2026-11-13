@@ -7,6 +7,8 @@ import org.maplibre.android.style.layers.PropertyFactory.textSize
 import org.maplibre.android.style.layers.PropertyFactory.textFont
 import org.maplibre.android.style.layers.PropertyFactory.textField
 import org.maplibre.android.style.expressions.Expression.has
+import org.maplibre.android.style.expressions.Expression.coalesce
+import app.sentrek.geo.plan.PlanGeometry
 import org.maplibre.android.style.layers.SymbolLayer
 import app.sentrek.geo.LatLon
 import app.sentrek.geo.plan.PlanLeg
@@ -29,6 +31,7 @@ import org.maplibre.android.style.layers.PropertyFactory.lineCap
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
 import org.maplibre.android.style.layers.PropertyFactory.lineDasharray
 import org.maplibre.android.style.layers.PropertyFactory.lineJoin
+import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
@@ -77,7 +80,10 @@ object PlanLayers {
     }
 
     /** Hides the plan without forgetting the layers (the planner was closed). */
-    fun clear(style: Style) = sync(style, emptyList(), emptyList(), null)
+    fun clear(style: Style) {
+        sync(style, emptyList(), emptyList(), null)
+        if (style.getSource(WAYS) != null) syncExtras(style, emptyList(), null, emptyList())
+    }
 
     private const val NUMBERS = "plan-section-numbers"
     private val SECTION_COLOR = rgb(239, 108, 0)
@@ -92,7 +98,7 @@ object PlanLayers {
             style,
             LineLayer(LINE + CASING, LINE).withProperties(
                 lineColor(rgb(255, 255, 255)),
-                lineWidth(8f),
+                lineWidth(10f),
                 lineCap(Property.LINE_CAP_ROUND),
                 lineJoin(Property.LINE_JOIN_ROUND),
             ),
@@ -101,7 +107,7 @@ object PlanLayers {
             style,
             LineLayer(LINE, LINE).withProperties(
                 lineColor(COLOR),
-                lineWidth(4.5f),
+                lineWidth(5.5f),
                 lineCap(Property.LINE_CAP_ROUND),
                 lineJoin(Property.LINE_JOIN_ROUND),
             ).withFilter(eq(get("t"), true)),
@@ -110,7 +116,7 @@ object PlanLayers {
             style,
             LineLayer(LINE + STRAIGHT, LINE).withProperties(
                 lineColor(COLOR),
-                lineWidth(4.5f),
+                lineWidth(5.5f),
                 lineDasharray(arrayOf(1.5f, 1.2f)),
             ).withFilter(eq(get("t"), false)),
         )
@@ -152,5 +158,111 @@ object PlanLayers {
                 textIgnorePlacement(true),
             ).withFilter(has("n")),
         )
+    }
+
+    private const val WAYS = "plan-ways"
+    private const val SHOWN = "-shown"
+    private const val WAY_NUMBERS = "plan-way-numbers"
+    private const val AVOIDED = "plan-avoided"
+
+    /** Each way's colour, in order, the same whether it's looked at or not: the first is the plan's own. */
+    val WAY_COLORS = listOf(COLOR, 0xFF0277BD.toInt(), 0xFF2E7D32.toInt())
+
+    private fun wayColor() = match(
+        get("i"), rgb(117, 117, 117),
+        *WAY_COLORS.mapIndexed { i, c -> stop(i, rgb((c shr 16) and 0xFF, (c shr 8) and 0xFF, c and 0xFF)) }.toTypedArray(),
+    )
+
+    /**
+     * What the planner shows besides the plan: the [ways] offered for a leg, each in its own
+     * colour, the [shown] one bold on top and the others thinner, with a number on each where
+     * it runs apart from the others; and the [avoided] spots, a red disc with a cross. Empty
+     * lists hide them.
+     */
+    fun syncExtras(style: Style, ways: List<List<LatLon>>, shown: Int?, avoided: List<LatLon>) {
+        val lines = ways.mapIndexed { i, way ->
+            Feature.fromGeometry(LineString.fromLngLats(way.map { Point.fromLngLat(it.lon, it.lat) })).apply {
+                addNumberProperty("i", i)
+                addBooleanProperty("s", i == shown)
+            }
+        }
+        val marks = ways.mapIndexed { i, way ->
+            val p = apart(way, ways.filterIndexed { j, _ -> j != i })
+            Feature.fromGeometry(Point.fromLngLat(p.lon, p.lat)).apply {
+                addNumberProperty("i", i)
+                addStringProperty("n", "${i + 1}")
+            }
+        } + avoided.map { p ->
+            Feature.fromGeometry(Point.fromLngLat(p.lon, p.lat)).apply { addStringProperty("x", "\u00d7") }
+        }
+        setSource(style, WAYS, lines)
+        setSource(style, AVOIDED, marks)
+        if (style.getLayer(WAYS) != null) return
+        // Over the plan: the others thinner, the one looked at bold, with an edge, on top.
+        PlaceLayers.addBelow(
+            style,
+            LineLayer(WAYS, WAYS).withProperties(
+                lineColor(wayColor()),
+                lineWidth(4f),
+                lineOpacity(0.85f),
+                lineCap(Property.LINE_CAP_ROUND),
+                lineJoin(Property.LINE_JOIN_ROUND),
+            ).withFilter(eq(get("s"), false)),
+        )
+        PlaceLayers.addBelow(
+            style,
+            LineLayer(WAYS + SHOWN + CASING, WAYS).withProperties(
+                lineColor(rgb(255, 255, 255)),
+                lineWidth(10f),
+                lineCap(Property.LINE_CAP_ROUND),
+                lineJoin(Property.LINE_JOIN_ROUND),
+            ).withFilter(eq(get("s"), true)),
+        )
+        PlaceLayers.addBelow(
+            style,
+            LineLayer(WAYS + SHOWN, WAYS).withProperties(
+                lineColor(wayColor()),
+                lineWidth(6f),
+                lineCap(Property.LINE_CAP_ROUND),
+                lineJoin(Property.LINE_JOIN_ROUND),
+            ).withFilter(eq(get("s"), true)),
+        )
+        PlaceLayers.addBelow(
+            style,
+            CircleLayer(WAY_NUMBERS, AVOIDED).withProperties(
+                circleRadius(12f),
+                circleColor(wayColor()),
+                circleStrokeColor(rgb(255, 255, 255)),
+                circleStrokeWidth(2.5f),
+            ).withFilter(has("n")),
+        )
+        PlaceLayers.addBelow(
+            style,
+            CircleLayer(AVOIDED, AVOIDED).withProperties(
+                circleRadius(11f),
+                circleColor(rgb(211, 47, 47)),
+                circleStrokeColor(rgb(255, 255, 255)),
+                circleStrokeWidth(2.5f),
+            ).withFilter(has("x")),
+        )
+        PlaceLayers.addBelow(
+            style,
+            SymbolLayer(AVOIDED + "-text", AVOIDED).withProperties(
+                textField(coalesce(get("n"), get("x"))),
+                textFont(arrayOf("Noto Sans Bold")),
+                textSize(15f),
+                textColor(rgb(255, 255, 255)),
+                textAllowOverlap(true),
+                textIgnorePlacement(true),
+            ),
+        )
+    }
+
+    /** The point of [way] farthest from all of [others]: where its number can't be mistaken. */
+    private fun apart(way: List<LatLon>, others: List<List<LatLon>>): LatLon {
+        if (others.isEmpty() || way.size < 3) return PlanGeometry.halfway(way)
+        val dense = PlanGeometry.densify(way, 50.0)
+        val theirs = others.flatMap { PlanGeometry.densify(it, 50.0) }
+        return dense.maxBy { p -> theirs.minOf { q -> app.sentrek.geo.Geo.distance(p, q) } }
     }
 }

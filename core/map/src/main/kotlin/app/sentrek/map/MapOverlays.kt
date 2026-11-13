@@ -122,8 +122,6 @@ object MapOverlays {
     private const val BASE_TRACK = "track"
     private const val BASE_ROUTE = "hiking-route"
     private const val BASE_ROUTE_REF = "hiking-route-ref"
-    private const val PATH_RED = "#c0262d"
-    private const val TRACK_BROWN = "#8b5a2b"
     private val baseFilters = WeakHashMap<Style, MutableMap<String, Expression>>()
 
     /** When each overlay source's file was written, as loaded: a newer file is loaded again. */
@@ -273,14 +271,14 @@ object MapOverlays {
 
     /** Ungraded lines: tracks (`t`) brown, paths red, like the base style's own. */
     private fun plainColor(style: Style) = switchCase(
-        has("t"), toColor(literal(baseColor(style, BASE_TRACK, TRACK_BROWN))),
-        toColor(literal(baseColor(style, BASE_PATH, PATH_RED))),
+        has("t"), toColor(literal(baseColor(style, BASE_TRACK, MapColors.TRACK))),
+        toColor(literal(baseColor(style, BASE_PATH, MapColors.PATH))),
     )
 
     private fun difficultyColor() = step(
-        get("s"), rgb(230, 175, 0),
-        stop(2, rgb(200, 30, 40)),
-        stop(4, rgb(30, 80, 200)),
+        get("s"), toColor(literal(MapColors.T1)),
+        stop(2, toColor(literal(MapColors.T2_T3))),
+        stop(4, toColor(literal(MapColors.T4_T6))),
     )
 
     /** Thin solid lines for zoomed-out views, where dashes would just be noise. */
@@ -315,7 +313,7 @@ object MapOverlays {
 
     private const val FERRATA_GRADE_KEY = "f"
 
-    private fun ferrataColor(night: Boolean) = if (night) "#e6e6e6" else "#1f1f1f"
+    private fun ferrataColor(night: Boolean) = MapColors.ferrata(night)
 
     private fun ferrataLines() = all(eq(geometryType(), literal("LineString")), has(FERRATA_GRADE_KEY))
 

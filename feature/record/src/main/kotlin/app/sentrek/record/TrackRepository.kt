@@ -17,6 +17,7 @@ import app.sentrek.geo.gpx.GpxWaypoint
 import app.sentrek.geo.gpx.Kml
 import app.sentrek.geo.plan.PlanLeg
 import app.sentrek.geo.plan.PlanPoint
+import app.sentrek.geo.plan.RouteOptions
 import app.sentrek.geo.plan.SavedPlan
 import app.sentrek.geo.gpx.TrackFiles
 import app.sentrek.geo.route.Route
@@ -448,6 +449,14 @@ class TrackRepository @Inject constructor(
                     },
                 ),
             )
+            .put(
+                "o",
+                JSONObject()
+                    .put("p", plan.options.profile.name)
+                    .put("f", plan.options.avoidFerratas)
+                    .put("r", plan.options.avoidRoads)
+                    .put("a", JSONArray(plan.options.avoided.map { JSONArray(listOf(it.lat, it.lon)) })),
+            )
         File(dir, track.id + PLAN).writeText(json.toString())
     }
 
@@ -471,7 +480,17 @@ class TrackRepository @Inject constructor(
                 )
             }
         }
-        return SavedPlan(points, legs)
+        // Plans saved before route options had none: the shortest way, as then.
+        val options = json.optJSONObject("o")?.let { o ->
+            val avoided = o.optJSONArray("a")
+            RouteOptions(
+                profile = RouteOptions.Profile.entries.firstOrNull { it.name == o.optString("p") } ?: RouteOptions.Profile.Shortest,
+                avoidFerratas = o.optBoolean("f"),
+                avoidRoads = o.optBoolean("r"),
+                avoided = (0 until (avoided?.length() ?: 0)).map { i -> avoided!!.getJSONArray(i).let { LatLon(it.getDouble(0), it.getDouble(1)) } },
+            )
+        } ?: RouteOptions()
+        return SavedPlan(points, legs, options)
     }
 
     /** Draws [track] on the map; returns its bounds to fly to. */

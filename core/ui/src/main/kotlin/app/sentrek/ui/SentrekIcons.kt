@@ -226,6 +226,15 @@ object SentrekIcons {
         icon("Sentrek.More", "M12,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM12,10c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM12,16c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2z")
     }
 
+    /** Material "tune": how something is set. */
+    val Tune: ImageVector by lazy { icon("Sentrek.Tune", "M3,17v2h6v-2L3,17zM3,5v2h10L13,5L3,5zM13,21v-2h8v-2h-8v-2h-2v6h2zM7,9v2L3,11v2h4v2h2L9,9L7,9zM21,13v-2L11,11v2h10zM15,9h2L17,7h4L21,5h-4L17,3h-2v6z") }
+
+    /** Material "alt_route": another way. */
+    val AltRoute: ImageVector by lazy { icon("Sentrek.AltRoute", "M9.78,11.16l-1.42,1.42c-0.68,-0.69 -1.34,-1.58 -1.79,-2.94l1.94,-0.49C8.83,10.04 9.28,10.65 9.78,11.16zM11,6L7,2L3,6h3.02C6.04,6.81 6.1,7.54 6.21,8.17l1.94,-0.49C8.08,7.2 8.03,6.63 8.02,6H11zM21,6l-4,-4l-4,4h2.99c-0.1,3.68 -1.28,4.75 -2.54,5.88c-0.5,0.44 -1.01,0.92 -1.45,1.55c-0.34,-0.49 -0.73,-0.88 -1.13,-1.24L9.46,13.6C10.39,14.45 11,15.14 11,17c0,0 0,0 0,0h0v5h2v-5c0,0 0,0 0,0c0,-2.02 0.71,-2.66 1.79,-3.63c1.38,-1.24 3.08,-2.78 3.2,-7.37H21z") }
+
+    /** Material "info" (outlined circle with an i). */
+    val Info: ImageVector by lazy { icon("Sentrek.Info", "M11,7h2v2h-2zM11,11h2v6h-2zM12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM12,20c-4.41,0 -8,-3.59 -8,-8s3.59,-8 8,-8 8,3.59 8,8 -3.59,8 -8,8z") }
+
     val ChevronRight: ImageVector by lazy { icon("Sentrek.ChevronRight", "M10,6L8.59,7.41 13.17,12l-4.58,4.59L10,18l6,-6z") }
 
     val ExpandMore: ImageVector by lazy { icon("Sentrek.ExpandMore", "M16.59,8.59L12,13.17 7.41,8.59 6,10l6,6 6,-6z") }

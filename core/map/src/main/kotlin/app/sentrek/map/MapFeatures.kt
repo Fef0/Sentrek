@@ -155,6 +155,8 @@ object MapFeatures {
             osmId = props["id"],
             sacGrade = props["s"]?.toIntOrNull(),
             visibility = props["v"]?.toIntOrNull(),
+            // Surface and operator as OSM has them (the overlay keeps them short-named).
+            tags = listOfNotNull(props["su"]?.let { "surface" to it }, props["op"]?.let { "operator" to it }).toMap().toSortedMap(),
             routes = routes,
             // Fords come with the base map, not the hiking overlay: looked up underneath.
             ford = trail != null && baseFord(map, near, layerIds),

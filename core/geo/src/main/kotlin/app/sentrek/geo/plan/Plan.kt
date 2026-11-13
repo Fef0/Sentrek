@@ -162,10 +162,13 @@ object Sections {
     }
 }
 
-/** A plan as saved with its route, to edit it again: its points and the legs as drawn. */
-data class SavedPlan(val points: List<PlanPoint>, val legs: List<PlanLeg>) {
+/**
+ * A plan as saved with its route, to edit it again: its points, the legs as drawn, and how
+ * its legs pick their way ([options]).
+ */
+data class SavedPlan(val points: List<PlanPoint>, val legs: List<PlanLeg>, val options: RouteOptions = RouteOptions()) {
     /** The same route from its end to its start, every leg as it was. */
-    fun reversed(): SavedPlan = SavedPlan(reversed(points), legs.reversed().map(PlanLeg::reversed))
+    fun reversed(): SavedPlan = SavedPlan(reversed(points), legs.reversed().map(PlanLeg::reversed), options)
 
     companion object {
         /**

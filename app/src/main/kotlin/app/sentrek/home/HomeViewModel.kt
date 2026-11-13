@@ -266,6 +266,10 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch { settings.setShowSlopes(show) }
     }
 
+    fun setCoordinateGrid(kind: app.sentrek.geo.CoordinateGrid.Kind) {
+        viewModelScope.launch { settings.setCoordinateGrid(kind) }
+    }
+
     fun setShowMapPoints(show: Boolean) {
         viewModelScope.launch { settings.setShowMapPoints(show) }
     }
@@ -358,6 +362,9 @@ class HomeViewModel @Inject constructor(
 
     val showTrackArrows: StateFlow<Boolean> =
         settings.showTrackArrows.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    val coordinateGrid: StateFlow<app.sentrek.geo.CoordinateGrid.Kind> =
+        settings.coordinateGrid.stateIn(viewModelScope, SharingStarted.Eagerly, app.sentrek.geo.CoordinateGrid.Kind.Off)
 
     val showMapPoints: StateFlow<Boolean> =
         settings.showMapPoints.stateIn(viewModelScope, SharingStarted.Eagerly, true)

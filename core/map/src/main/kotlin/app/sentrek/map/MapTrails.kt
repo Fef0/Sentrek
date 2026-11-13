@@ -21,16 +21,22 @@ object MapTrails {
     private const val SOURCE = "openmaptiles"
     private const val LAYER = "transportation"
 
-    /** Cost per metre by class: trails first, quiet roads if needed, busy roads last. */
+    /**
+     * Cost per metre by class: paths, tracks and quiet roads the same, so the route takes the
+     * road when it's shorter; busy roads a little more. "Avoid roads" leaves out all but paths
+     * and tracks.
+     */
     private val COST = mapOf(
         "path" to 1.0,
         "track" to 1.0,
-        "minor" to 1.3,
-        "service" to 1.3,
-        "tertiary" to 1.6,
-        "secondary" to 2.5,
-        "primary" to 3.0,
+        "minor" to 1.0,
+        "service" to 1.0,
+        "tertiary" to 1.1,
+        "secondary" to 1.3,
+        "primary" to 1.5,
     )
+
+    private val NOT_ROADS = setOf("path", "track")
 
     private const val FERRATA_COST = 3.0
 
@@ -38,25 +44,33 @@ object MapTrails {
     fun lines(style: Style, box: BoundingBox): List<TrailLine> {
         val base = style.getSourceAs<VectorSource>(SOURCE)?.querySourceFeatures(arrayOf(LAYER), null).orEmpty()
             .flatMap { feature ->
-                val cost = COST[feature.getStringProperty("class")] ?: return@flatMap emptyList()
-                lines(feature, box, cost)
+                val type = feature.getStringProperty("class")
+                val cost = COST[type] ?: return@flatMap emptyList()
+                lines(feature, box, cost, road = type !in NOT_ROADS)
             }
         // Overlay trails are all footpaths, but via ferratas: taken only when there's no
         // walking way round, since they need gear. Its points are skipped by lines().
         val overlay = style.sources.filter { MapOverlays.isOverlaySource(it.id) }
             .filterIsInstance<GeoJsonSource>()
-            .flatMap { source -> source.querySourceFeatures(null).flatMap { lines(it, box, if (it.hasProperty("f")) FERRATA_COST else 1.0) } }
+            .flatMap { source ->
+                source.querySourceFeatures(null).flatMap { feature ->
+                    val ferrata = feature.hasProperty("f")
+                    // The SAC grade, for the "easiest" way; numbers may come back as doubles.
+                    val grade = if (feature.hasProperty("s")) feature.getNumberProperty("s")?.toInt() else null
+                    lines(feature, box, if (ferrata) FERRATA_COST else 1.0, grade, ferrata)
+                }
+            }
         return base + overlay
     }
 
-    private fun lines(feature: Feature, box: BoundingBox, cost: Double): List<TrailLine> =
+    private fun lines(feature: Feature, box: BoundingBox, cost: Double, grade: Int? = null, ferrata: Boolean = false, road: Boolean = false): List<TrailLine> =
         when (val g = feature.geometry()) {
             is LineString -> listOf(g.coordinates())
             is MultiLineString -> g.coordinates()
             else -> emptyList()
         }.mapNotNull { coordinates ->
             val points = coordinates.map(::latLon)
-            if (points.size >= 2 && overlaps(points, box)) TrailLine(points, cost) else null
+            if (points.size >= 2 && overlaps(points, box)) TrailLine(points, cost, grade, ferrata, road) else null
         }
 
     private fun overlaps(points: List<LatLon>, box: BoundingBox) =

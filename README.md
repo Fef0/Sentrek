@@ -31,8 +31,10 @@ The name comes from *sentiero*, Italian for trail, and *trek*.
 - Parks and nature reserves are outlined and named. Long-press inside one to see which protected areas you're in.
 - You can colour steep slopes like an avalanche map, and colour trails by difficulty (SAC scale).
 - Via ferratas are drawn as on paper maps, with their grade (A to F) along the line. Long-press one to see its name and difficulty. The planner only routes over a via ferrata when there's no walking way round.
-- Long-press a trail to see its difficulty and the marked routes that use it, with length, climb, walking time and who looks after them. From there you can get the weather forecast for that spot, day by day or hour by hour.
+- Long-press a trail to see its difficulty, its surface and the marked routes that use it, with length, climb, walking time and who looks after them. From there you can get the weather forecast for that spot, day by day or hour by hour.
 - With the weather forecast comes the avalanche bulletin, where one is published for that spot: the danger level, by height or elevation band, the avalanche problems with the slopes they're on, tomorrow's level once it's out, and the full text. Bulletins come from the European warning services (EAWS, through avalanche.report), Avalanche Canada (Parks Canada included) and the US avalanche centers (avalanche.org), in the app's language when the service publishes in it. A bulletin you looked up is kept, so you still have it without signal while it's valid.
+- The map button's sheet has a legend: what the trail colours and lines, the slope colours, the contour spacing and the icons mean, for the map you're on.
+- A coordinate grid can go over the map: UTM in kilometres, as on paper maps, or latitude and longitude. The numbers run along the top and left edges of the screen.
 - You can also open your own `.mbtiles` and `.pmtiles` files.
 - Besides hiking, there's a cycling map (waymarked cycle and mountain bike routes, cycleways) and a winter map (pistes by difficulty, cross-country and ski touring runs, lift names, in winter colours). The button under the compass switches between them and turns the map layers on and off. When you download an area you choose which of these maps it gets.
 
@@ -40,6 +42,9 @@ The name comes from *sentiero*, Italian for trail, and *trek*.
 - Tap the map to add points and the route follows the paths between them. This works offline too, in downloaded areas.
 - You see distance, climb, descent, walking time and the elevation profile while you plan.
 - Drag a point to move it, or drag the middle of a segment to add one. Undo and redo are there. One button turns the route around.
+- Each route picks its way the shortest, the easiest (lower SAC grades, gentler slopes) or with the least climb, and can avoid via ferratas or roads. The choice is saved with the route.
+- "Other ways" offers up to three different ways for the selected or last leg, each with its distance, climb and time. Tap one to see it on the map and keep it.
+- Long-press a path while planning to close it (a washed-out bridge, a closed path): the route goes round it.
 - Split a long route into sections (days, stages) with the flag button: each one gets its own distance, climb and time, and a mark on the map and on the profile. Section ends are saved as waypoints, so they show among the places ahead when you follow the route.
 - Save the route, or export it as GPX or KML.
 

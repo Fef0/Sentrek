@@ -24,7 +24,7 @@ import java.util.WeakHashMap
  */
 internal object WinterStyle {
     private val colours: Map<String, List<PropertyValue<*>>> = mapOf(
-        "background" to listOf(backgroundColor("#f8fafc")),
+        "background" to listOf(backgroundColor(MapColors.BACKGROUND_WINTER)),
         "landcover-wood" to listOf(fillColor("#c9d8cf"), fillOpacity(0.9f)),
         "landcover-grass" to listOf(fillColor("#f3f6f9")),
         "landcover-wetland" to listOf(fillColor("#e6eef3")),

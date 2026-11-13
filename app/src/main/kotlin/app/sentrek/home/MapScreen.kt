@@ -1,5 +1,14 @@
 package app.sentrek.home
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import app.sentrek.geo.overlay.OverlayTrails
+import kotlin.math.hypot
+import app.sentrek.planner.profileName
+import app.sentrek.planner.WayChoicePanel
+import app.sentrek.planner.RouteOptionsSheet
 import app.sentrek.geo.plan.Sections
 import android.location.Location
 import androidx.compose.runtime.State
@@ -86,6 +95,7 @@ import app.sentrek.feature.record.R as RecordR
 import app.sentrek.data.PowerMode
 import app.sentrek.geo.BoundingBox
 import app.sentrek.geo.Geo
+import app.sentrek.geo.CoordinateGrid
 import app.sentrek.geo.LatLon
 import app.sentrek.geo.RegionCell
 import app.sentrek.geo.RegionGrid
@@ -104,6 +114,7 @@ import app.sentrek.map.MapHeights
 import app.sentrek.map.MapOverlays
 import app.sentrek.map.MapStyle
 import app.sentrek.map.GoToLayer
+import app.sentrek.map.GridLayer
 import app.sentrek.map.PlaceLayers
 import app.sentrek.map.MapTrails
 import app.sentrek.map.PlanLayers
@@ -253,6 +264,7 @@ fun MapScreen(
     var planPreview by remember { mutableStateOf<List<LatLon>?>(null) }
     var askPlanName by remember { mutableStateOf(false) }
     var askPlanDiscard by remember { mutableStateOf(false) }
+    var routeOptionsOpen by remember { mutableStateOf(false) }
     // An action waiting for "are you sure?".
     var confirm by remember { mutableStateOf<Confirmation?>(null) }
     val currentOnCameraChange by rememberUpdatedState(onCameraChange)
@@ -300,6 +312,7 @@ fun MapScreen(
     val downloadStatus by viewModel.downloadStatus.collectAsStateWithLifecycle()
     val downloadOutcome by viewModel.downloadOutcome.collectAsStateWithLifecycle()
     var layersOpen by remember { mutableStateOf(false) }
+    var legendOpen by remember { mutableStateOf(false) }
     // A fix comes every second or so: read as it is only where needed (the GoTo panel, the map
     // layers), so it doesn't redraw this whole screen. The rest gets it rounded, and changes
     // only when that does: about 10 m for the way back to signal, about 1 km for the sun.
@@ -537,7 +550,13 @@ fun MapScreen(
                     .padding(end = TouchTarget + 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (plan.active) PlanPanel(planStats, plan.editing?.name, Modifier.fillMaxWidth())
+                val planRouting by planner.routingLegs.collectAsStateWithLifecycle()
+                val choices = plan.choices
+                if (plan.active && choices != null) {
+                    WayChoicePanel(choices, planner::showWay, planner::chooseWay, planner::dismissChoices, Modifier.fillMaxWidth())
+                } else if (plan.active) {
+                    PlanPanel(planStats, plan.editing?.name, Modifier.fillMaxWidth(), routing = planRouting)
+                }
                 // Where the sun sets for the user: their position, or the map's before a fix.
                 val sunPosition = sunHere ?: map?.cameraPosition?.target?.let { LatLon(it.latitude, it.longitude) }
                 goTo?.let { target ->
@@ -710,39 +729,49 @@ fun MapScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalAlignment = Alignment.End,
             ) {
-                // Planning is a mode of its own: its buttons say what they do, in words.
-                val sectionTarget = plan.sectionTarget
-                if (plan.active && sectionTarget != null) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        MapLabel(stringResource(PlannerR.string.plan_section_short))
-                        MapButton(
-                            icon = SentrekIcons.Flag,
-                            contentDescription = stringResource(PlannerR.string.plan_section),
-                            onClick = planner::toggleSection,
-                            active = plan.points.getOrNull(sectionTarget)?.sectionEnd == true,
-                        )
-                    }
-                }
-                if (plan.active && plan.points.size >= 2) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        MapLabel(stringResource(PlannerR.string.plan_reverse_short))
-                        MapButton(
-                            icon = SentrekIcons.Reverse,
-                            contentDescription = stringResource(PlannerR.string.plan_reverse),
-                            onClick = planner::reverse,
-                        )
-                    }
+                // Planning is a mode of its own: a long press on a button says what it does.
+                if (plan.active && plan.choiceLeg != null && plan.choices == null) {
+                    HintedMapButton(
+                        label = stringResource(PlannerR.string.route_other_ways_short),
+                        icon = SentrekIcons.AltRoute,
+                        contentDescription = stringResource(PlannerR.string.route_other_ways),
+                        onClick = planner::findOtherWays,
+                    )
                 }
                 if (plan.active) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        MapLabel(stringResource(if (plan.followTrails) PlannerR.string.plan_mode_trails else PlannerR.string.plan_mode_straight))
-                        MapButton(
-                            icon = SentrekIcons.Tracks,
-                            contentDescription = stringResource(PlannerR.string.plan_follow_trails),
-                            onClick = planner::toggleTrails,
-                            active = plan.followTrails,
-                        )
-                    }
+                    HintedMapButton(
+                        label = stringResource(PlannerR.string.route_options_short, profileName(plan.options.profile)),
+                        icon = SentrekIcons.Tune,
+                        contentDescription = stringResource(PlannerR.string.route_options),
+                        onClick = { routeOptionsOpen = true },
+                    )
+                }
+                val sectionTarget = plan.sectionTarget
+                if (plan.active && sectionTarget != null) {
+                    HintedMapButton(
+                        label = stringResource(PlannerR.string.plan_section_short),
+                        icon = SentrekIcons.Flag,
+                        contentDescription = stringResource(PlannerR.string.plan_section),
+                        onClick = planner::toggleSection,
+                        active = plan.points.getOrNull(sectionTarget)?.sectionEnd == true,
+                    )
+                }
+                if (plan.active && plan.points.size >= 2) {
+                    HintedMapButton(
+                        label = stringResource(PlannerR.string.plan_reverse_short),
+                        icon = SentrekIcons.Reverse,
+                        contentDescription = stringResource(PlannerR.string.plan_reverse),
+                        onClick = planner::reverse,
+                    )
+                }
+                if (plan.active) {
+                    HintedMapButton(
+                        label = stringResource(if (plan.followTrails) PlannerR.string.plan_mode_trails else PlannerR.string.plan_mode_straight),
+                        icon = SentrekIcons.Tracks,
+                        contentDescription = stringResource(PlannerR.string.plan_follow_trails),
+                        onClick = planner::toggleTrails,
+                        active = plan.followTrails,
+                    )
                 }
                 // Bottom-aligned: a taller label grows upwards and the button stays under the finger.
                 Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -808,6 +837,21 @@ fun MapScreen(
             }
         }
 
+        // A leg meant to follow paths but drawn straight: no way was found along them. Said
+        // over the map, above the bar; with roads avoided, one tap lets the route use them.
+        val planBusy by planner.routingLegs.collectAsStateWithLifecycle()
+        val unrouted = plan.active && !planBusy && plan.points.size == planLegs.size + 1 &&
+            plan.points.drop(1).zip(planLegs).any { (point, leg) -> point.onTrails && !leg.onTrails }
+        if (unrouted) {
+            NoWayCard(
+                avoidRoads = plan.options.avoidRoads,
+                onUseRoads = { planner.setOptions(plan.options.copy(avoidRoads = false)) },
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 12.dp, end = TouchTarget + 24.dp, bottom = barHeight + 12.dp),
+            )
+        }
+
         // Bottom left, above the bar, for the first seconds. Clear of the buttons on the right:
         // the credit wraps instead.
         MapCredit(
@@ -831,7 +875,7 @@ fun MapScreen(
                         BarItem(SentrekIcons.Check, stringResource(PlannerR.string.plan_save), { askPlanName = true }, enabled = plan.points.size >= 2),
                         BarItem(SentrekIcons.Close, stringResource(PlannerR.string.plan_close), {
                             // Nothing to lose: an empty plan, or a saved route opened and left as it was.
-                            val unchanged = plan.editing != null && !plan.canUndo
+                            val unchanged = plan.editing != null && !plan.canUndo && !plan.optionsChanged
                             if (plan.points.isEmpty() || unchanged) planner.close() else askPlanDiscard = true
                         }),
                     ),
@@ -960,8 +1004,34 @@ fun MapScreen(
     DisposableEffect(map) {
         val m = map ?: return@DisposableEffect onDispose {}
         val onLongPress = MapLibreMap.OnMapLongClickListener { pressedAt ->
-            // While planning, taps add points and long presses do nothing.
-            if (planning) return@OnMapLongClickListener true
+            // While planning, a long press closes the path there, or opens a closed spot again.
+            if (planning) {
+                val screen = m.projection.toScreenLocation(pressedAt)
+                val avoided = planner.state.value.options.avoided
+                val near = avoided.indices.minByOrNull { i ->
+                    val p = m.projection.toScreenLocation(LatLng(avoided[i].lat, avoided[i].lon))
+                    hypot(p.x - screen.x, p.y - screen.y)
+                }?.takeIf { i ->
+                    val p = m.projection.toScreenLocation(LatLng(avoided[i].lat, avoided[i].lon))
+                    hypot(p.x - screen.x, p.y - screen.y) <= pressRadiusPx * 2
+                }
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                val at = pressedAt.wrap()
+                confirm = if (near != null) {
+                    Confirmation(
+                        title = context.getString(PlannerR.string.route_allow_title),
+                        text = context.getString(PlannerR.string.route_allow_text),
+                        confirmLabel = context.getString(PlannerR.string.route_allow_confirm),
+                    ) { planner.allow(near) }
+                } else {
+                    Confirmation(
+                        title = context.getString(PlannerR.string.route_avoid_title),
+                        text = context.getString(PlannerR.string.route_avoid_text),
+                        confirmLabel = context.getString(PlannerR.string.route_avoid_confirm),
+                    ) { planner.avoid(LatLon(at.latitude, at.longitude)) }
+                }
+                return@OnMapLongClickListener true
+            }
             val latLng = pressedAt.wrap()
             val info = MapFeatures.at(m, m.projection.toScreenLocation(pressedAt), latLng, pressRadiusPx, exactPressPx)
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -1068,17 +1138,32 @@ fun MapScreen(
         val hillshade by viewModel.showHillshadeSetting.collectAsStateWithLifecycle()
         val slopes by viewModel.showSlopesSetting.collectAsStateWithLifecycle()
         val points by viewModel.showMapPoints.collectAsStateWithLifecycle()
+        val grid by viewModel.coordinateGrid.collectAsStateWithLifecycle()
         MapLayersSheet(
             kind = mapKind,
             onKind = viewModel::setMapKind,
-            layers = MapLayers(showDifficulty, contours, hillshade, slopes, points),
+            layers = MapLayers(showDifficulty, contours, hillshade, slopes, points, grid),
             onDifficulty = viewModel::setShowDifficulty,
             onContours = viewModel::setShowContours,
             onHillshade = viewModel::setShowHillshade,
             onSlopes = viewModel::setShowSlopes,
             onPoints = viewModel::setShowMapPoints,
+            onGrid = viewModel::setCoordinateGrid,
             onDownloadMaps = { layersOpen = false; onOpenMaps() },
+            onLegend = { layersOpen = false; legendOpen = true },
             onDismiss = { layersOpen = false },
+        )
+    }
+
+    if (legendOpen) {
+        val showDifficulty by viewModel.showDifficulty.collectAsStateWithLifecycle()
+        MapLegendSheet(
+            kind = mapKind,
+            night = LocalNightMap.current,
+            showDifficulty = showDifficulty,
+            zoom = zoom,
+            elevationUnit = viewModel.units.collectAsStateWithLifecycle().value.elevation,
+            onDismiss = { legendOpen = false },
         )
     }
 
@@ -1201,6 +1286,23 @@ fun MapScreen(
     ShareDialog(sharing)
 
     MapReminders(viewModel)
+
+    // Other ways found: the map shows them all.
+    val foundWays = plan.choices?.ways
+    LaunchedEffect(foundWays) {
+        val m = map ?: return@LaunchedEffect
+        val all = foundWays?.flatMap { it.leg.points }?.takeIf { it.size >= 2 } ?: return@LaunchedEffect
+        val bounds = LatLngBounds.from(all.maxOf { it.lat }, all.maxOf { it.lon }, all.minOf { it.lat }, all.minOf { it.lon })
+        // The panel is over the top of the map and the buttons on the right: room for them.
+        val d = context.resources.displayMetrics.density
+        m.animateCamera(
+            CameraUpdateFactory.newLatLngBounds(bounds, (24 * d).toInt(), (WAYS_TOP_DP * d).toInt(), (WAYS_RIGHT_DP * d).toInt(), (120 * d).toInt()),
+        )
+    }
+
+    if (routeOptionsOpen && plan.active) {
+        RouteOptionsSheet(plan.options, planner::setOptions) { routeOptionsOpen = false }
+    }
 
     if (askPlanDiscard) {
         DiscardPlanDialog(
@@ -1390,6 +1492,22 @@ private fun MapLayerEffects(
         }
     }
 
+    // The coordinate grid: made for the area on screen, again when the map moves past it.
+    val grid by viewModel.coordinateGrid.collectAsStateWithLifecycle()
+    val density = LocalDensity.current.density
+    DisposableEffect(map, style, grid, night) {
+        val m = map
+        val s = style
+        if (m == null || s == null) return@DisposableEffect onDispose {}
+        // Numbers below the scale bar and the map button, and clear of the screen's left edge.
+        val sync = { GridLayer.sync(s, m, grid, night, topPx = GRID_NUMBERS_TOP_DP * density, leftPx = GRID_NUMBERS_LEFT_DP * density) }
+        sync()
+        if (grid == CoordinateGrid.Kind.Off) return@DisposableEffect onDispose {}
+        val onIdle = MapLibreMap.OnCameraIdleListener { if (s.isFullyLoaded) sync() }
+        m.addOnCameraIdleListener(onIdle)
+        onDispose { m.removeOnCameraIdleListener(onIdle) }
+    }
+
     val contourTerrain by viewModel.contourTerrain.collectAsStateWithLifecycle()
     val elevationUnit = viewModel.units.collectAsStateWithLifecycle().value.elevation
     val nightMap = LocalNightMap.current
@@ -1414,12 +1532,18 @@ private fun MapLayerEffects(
             PlanLayers.clear(s)
             return@LaunchedEffect
         }
+        val choices = plan.choices?.takeIf { it.ways.isNotEmpty() }
+        PlanLayers.syncExtras(s, choices?.ways.orEmpty().map { it.leg.points }, choices?.shown, plan.options.avoided)
         // While dragging, legs that changed are straight until the finger lifts.
         val preview = planPreview
         if (preview != null) {
             PlanLayers.sync(s, preview, preview.zipWithNext { a, b -> planner.knownLeg(a, b, onTrails = true) }, plan.selected, Sections.ends(plan.points))
         } else {
-            PlanLayers.sync(s, plan.positions, planLegs, plan.selected, Sections.ends(plan.points))
+            // While choosing, the way looked at is drawn as its leg.
+            val legs = choices?.let { c ->
+                planLegs.mapIndexed { i, leg -> if (i == c.leg) c.ways.getOrNull(c.shown)?.leg ?: leg else leg }
+            } ?: planLegs
+            PlanLayers.sync(s, plan.positions, legs, plan.selected, Sections.ends(plan.points))
         }
     }
 
@@ -1429,6 +1553,13 @@ private fun MapLayerEffects(
         val s = style ?: return@LaunchedEffect
         planner.trails = object : TrailSource {
             override suspend fun lines(box: BoundingBox) = MapTrails.lines(s, box)
+
+            override suspend fun areaLines(box: BoundingBox) = withContext(Dispatchers.IO) {
+                val files = viewModel.overlays.value
+                RegionGrid.cellsIn(box).mapNotNull { files[it.id] }.flatMap { file ->
+                    runCatching { file.reader().use { OverlayTrails.read(it, box) } }.getOrDefault(emptyList())
+                }
+            }
 
             // MapLibre's "pixels" here are density-independent: the same unit as dp.
             override fun snapRadiusM() =
@@ -1540,4 +1671,38 @@ private fun MapReminders(viewModel: HomeViewModel) {
 private fun round(value: Double, decimals: Int): Double {
     val f = 10.0.pow(decimals)
     return kotlin.math.round(value * f) / f
+}
+
+/** Where the coordinate grid's numbers go: this far down the screen, and in from its left. */
+private const val GRID_NUMBERS_TOP_DP = 130f
+private const val GRID_NUMBERS_LEFT_DP = 28f
+
+/** Room above the other ways when the map fits them: the list of ways covers the top. */
+private const val WAYS_TOP_DP = 300
+
+/** ...and right of them: the planner's buttons are there. */
+private const val WAYS_RIGHT_DP = 110
+
+/** No way along the paths between two points of the plan; [onUseRoads] when roads are avoided. */
+@Composable
+private fun NoWayCard(avoidRoads: Boolean, onUseRoads: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        shadowElevation = 4.dp,
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                stringResource(if (avoidRoads) PlannerR.string.plan_no_way_roads else PlannerR.string.plan_no_way),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            if (avoidRoads) {
+                Button(onClick = onUseRoads, modifier = Modifier.heightIn(min = TouchTarget)) {
+                    Text(stringResource(PlannerR.string.plan_use_roads))
+                }
+            }
+        }
+    }
 }

@@ -145,6 +145,8 @@ fun FeatureSheet(
                         stringResource(R.string.feature_coordinates),
                         Format.coordinates(info.position.latitude, info.position.longitude),
                     )
+                    info.tags["surface"]?.let { Fact(stringResource(R.string.feature_surface), SURFACES[it]?.let { r -> stringResource(r) } ?: tagValue(it)) }
+                    info.tags["operator"]?.let { Fact(stringResource(R.string.feature_route_operator), it) }
                     // What OSM says that matters on the way (water, a fire, a bed), in words.
                     for ((key, label) in USEFUL_TAGS) {
                         val value = info.tags[key] ?: continue
@@ -410,6 +412,32 @@ private val PISTE_GROOMING = mapOf(
 
 /** The kind of a long-pressed spot with nothing on it. */
 const val SPOT = "spot"
+
+/** What a path is made of (OSM surface), the common values in the app's language. */
+private val SURFACES = mapOf(
+    "asphalt" to R.string.surface_asphalt,
+    "paved" to R.string.surface_paved,
+    "concrete" to R.string.surface_paved,
+    "paving_stones" to R.string.surface_paving_stones,
+    "sett" to R.string.surface_paving_stones,
+    "unpaved" to R.string.surface_unpaved,
+    "compacted" to R.string.surface_compacted,
+    "gravel" to R.string.surface_gravel,
+    "fine_gravel" to R.string.surface_fine_gravel,
+    "pebblestone" to R.string.surface_gravel,
+    "ground" to R.string.surface_ground,
+    "dirt" to R.string.surface_ground,
+    "earth" to R.string.surface_ground,
+    "mud" to R.string.surface_mud,
+    "grass" to R.string.surface_grass,
+    "rock" to R.string.surface_rock,
+    "stone" to R.string.surface_rock,
+    "scree" to R.string.surface_scree,
+    "sand" to R.string.surface_sand,
+    "wood" to R.string.surface_wood,
+    "snow" to R.string.surface_snow,
+    "ice" to R.string.surface_ice,
+)
 
 /** OSM tags worth a line of their own on a feature's card, under a name in the app's language. */
 private val USEFUL_TAGS = listOf(

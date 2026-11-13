@@ -43,7 +43,7 @@ object OverpassOverlay {
             // Via ferratas: their own kind of way, or a path with a ferrata grade.
             "way[\"highway\"=\"via_ferrata\"];way[\"via_ferrata_scale\"];);" +
             "convert trail ::id=id(),hw=t[\"highway\"],sac=t[\"sac_scale\"],vis=t[\"trail_visibility\"]," +
-            "vf=t[\"via_ferrata_scale\"],nm=t[\"name\"],::geom=geom();" +
+            "vf=t[\"via_ferrata_scale\"],nm=t[\"name\"],su=t[\"surface\"],op=t[\"operator\"],::geom=geom();" +
             "out geom;" +
             "(" +
             "nwr[\"natural\"~\"^(cave_entrance|spring)$\"];" +
@@ -253,7 +253,13 @@ object OverpassOverlay {
         } else {
             ""
         }
-        return """{"type":"Feature","properties":{$grade"v":$vis$track$ferrata$id},""" +
+        // What the path is like underfoot and who looks after it, for its card.
+        val details = listOf("su", "op").joinToString("") { key ->
+            e.tags[key]?.trim()?.takeIf { it.isNotEmpty() && it.length <= MAX_NAME }
+                ?.let { v -> ",\"$key\":" + StringWriter().also { w -> JsonWriter(w).use { it.value(v) } } }
+                .orEmpty()
+        }
+        return """{"type":"Feature","properties":{$grade"v":$vis$track$ferrata$details$id},""" +
             """"geometry":{"type":"LineString","coordinates":[$coords]}}"""
     }
 

@@ -19,6 +19,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -31,7 +34,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import app.sentrek.R
+import app.sentrek.geo.CoordinateGrid
 import app.sentrek.geo.overlay.MapKind
+import app.sentrek.ui.FitText
 import app.sentrek.ui.SentrekIcons
 import app.sentrek.ui.TouchTarget
 
@@ -42,6 +47,7 @@ class MapLayers(
     val hillshade: Boolean,
     val slopes: Boolean,
     val points: Boolean,
+    val grid: CoordinateGrid.Kind = CoordinateGrid.Kind.Off,
 )
 
 /**
@@ -59,8 +65,10 @@ fun MapLayersSheet(
     onHillshade: (Boolean) -> Unit,
     onSlopes: (Boolean) -> Unit,
     onPoints: (Boolean) -> Unit,
+    onGrid: (CoordinateGrid.Kind) -> Unit,
     /** Opens the map downloads: where the map is looked for, not in a menu of its own. */
     onDownloadMaps: () -> Unit,
+    onLegend: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(
@@ -104,6 +112,40 @@ fun MapLayersSheet(
             LayerRow(stringResource(R.string.settings_hillshade), layers.hillshade, onHillshade)
             LayerRow(stringResource(R.string.settings_slopes), layers.slopes, onSlopes)
             LayerRow(stringResource(R.string.settings_map_points), layers.points, onPoints)
+            Text(stringResource(R.string.grid_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
+            val options = listOf(
+                CoordinateGrid.Kind.Off to stringResource(R.string.grid_off),
+                CoordinateGrid.Kind.Utm to stringResource(R.string.grid_utm),
+                CoordinateGrid.Kind.LatLon to stringResource(R.string.grid_lat_lon),
+            )
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                options.forEachIndexed { i, (option, label) ->
+                    SegmentedButton(
+                        selected = option == layers.grid,
+                        onClick = { onGrid(option) },
+                        shape = SegmentedButtonDefaults.itemShape(i, options.size),
+                        modifier = Modifier.heightIn(min = TouchTarget),
+                        icon = {},
+                    ) { FitText(label) }
+                }
+            }
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = TouchTarget)
+                    .clickable(onClick = onLegend)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Icon(SentrekIcons.Info, contentDescription = null)
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.legend_open), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.legend_open_hint), style = MaterialTheme.typography.bodyMedium)
+                }
+                Icon(SentrekIcons.ChevronRight, contentDescription = null)
+            }
         }
     }
 }

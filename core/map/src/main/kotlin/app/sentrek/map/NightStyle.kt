@@ -60,11 +60,11 @@ internal object NightStyle {
         )
         set(
             style, "hiking-route",
-            lineColor(Expression.raw("""["match",["get","route_1_network"],["iwn","nwn"],"#b85cd6","rwn","#4f8fe0","lwn","#e0b030","#ffffff"]""")),
-            lineOpacity(0.55f),
+            lineColor(Expression.raw("""["match",["get","route_1_network"],["iwn","nwn"],"${MapColors.ROUTE_NATIONAL_NIGHT}","rwn","${MapColors.ROUTE_REGIONAL_NIGHT}","lwn","${MapColors.ROUTE_LOCAL_NIGHT}","#ffffff"]""")),
+            lineOpacity(MapColors.ROUTE_OPACITY_NIGHT),
         )
-        set(style, "track", lineColor("#b07a45"))
-        set(style, "path", lineColor("#e0484f"))
+        set(style, "track", lineColor(MapColors.TRACK_NIGHT))
+        set(style, "path", lineColor(MapColors.PATH_NIGHT))
         set(style, "aerialway", lineColor("#aaaaaa"))
         for ((id, color) in textLayers) set(style, id, textColor(color), textHaloColor(HALO))
     }

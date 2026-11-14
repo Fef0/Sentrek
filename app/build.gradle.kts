@@ -108,8 +108,43 @@ android {
 // can run both and should get the 64-bit one. The universal APK has 0.
 val ABI_CODES = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2, "x86_64" to 4)
 
+/**
+ * This version's changelog from the store listing (fastlane/metadata/android/<language>/
+ * changelogs), one file per language as assets/whatsnew/<language>.txt: what the app shows
+ * once after an update, in its own language, without a connection.
+ */
+abstract class WhatsNewTask : DefaultTask() {
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val metadata: DirectoryProperty
+
+    @get:Input
+    abstract val changelog: Property<String>
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val out = outputDir.get().asFile.resolve("whatsnew")
+        out.deleteRecursively()
+        out.mkdirs()
+        metadata.get().asFile.listFiles().orEmpty().sortedBy { it.name }.forEach { locale ->
+            val file = locale.resolve("changelogs/${changelog.get()}")
+            if (file.isFile) file.copyTo(out.resolve(locale.name.substringBefore('-') + ".txt"), overwrite = true)
+        }
+    }
+}
+
+val whatsNew = tasks.register<WhatsNewTask>("whatsNew") {
+    metadata.set(rootProject.layout.projectDirectory.dir("fastlane/metadata/android"))
+    // The store's changelog is named after the x86_64 APK's version code (… 4).
+    changelog.set("${android.defaultConfig.versionCode!! * 10 + 4}.txt")
+}
+
 androidComponents {
     onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(whatsNew, WhatsNewTask::outputDir)
         val base = android.defaultConfig.versionCode!!
         variant.outputs.forEach { output ->
             val abi = output.filters.find { it.filterType == FilterConfiguration.FilterType.ABI }?.identifier

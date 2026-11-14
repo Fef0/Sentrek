@@ -3,6 +3,8 @@ package app.sentrek
 import app.sentrek.update.AppUpdater
 import app.sentrek.update.UpdateCheck
 import app.sentrek.update.UpdateDialog
+import app.sentrek.update.WhatsNew
+import app.sentrek.update.WhatsNewDialog
 import app.sentrek.maps.DownloadNotifications
 import app.sentrek.search.PeaksScreen
 import app.sentrek.home.FirstRunGuide
@@ -33,6 +35,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -322,6 +325,16 @@ class MainActivity : ComponentActivity() {
                             }
                             }
                         }
+                        // Just updated: what changed, once, on the map. Before any question about a newer one.
+                        val language = LocalConfiguration.current.locales[0].language
+                        var whatsNew by remember(language) { mutableStateOf(WhatsNew.pending(this@MainActivity, language)) }
+                        val changes = whatsNew
+                        if (changes != null && guideSeen && screen == Screen.Map) {
+                            WhatsNewDialog(changes, onDismiss = {
+                                WhatsNew.seen(this@MainActivity)
+                                whatsNew = null
+                            })
+                        }
                         // A new version: asked once per opening, on the map, never mid-hike (installing closes the app).
                         val update by updater.newVersion.collectAsStateWithLifecycle()
                         val updateCheck by updater.check.collectAsStateWithLifecycle()
@@ -329,7 +342,7 @@ class MainActivity : ComponentActivity() {
                         val followingNow by home.following.collectAsStateWithLifecycle()
                         var updateLater by rememberSaveable { mutableStateOf<String?>(null) }
                         val newVersion = update
-                        if (newVersion != null && newVersion.version != updateLater && guideSeen && screen == Screen.Map &&
+                        if (newVersion != null && newVersion.version != updateLater && guideSeen && screen == Screen.Map && whatsNew == null &&
                             recordingNow == null && followingNow == null && updateCheck !is UpdateCheck.Installing
                         ) {
                             UpdateDialog(

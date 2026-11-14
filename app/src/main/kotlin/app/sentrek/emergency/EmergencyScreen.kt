@@ -13,7 +13,6 @@ import android.content.Context
 import android.content.Intent
 import android.location.Location
 import android.net.Uri
-import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -35,6 +34,13 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.delay
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -235,7 +241,7 @@ fun EmergencyScreen(
                     val message = message(context, position, here)
                     if (smsButton) SmsButton(viewModel, smsTo, contactName.ifBlank { smsTo }, message, wide)
                     OutlinedButton(onClick = { share(context, message) }, modifier = wide) { Text(stringResource(R.string.emergency_share)) }
-                    OutlinedButton(onClick = { copy(context, message) }, modifier = wide) { Text(stringResource(R.string.emergency_copy)) }
+                    CopyButton(message, wide)
                 }
             }
             Text(stringResource(R.string.emergency_hint), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 16.dp))
@@ -346,7 +352,35 @@ private fun share(context: Context, text: String) {
     context.startActivity(Intent.createChooser(send, context.getString(R.string.emergency_title)))
 }
 
-private fun copy(context: Context, text: String) {
-    context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(text, text))
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) Toast.makeText(context, R.string.gps_copied, Toast.LENGTH_SHORT).show()
+/**
+ * Copies [text], and says so on the button itself for a moment ("Copied" with a tick): the
+ * system's own notice is small, easy to miss in a hurry, and some phones don't show one.
+ */
+@Composable
+private fun CopyButton(text: String, modifier: Modifier) {
+    val context = LocalContext.current
+    var copies by remember { mutableIntStateOf(0) }
+    LaunchedEffect(copies) {
+        if (copies > 0) {
+            delay(COPIED_MS)
+            copies = 0
+        }
+    }
+    val copied = copies > 0
+    OutlinedButton(
+        onClick = {
+            context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(text, text))
+            copies++
+        },
+        modifier = modifier,
+    ) {
+        if (copied) {
+            Icon(SentrekIcons.Check, contentDescription = null, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+        }
+        Text(stringResource(if (copied) R.string.gps_copied else R.string.emergency_copy))
+    }
 }
+
+/** How long the copy button says "Copied". */
+private const val COPIED_MS = 2_500L

@@ -1,0 +1,5 @@
+• Planner: Save on the right, the route drawn on top with direction arrows, smaller points
+• Hold the start point to walk back to it and make a loop
+• Saved routes show their sections on the map and in the routes list
+• Each section shows the heights it starts and ends at
+• The map layers sheet closes smoothly when dragged down

@@ -1,0 +1,5 @@
+• Pianificazione: Salva a destra, percorso sopra gli altri con le frecce, punti più piccoli
+• Tieni premuto il punto di partenza per tornarci e fare un anello
+• I percorsi salvati mostrano le tappe sulla mappa e nell'elenco dei percorsi
+• Ogni tappa mostra la quota di partenza e di arrivo
+• Il pannello dei livelli della mappa si chiude senza scatti trascinandolo giù

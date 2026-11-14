@@ -41,11 +41,11 @@ The name comes from *sentiero*, Italian for trail, and *trek*.
 ### Planning
 - Tap the map to add points and the route follows the paths between them. This works offline too, in downloaded areas.
 - You see distance, climb, descent, walking time and the elevation profile while you plan.
-- Drag a point to move it, or drag the middle of a segment to add one. Undo and redo are there. One button turns the route around.
+- Drag a point to move it, or drag the middle of a segment to add one. Undo and redo are there. One button turns the route around. Hold the start point to walk back to it: the route becomes a loop.
 - Each route picks its way the shortest, the easiest (lower SAC grades, gentler slopes) or with the least climb, and can avoid via ferratas or roads. The choice is saved with the route.
 - "Other ways" offers up to three different ways for the selected or last leg, each with its distance, climb and time. Tap one to see it on the map and keep it.
 - Long-press a path while planning to close it (a washed-out bridge, a closed path): the route goes round it.
-- Split a long route into sections (days, stages) with the flag button: each one gets its own distance, climb and time, and a mark on the map and on the profile. Section ends are saved as waypoints, so they show among the places ahead when you follow the route.
+- Split a long route into sections (days, stages) with the flag button: each one gets its own distance, climb, time and the heights it starts and ends at, and a mark on the map and on the profile. Saved routes show them too, in the routes list and on the map. Section ends are saved as waypoints, so they show among the places ahead when you follow the route.
 - Save the route, or export it as GPX or KML.
 
 ### Routes and tracks

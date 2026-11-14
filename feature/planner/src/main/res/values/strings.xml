@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="plan_start">Plan a route</string>
-    <string name="plan_hint">Tap to add points. Drag points to move them, drag a midpoint to insert one.</string>
+    <string name="plan_hint">Tap to add points. Drag points to move them, drag a midpoint to insert one. Hold the start point to walk back to it.</string>
     <string name="plan_follow_trails">Follow paths</string>
     <string name="plan_reverse">Reverse the route</string>
     <string name="plan_editing">Editing: %s</string>
@@ -30,7 +30,6 @@
     <string name="plan_mode_straight">Straight lines</string>
     <string name="plan_section_short">Section end</string>
     <string name="plan_section">End a section at this point</string>
-    <string name="plan_section_number">Section %1$d</string>
     <string name="route_options_short">Route: %s</string>
     <string name="route_options">How the route picks its way</string>
     <string name="route_options_title">Route along the paths</string>

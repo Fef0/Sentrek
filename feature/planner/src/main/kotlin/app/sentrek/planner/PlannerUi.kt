@@ -36,6 +36,8 @@ import androidx.compose.ui.unit.dp
 import app.sentrek.feature.planner.R
 import app.sentrek.ui.ElevationProfile
 import app.sentrek.ui.Format
+import app.sentrek.ui.SectionList
+import app.sentrek.ui.sectionFlags
 
 /**
  * Totals of the route being planned and its elevation profile; a hint until there are two
@@ -109,46 +111,7 @@ fun PlanPanel(stats: PlanStats?, editing: String?, modifier: Modifier = Modifier
             if (stats.sections.isNotEmpty()) {
                 SectionList(
                     stats.sections,
-                    Modifier.padding(horizontal = 4.dp).heightIn(max = 112.dp).verticalScroll(rememberScrollState()),
-                )
-            }
-        }
-    }
-}
-
-/** The section ends' colour on the map (PlanLayers). */
-private val SECTION_ORANGE = Color(0xFFEF6C00)
-
-/**
- * Where on [profile] each section but the last ends: the sections' lengths added up, fitted to
- * the profile's length (they're measured on their own pieces, a few metres apart).
- */
-fun sectionFlags(sections: List<SectionTotals>, profile: List<Pair<Double, Double>>): List<Double> {
-    val total = sections.sumOf { it.distance }
-    val length = profile.lastOrNull()?.first ?: return emptyList()
-    if (sections.size < 2 || total <= 0) return emptyList()
-    var along = 0.0
-    return sections.dropLast(1).map { along += it.distance; along / total * length }
-}
-
-/** A route's sections, one line each: its number, distance, climb, descent and time. */
-@Composable
-fun SectionList(sections: List<SectionTotals>, modifier: Modifier = Modifier) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        sections.forEachIndexed { i, s ->
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                // As on the map: the number in an orange dot, where the section ends.
-                val label = stringResource(R.string.plan_section_number, i + 1)
-                Box(
-                    Modifier.size(24.dp).background(SECTION_ORANGE, CircleShape).semantics { contentDescription = label },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("${i + 1}", color = Color.White, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                }
-                val climb = if (s.hasElevation) " · ↑ ${Format.elevation(s.ascent)} ↓ ${Format.elevation(s.descent)}" else ""
-                Text(
-                    "${Format.distance(s.distance)}$climb · ${Format.estimate(s.millis)}",
-                    style = MaterialTheme.typography.bodyMedium,
+                    Modifier.padding(horizontal = 4.dp).heightIn(max = 136.dp).verticalScroll(rememberScrollState()),
                 )
             }
         }
@@ -169,12 +132,13 @@ fun DiscardPlanDialog(onDiscard: () -> Unit, onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.plan_discard_title)) },
         text = { Text(stringResource(R.string.plan_discard_text)) },
-        confirmButton = {
-            Button(
+        // Keeping on is the safe choice: the filled button, on the right.
+        confirmButton = { Button(onClick = onDismiss) { Text(stringResource(R.string.plan_keep)) } },
+        dismissButton = {
+            TextButton(
                 onClick = onDiscard,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
             ) { Text(stringResource(R.string.plan_discard)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.plan_keep)) } },
     )
 }

@@ -1,7 +1,10 @@
 package app.sentrek.planner
 
 import android.graphics.PointF
+import android.os.Handler
+import android.os.Looper
 import android.view.MotionEvent
+import android.view.ViewConfiguration
 import app.sentrek.geo.LatLon
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
@@ -26,6 +29,8 @@ class PlanGestures(
     private val onDrag: (PlanHandle, LatLon) -> Unit,
     /** Finger lifted after a drag: apply it. Null position: the drag was cancelled. */
     private val onDrop: (PlanHandle, LatLon?) -> Unit,
+    /** Held still on a handle: true if that did something (the lift is then not a tap). */
+    private val onLongPress: (PlanHandle) -> Boolean = { false },
 ) {
     var map: MapLibreMap? = null
     var points: List<LatLon> = emptyList()
@@ -37,6 +42,12 @@ class PlanGestures(
     private var downX = 0f
     private var downY = 0f
     private var dragging = false
+    private var pressedLong = false
+    private val handler = Handler(Looper.getMainLooper())
+    private val longPress = Runnable {
+        val h = handle
+        if (h != null && !dragging) pressedLong = onLongPress(h)
+    }
 
     fun onTouch(event: MotionEvent): Boolean {
         val m = map ?: return false
@@ -46,21 +57,34 @@ class PlanGestures(
                 downX = event.x
                 downY = event.y
                 dragging = false
+                pressedLong = false
+                handler.removeCallbacks(longPress)
+                if (handle != null) handler.postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong())
                 return handle != null
             }
             MotionEvent.ACTION_MOVE -> {
                 val h = handle ?: return false
-                if (!dragging && hypot(event.x - downX, event.y - downY) > slopPx) dragging = true
+                if (pressedLong) return true
+                if (!dragging && hypot(event.x - downX, event.y - downY) > slopPx) {
+                    dragging = true
+                    handler.removeCallbacks(longPress)
+                }
                 if (dragging) onDrag(h, at(m, event.x, event.y))
                 return true
             }
             MotionEvent.ACTION_UP -> {
+                handler.removeCallbacks(longPress)
                 val h = handle ?: return false
                 handle = null
-                if (dragging) onDrop(h, at(m, event.x, event.y)) else onTap(h)
+                when {
+                    pressedLong -> Unit
+                    dragging -> onDrop(h, at(m, event.x, event.y))
+                    else -> onTap(h)
+                }
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
+                handler.removeCallbacks(longPress)
                 val h = handle ?: return false
                 handle = null
                 if (dragging) onDrop(h, null)

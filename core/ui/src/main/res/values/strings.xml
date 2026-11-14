@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ui_cancel">Cancel</string>
+    <string name="section_number">Section %1$d</string>
+    <string name="section_heights">From %1$s to %2$s</string>
 </resources>

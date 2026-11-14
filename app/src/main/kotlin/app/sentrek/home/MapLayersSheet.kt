@@ -28,6 +28,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -75,9 +76,12 @@ fun MapLayersSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
+        // Never quite the screen's height: a sheet just as tall as the room jumped and
+        // flickered when dragged down (it went from fitting to scrolling under the finger).
         Column(
             Modifier
                 .fillMaxWidth()
+                .heightIn(max = (LocalConfiguration.current.screenHeightDp * MAX_HEIGHT).dp)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 24.dp),
@@ -149,6 +153,9 @@ fun MapLayersSheet(
         }
     }
 }
+
+/** Of the screen's height, at most: the rest scrolls. */
+private const val MAX_HEIGHT = 0.8f
 
 @Composable
 private fun KindRow(kind: MapKind, selected: Boolean, onClick: () -> Unit) {

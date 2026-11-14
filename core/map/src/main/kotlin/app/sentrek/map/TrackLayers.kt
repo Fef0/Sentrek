@@ -8,6 +8,11 @@ import android.graphics.Path
 import app.sentrek.geo.Geo
 import app.sentrek.geo.LatLon
 import app.sentrek.geo.gpx.GpxWaypoint
+import app.sentrek.geo.plan.Sections
+import org.maplibre.android.style.expressions.Expression.eq
+import org.maplibre.android.style.expressions.Expression.neq
+import org.maplibre.android.style.layers.PropertyFactory.textAllowOverlap
+import org.maplibre.android.style.layers.PropertyFactory.textIgnorePlacement
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression.coalesce
 import org.maplibre.android.style.expressions.Expression.get
@@ -73,13 +78,13 @@ object TrackLayers {
 
     /** Small arrows along the shown tracks, the way they go: on a loop, the start doesn't say. */
     private const val ARROWS = "track-arrows"
-    private const val ARROW_IMAGE = "track-arrow"
+    internal const val ARROW_IMAGE = "track-arrow"
 
     /** Closer out, a track is a few pixels long and the arrows would only be noise. */
-    private const val ARROWS_MIN_ZOOM = 12f
+    internal const val ARROWS_MIN_ZOOM = 12f
 
     /** Screen pixels between arrows: a few on screen at any zoom. */
-    private const val ARROW_SPACING = 180f
+    internal const val ARROW_SPACING = 180f
 
     /** Start and end closer than this (a loop): one marker for both, or the labels would collide. */
     private const val SAME_PLACE_M = 30.0
@@ -131,10 +136,17 @@ object TrackLayers {
         setWaypoints(
             style,
             shown.flatMap { track ->
+                var section = 0
                 track.waypoints.map { w ->
                     Feature.fromGeometry(Point.fromLngLat(w.position.lon, w.position.lat)).apply {
                         w.name?.let { addStringProperty("name", it) }
-                        addStringProperty("class", "waypoint")
+                        // A section end of a planned route: numbered in orange, as in the planner.
+                        if (w.type == Sections.WAYPOINT_TYPE) {
+                            addStringProperty("class", "section")
+                            addStringProperty("n", "${++section}")
+                        } else {
+                            addStringProperty("class", "waypoint")
+                        }
                         addStringProperty("track", track.id)
                         addStringProperty(COLOR, hex(track.color))
                     }
@@ -228,7 +240,7 @@ object TrackLayers {
      * the space: an arrow that would cover one is left out, the next one shows.
      */
     private fun addArrows(style: Style) {
-        if (style.getImage(ARROW_IMAGE) == null) style.addImage(ARROW_IMAGE, arrow())
+        addArrowImage(style)
         PlaceLayers.addBelow(
             style,
             SymbolLayer(ARROWS, ARROWS).withProperties(
@@ -243,6 +255,11 @@ object TrackLayers {
      * A chevron pointing along the line (right, as MapLibre lays icons on lines): white with a
      * dark edge, a little wider than the line, so it reads on any track colour and on its casing.
      */
+    /** The arrow drawn along tracks and the planned route, once per style. */
+    internal fun addArrowImage(style: Style) {
+        if (style.getImage(ARROW_IMAGE) == null) style.addImage(ARROW_IMAGE, arrow())
+    }
+
     private fun arrow(): Bitmap {
         val density = Resources.getSystem().displayMetrics.density
         val size = (14 * density).toInt().coerceAtLeast(14)
@@ -325,8 +342,8 @@ object TrackLayers {
         PlaceLayers.addBelow(
             style,
             CircleLayer(WAYPOINTS, WAYPOINTS).withProperties(
-                circleRadius(7f),
-                circleColor(toColor(get(COLOR))),
+                circleRadius(match(get("class"), literal(7f), stop("section", 10f))),
+                circleColor(match(get("class"), toColor(get(COLOR)), stop("section", rgb(239, 108, 0)))),
                 circleStrokeColor(rgb(255, 255, 255)),
                 circleStrokeWidth(2.5f),
             ),
@@ -343,9 +360,22 @@ object TrackLayers {
                 textColor(toColor(get(COLOR))),
                 textHaloColor(rgb(255, 255, 255)),
                 textHaloWidth(1.8f),
-            ),
+            ).withFilter(neq(get("class"), "section")),
+        )
+        PlaceLayers.addBelow(
+            style,
+            SymbolLayer(WAYPOINTS + NUMBERS, WAYPOINTS).withProperties(
+                textField(get("n")),
+                textFont(arrayOf("Noto Sans Bold")),
+                textSize(11f),
+                textColor(rgb(255, 255, 255)),
+                textAllowOverlap(true),
+                textIgnorePlacement(true),
+            ).withFilter(eq(get("class"), "section")),
         )
     }
+
+    private const val NUMBERS = "-numbers"
 
     private fun hex(argb: Int) = String.format("#%06X", argb and 0xFFFFFF)
 }

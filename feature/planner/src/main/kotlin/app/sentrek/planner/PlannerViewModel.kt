@@ -245,6 +245,20 @@ class PlannerViewModel @Inject constructor(
         null
     }
 
+    /**
+     * Back to the start: a last point on the first one, in the mode new legs are drawn in, so
+     * the route ends where it began. Nothing when it already does.
+     */
+    fun closeLoop(): Boolean {
+        val points = editor.points
+        if (points.size < 2 || points.last().position == points.first().position) return false
+        edit {
+            editor.add(PlanPoint(editor.points.first().position, _state.value.followTrails))
+            null
+        }
+        return true
+    }
+
     fun select(index: Int?) {
         _state.value = _state.value.copy(selected = index?.takeIf { it in editor.points.indices })
     }
@@ -530,7 +544,7 @@ class PlannerViewModel @Inject constructor(
         if (legs.size != points.size - 1) return emptyList()
         return Sections.legRanges(points).map { range ->
             val s = stats(join(legs.subList(range.first, range.last + 1)))
-            SectionTotals(s.distance, s.ascent, s.descent, s.millis, s.hasElevation)
+            SectionTotals(s.distance, s.ascent, s.descent, s.millis, s.hasElevation, s.profile.firstOrNull()?.second, s.profile.lastOrNull()?.second)
         }
     }
 

@@ -405,6 +405,12 @@ fun MapScreen(
                     }
                 }
             },
+            // A long press on the start closes the route there: a loop, without aiming.
+            onLongPress = { handle ->
+                val closed = handle == PlanHandle.Point(0) && planner.closeLoop()
+                if (closed) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                closed
+            },
         )
     }
     // The touch that brings the controls back does nothing else (no pan, no feature sheet).
@@ -872,12 +878,13 @@ fun MapScreen(
                         BarItem(SentrekIcons.Undo, stringResource(PlannerR.string.plan_undo), planner::undo, enabled = plan.canUndo),
                         BarItem(SentrekIcons.Redo, stringResource(PlannerR.string.plan_redo), planner::redo, enabled = plan.canRedo),
                         BarItem(SentrekIcons.Delete, stringResource(PlannerR.string.plan_remove), planner::removePoint, enabled = plan.points.isNotEmpty()),
-                        BarItem(SentrekIcons.Check, stringResource(PlannerR.string.plan_save), { askPlanName = true }, enabled = plan.points.size >= 2),
                         BarItem(SentrekIcons.Close, stringResource(PlannerR.string.plan_close), {
                             // Nothing to lose: an empty plan, or a saved route opened and left as it was.
                             val unchanged = plan.editing != null && !plan.canUndo && !plan.optionsChanged
                             if (plan.points.isEmpty() || unchanged) planner.close() else askPlanDiscard = true
                         }),
+                        // Last, at the far right, filled: what the planning is for.
+                        BarItem(SentrekIcons.Check, stringResource(PlannerR.string.plan_save), { askPlanName = true }, highlighted = true, enabled = plan.points.size >= 2),
                     ),
                 )
             } else AnimatedVisibility(visible = !controlsHidden, enter = fadeIn(), exit = fadeOut()) { Column {
@@ -1526,7 +1533,8 @@ private fun MapLayerEffects(
         style?.let { MapContours.showRelief(it, showHillshade) }
     }
 
-    LaunchedEffect(style, plan, planLegs, planPreview) {
+    val showTrackArrows by viewModel.showTrackArrows.collectAsStateWithLifecycle()
+    LaunchedEffect(style, plan, planLegs, planPreview, showTrackArrows) {
         val s = style ?: return@LaunchedEffect
         if (!plan.active) {
             PlanLayers.clear(s)
@@ -1537,13 +1545,13 @@ private fun MapLayerEffects(
         // While dragging, legs that changed are straight until the finger lifts.
         val preview = planPreview
         if (preview != null) {
-            PlanLayers.sync(s, preview, preview.zipWithNext { a, b -> planner.knownLeg(a, b, onTrails = true) }, plan.selected, Sections.ends(plan.points))
+            PlanLayers.sync(s, preview, preview.zipWithNext { a, b -> planner.knownLeg(a, b, onTrails = true) }, plan.selected, Sections.ends(plan.points), showTrackArrows)
         } else {
             // While choosing, the way looked at is drawn as its leg.
             val legs = choices?.let { c ->
                 planLegs.mapIndexed { i, leg -> if (i == c.leg) c.ways.getOrNull(c.shown)?.leg ?: leg else leg }
             } ?: planLegs
-            PlanLayers.sync(s, plan.positions, legs, plan.selected, Sections.ends(plan.points))
+            PlanLayers.sync(s, plan.positions, legs, plan.selected, Sections.ends(plan.points), showTrackArrows)
         }
     }
 
@@ -1588,7 +1596,6 @@ private fun MapLayerEffects(
 
     // A route open in the planner is drawn by the planner: its saved line would show twice.
     val editedId = plan.editing?.id?.takeIf { plan.active }
-    val showTrackArrows by viewModel.showTrackArrows.collectAsStateWithLifecycle()
     LaunchedEffect(style, shownTracks, editedId, showTrackArrows) {
         style?.let {
             val shown = shownTracks.filter { t -> t.id != editedId }

@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ui_cancel">Annulla</string>
+    <string name="section_number">Tappa %1$d</string>
+    <string name="section_heights">Da %1$s a %2$s</string>
 </resources>

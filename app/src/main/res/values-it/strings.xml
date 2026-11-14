@@ -649,4 +649,6 @@
     <string name="grid_off">No</string>
     <string name="grid_utm">UTM (km)</string>
     <string name="grid_lat_lon">Lat/long</string>
+    <string name="whats_new_title">Novità di Sentrek %1$s</string>
+    <string name="whats_new_ok">OK</string>
 </resources>

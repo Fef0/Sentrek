@@ -119,6 +119,8 @@ Download the APK from the [Releases](../../releases) page. The `arm64` file is t
 
 The app from the Releases page tells you when there's a new version. It looks on GitHub at most twice a day, on Wi-Fi, and shows a notification. Nothing is downloaded until you tap Update: then it downloads the new version, checks that it's signed with the same key, and hands it to Android's installer, which asks you to confirm and lets you open Sentrek again when it's done. It never updates during a recording or a followed route. The first time, Android asks you to allow updates from Sentrek. You can turn the notifications off in Settings › About, where Check for updates looks for a new version right away.
 
+After any update, from the app, F-Droid or a file you installed yourself, Sentrek shows once what's new in that version, in the app's language.
+
 > **Google Play Protect may block this version.** Play Protect flags apps that can both send text messages (Sentrek's SOS and position messages) and install apps (the updater), and it may block installing or updating Sentrek, saying it may be harmful. If you'd rather avoid that, install one of the `fdroid` files from the same Releases page instead: it's the same app without the updater, so Play Protect doesn't flag it. You update it by downloading the new `fdroid` file yourself. Both versions are signed with the same key, so you can switch from one to the other without losing your data.
 
 ## Building

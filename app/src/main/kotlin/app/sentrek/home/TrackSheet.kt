@@ -1,7 +1,7 @@
 package app.sentrek.home
 
-import app.sentrek.planner.SectionList
-import app.sentrek.planner.sectionFlags
+import app.sentrek.ui.SectionList
+import app.sentrek.ui.sectionFlags
 import app.sentrek.geo.plan.SectionTotals
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

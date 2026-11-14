@@ -97,8 +97,13 @@ object PlaceLayers {
         )
     }
 
+    /** Layers added so far by [addBelow]: a layer that must stay on top can tell when another came. */
+    internal var added = 0
+        private set
+
     /** Adds [layer] below the places, so they stay on top whatever is added later. */
     internal fun addBelow(style: Style, layer: Layer) {
+        added++
         if (style.getLayer(LAYER) != null) style.addLayerBelow(layer, LAYER) else style.addLayer(layer)
     }
 

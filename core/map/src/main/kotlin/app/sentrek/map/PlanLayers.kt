@@ -33,6 +33,10 @@ import org.maplibre.android.style.layers.PropertyFactory.lineDasharray
 import org.maplibre.android.style.layers.PropertyFactory.lineJoin
 import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
+import org.maplibre.android.style.layers.PropertyFactory.iconImage
+import org.maplibre.android.style.layers.PropertyFactory.symbolPlacement
+import org.maplibre.android.style.layers.PropertyFactory.symbolSpacing
+import org.maplibre.android.style.layers.PropertyFactory.visibility
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
@@ -51,8 +55,18 @@ object PlanLayers {
     private const val STRAIGHT = "-straight"
     private const val COLOR = 0xFFD81B60.toInt()
 
-    /** [sectionEnds]: the indices of the points that end a section, numbered on the map. */
-    fun sync(style: Style, points: List<LatLon>, legs: List<PlanLeg>, selected: Int?, sectionEnds: List<Int> = emptyList()) {
+    /**
+     * [sectionEnds]: the indices of the points that end a section, numbered on the map.
+     * [arrows]: small arrows along the line, the way it goes, as on the saved tracks.
+     */
+    fun sync(
+        style: Style,
+        points: List<LatLon>,
+        legs: List<PlanLeg>,
+        selected: Int?,
+        sectionEnds: List<Int> = emptyList(),
+        arrows: Boolean = true,
+    ) {
         val line = legs.flatMap { it.pieces }.filter { (points, _) -> points.size >= 2 }.map { (points, onPath) ->
             Feature.fromGeometry(LineString.fromLngLats(points.map { Point.fromLngLat(it.lon, it.lat) })).apply {
                 addBooleanProperty("t", onPath)
@@ -77,6 +91,27 @@ object PlanLayers {
         setSource(style, LINE, line)
         setSource(style, POINTS, handles)
         if (style.getLayer(LINE) == null) addLayers(style)
+        style.getLayer(ARROWS)?.setProperties(visibility(if (arrows) Property.VISIBLE else Property.NONE))
+        // Over every track, whenever one was drawn after the plan: the route being made is
+        // the one the user is looking at.
+        if (points.isNotEmpty() && (style !== raisedStyle || PlaceLayers.added != raisedAt)) raise(style)
+    }
+
+    private var raisedStyle: Style? = null
+    private var raisedAt = -1
+
+    /** The plan's layers (and the other ways', over it) taken out and put back on top, below the places. */
+    private fun raise(style: Style) {
+        val ids = style.layers.map { it.id }
+        val first = ids.indexOf(LINE + CASING)
+        val lastTrack = ids.indexOfLast { it.startsWith("track-") || it.startsWith("goto") }
+        if (first < 0 || lastTrack > first) {
+            for (id in PLAN_LAYERS + EXTRA_LAYERS) style.removeLayer(id)
+            addLayers(style)
+            if (style.getSource(WAYS) != null) addExtraLayers(style)
+        }
+        raisedStyle = style
+        raisedAt = PlaceLayers.added
     }
 
     /** Hides the plan without forgetting the layers (the planner was closed). */
@@ -86,6 +121,8 @@ object PlanLayers {
     }
 
     private const val NUMBERS = "plan-section-numbers"
+    private const val ARROWS = "plan-arrows"
+    private val PLAN_LAYERS = listOf(LINE + CASING, LINE, LINE + STRAIGHT, ARROWS, POINTS, NUMBERS)
     private val SECTION_COLOR = rgb(239, 108, 0)
 
     private fun setSource(style: Style, id: String, features: List<Feature>) {
@@ -120,10 +157,20 @@ object PlanLayers {
                 lineDasharray(arrayOf(1.5f, 1.2f)),
             ).withFilter(eq(get("t"), false)),
         )
+        TrackLayers.addArrowImage(style)
+        PlaceLayers.addBelow(
+            style,
+            SymbolLayer(ARROWS, LINE).withProperties(
+                symbolPlacement(Property.SYMBOL_PLACEMENT_LINE),
+                symbolSpacing(TrackLayers.ARROW_SPACING),
+                iconImage(TrackLayers.ARROW_IMAGE),
+            ).apply { minZoom = TrackLayers.ARROWS_MIN_ZOOM },
+        )
         PlaceLayers.addBelow(
             style,
             CircleLayer(POINTS, POINTS).withProperties(
-                circleRadius(match(get("r"), literal(8f), stop("selected", 12f), stop("section", 12f), stop("mid", 5f))),
+                // Small, so they hide little of the map: a touch reaches further than the dot (PlanGestures).
+                circleRadius(match(get("r"), literal(6f), stop("selected", 10f), stop("section", 10f), stop("mid", 4f))),
                 circleColor(
                     match(
                         get("r"), rgb(255, 255, 255),
@@ -143,7 +190,7 @@ object PlanLayers {
                         stop("section", rgb(255, 255, 255)),
                     ),
                 ),
-                circleStrokeWidth(match(get("r"), literal(3f), stop("mid", 2f))),
+                circleStrokeWidth(match(get("r"), literal(2.5f), stop("mid", 1.5f))),
             ),
         )
         // The section's number in its end point (the selected one too: the number stays).
@@ -152,7 +199,7 @@ object PlanLayers {
             SymbolLayer(NUMBERS, POINTS).withProperties(
                 textField(get("n")),
                 textFont(arrayOf("Noto Sans Bold")),
-                textSize(12f),
+                textSize(11f),
                 textColor(rgb(255, 255, 255)),
                 textAllowOverlap(true),
                 textIgnorePlacement(true),
@@ -197,7 +244,12 @@ object PlanLayers {
         }
         setSource(style, WAYS, lines)
         setSource(style, AVOIDED, marks)
-        if (style.getLayer(WAYS) != null) return
+        if (style.getLayer(WAYS) == null) addExtraLayers(style)
+    }
+
+    private val EXTRA_LAYERS = listOf(WAYS, WAYS + SHOWN + CASING, WAYS + SHOWN, WAY_NUMBERS, AVOIDED, AVOIDED + "-text")
+
+    private fun addExtraLayers(style: Style) {
         // Over the plan: the others thinner, the one looked at bold, with an edge, on top.
         PlaceLayers.addBelow(
             style,

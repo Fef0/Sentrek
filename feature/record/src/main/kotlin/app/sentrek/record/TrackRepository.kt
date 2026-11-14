@@ -428,6 +428,8 @@ class TrackRepository @Inject constructor(
                         descent = stats.descent,
                         millis = HikingTime.millis(stats.distance, stats.ascent, stats.descent),
                         hasElevation = hasElevation,
+                        startEle = piece.first().position.ele,
+                        endEle = piece.last().position.ele,
                     )
                 }
             }.onFailure { Log.w(TAG, "Cannot cut ${track.id} into sections", it) }.getOrDefault(emptyList())
@@ -665,7 +667,7 @@ class TrackRepository @Inject constructor(
         private const val PLAN = ".plan"
 
         /** GPX `<type>` of the waypoints that mark where a section ends. */
-        const val SECTION_TYPE = "Sentrek section end"
+        const val SECTION_TYPE = Sections.WAYPOINT_TYPE
         private const val CREATOR = "Sentrek"
 
         /** "<name>.gpx" (or [extension]), without characters that file systems reject (dates contain some). */

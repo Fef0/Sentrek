@@ -108,10 +108,16 @@ data class SectionTotals(
     val descent: Double,
     val millis: Long,
     val hasElevation: Boolean,
+    /** Height where the section starts and ends; null where the terrain isn't known. */
+    val startEle: Double? = null,
+    val endEle: Double? = null,
 )
 
 /** A route cut into sections at the points that end one. */
 object Sections {
+    /** The type of the waypoints a saved route has at its section ends (GPX "type"). */
+    const val WAYPOINT_TYPE = "Sentrek section end"
+
     /**
      * The indices of the points ending a section, in order. The start can't end one, and the
      * end of the route ends the last section anyway: a mark there (put while planning, before

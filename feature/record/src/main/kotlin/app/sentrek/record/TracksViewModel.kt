@@ -63,6 +63,8 @@ class TracksViewModel @Inject constructor(
 
     suspend fun profile(track: SavedTrack) = repository.profile(track)
 
+    suspend fun sections(track: SavedTrack) = repository.sections(track)
+
     /** Starts following [track]; [onStarted] gets the route's bounds to show it. */
     fun follow(track: SavedTrack, onStarted: (BoundingBox?) -> Unit) {
         viewModelScope.launch {

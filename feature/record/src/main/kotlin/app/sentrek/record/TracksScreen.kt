@@ -59,6 +59,9 @@ import app.sentrek.geo.track.PersonalPace
 import app.sentrek.ui.Confirmation
 import app.sentrek.ui.ConfirmDialog
 import app.sentrek.ui.ElevationProfile
+import app.sentrek.ui.SectionList
+import app.sentrek.ui.sectionFlags
+import app.sentrek.geo.plan.SectionTotals
 import app.sentrek.ui.Format
 import app.sentrek.ui.TouchTarget
 import app.sentrek.ui.MapButton
@@ -254,6 +257,7 @@ fun TracksScreen(
                         onRename = { renaming = track },
                         onColor = { coloring = track },
                         loadProfile = viewModel::profile,
+                        loadSections = viewModel::sections,
                         notesExpanded = notesExpanded,
                         onExpandNotes = viewModel::setNotesExpanded,
                     )
@@ -412,11 +416,14 @@ private fun TrackCard(
     /** Null when it can't be a walk (no times). */
     onCountAsWalk: (() -> Unit)?,
     loadProfile: suspend (SavedTrack) -> List<Pair<Double, Double>>,
+    /** Each section's totals, for a route cut into sections in the planner. */
+    loadSections: suspend (SavedTrack) -> List<SectionTotals>,
     notesExpanded: Boolean,
     onExpandNotes: (Boolean) -> Unit,
 ) {
     // Keyed on the climb too: it changes when heights are added to an imported track.
     val profile by produceState(emptyList<Pair<Double, Double>>(), track.id, track.ascent) { value = loadProfile(track) }
+    val sections by produceState(emptyList<SectionTotals>(), track) { value = loadSections(track) }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
@@ -455,7 +462,8 @@ private fun TrackCard(
             if (details.isNotEmpty()) {
                 Text(details.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            ElevationProfile(profile, Modifier.fillMaxWidth().height(56.dp))
+            ElevationProfile(profile, Modifier.fillMaxWidth().height(56.dp), flags = sectionFlags(sections, profile))
+            if (sections.isNotEmpty()) SectionList(sections)
             TrackNote(track.note, track.photos, notesExpanded, onExpandNotes, photoSize = TouchTarget * 1.2f)
             val buttonModifier = Modifier.weight(1f).heightIn(min = TouchTarget)
             val padding = PaddingValues(horizontal = 4.dp)

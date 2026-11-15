@@ -376,6 +376,9 @@ class HomeViewModel @Inject constructor(
     val showScaleBar: StateFlow<Boolean> =
         settings.showScaleBar.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
+    val showHudCompass: StateFlow<Boolean> =
+        settings.showHudCompass.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
     val rotationLocked: StateFlow<Boolean> =
         settings.rotationLocked.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 

@@ -88,6 +88,7 @@ You can also set a turnaround alarm.
 - A red SOS button on the map opens a screen with your position in big text (coordinates, UTM and Plus Code), with buttons to call for help and to send your position by SMS to your emergency contact. It asks first, then sends the text itself.
 - It can send your position by SMS to someone every 30 or 60 minutes while you record. SMS works without mobile data.
 - "Peaks around" tells you the names of the mountains you can see.
+- When your position is on the map, a compass strip at the top shows where the phone points and the peaks in sight, huts and water that way, with the name and distance of the one nearest straight ahead. It can be turned off in Settings › Map.
 
 ### Search
 - One search box for your places and tracks, and the towns, peaks, lakes, huts, springs, paths, marked routes (by name or number) and via ferratas of the downloaded areas. It works offline.

@@ -341,6 +341,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setShowScaleBar(show) }
     }
 
+    val showHudCompass: StateFlow<Boolean> =
+        settings.showHudCompass.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setShowHudCompass(show: Boolean) {
+        viewModelScope.launch { settings.setShowHudCompass(show) }
+    }
+
 
     val autoPower: StateFlow<AutoPower> =
         settings.autoPower.stateIn(viewModelScope, SharingStarted.Eagerly, AutoPower())
@@ -552,6 +559,7 @@ private fun MapSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val stamina = viewModel.powerMode.collectAsStateWithLifecycle().value == PowerMode.Stamina
     val showTrailDifficulty by viewModel.showTrailDifficulty.collectAsStateWithLifecycle()
     val showScaleBar by viewModel.showScaleBar.collectAsStateWithLifecycle()
+    val showHudCompass by viewModel.showHudCompass.collectAsStateWithLifecycle()
     val rotationLocked by viewModel.rotationLocked.collectAsStateWithLifecycle()
     // What the power modes override is greyed out: it waits until they're off.
     val saving = rememberSaving(viewModel)
@@ -602,6 +610,12 @@ private fun MapSettings(viewModel: SettingsViewModel, onBack: () -> Unit) {
             hint = stringResource(R.string.settings_scale_bar_hint),
             checked = showScaleBar,
             onChange = viewModel::setShowScaleBar,
+        )
+        ToggleRow(
+            title = stringResource(R.string.settings_hud_compass),
+            hint = stringResource(R.string.settings_hud_compass_hint),
+            checked = showHudCompass,
+            onChange = viewModel::setShowHudCompass,
         )
         ToggleRow(
             title = stringResource(R.string.settings_lock_north),

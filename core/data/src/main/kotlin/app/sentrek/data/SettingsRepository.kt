@@ -493,6 +493,13 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         context.settings.edit { it[SHOW_SCALE_BAR] = show }
     }
 
+    val showHudCompass: Flow<Boolean> =
+        prefs { it[SHOW_HUD_COMPASS] ?: true }
+
+    suspend fun setShowHudCompass(show: Boolean) {
+        context.settings.edit { it[SHOW_HUD_COMPASS] = show }
+    }
+
     /** Contour lines on the map, drawn from the terrain data. */
     val showContours: Flow<Boolean> =
         prefs { it[SHOW_CONTOURS] ?: false }
@@ -690,6 +697,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val AUTO_HIDE_CONTROLS = booleanPreferencesKey("auto_hide_controls")
         val CONFIRM_EXIT = booleanPreferencesKey("confirm_exit")
         val SHOW_SCALE_BAR = booleanPreferencesKey("show_scale_bar")
+        val SHOW_HUD_COMPASS = booleanPreferencesKey("show_hud_compass")
         val SHOW_LOCK_BUTTON = booleanPreferencesKey("show_lock_button")
         val SHOW_CONTOURS = booleanPreferencesKey("show_contours")
         val SHOW_SLOPES = booleanPreferencesKey("show_slopes")

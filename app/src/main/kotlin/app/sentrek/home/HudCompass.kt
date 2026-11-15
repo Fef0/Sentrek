@@ -2,7 +2,8 @@ package app.sentrek.home
 
 import android.location.Location
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -158,11 +159,12 @@ fun HudCompass(
         position?.let(viewModel::near)
     }
 
-    // The compass moves in steps (see SteadyCompass); the strip slides between them.
+    // The compass moves in steps (see SteadyCompass); the strip slides between them, a new
+    // step picking up from where the last one was going.
     val shown = remember { Animatable(heading) }
     LaunchedEffect(heading) {
         val turn = ((heading - shown.value) % 360 + 540) % 360 - 180
-        shown.animateTo(shown.value + turn, tween(TURN_MS))
+        shown.animateTo(shown.value + turn, spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium))
     }
 
     val colors = MaterialTheme.colorScheme
@@ -277,8 +279,6 @@ private val HUD_KINDS = listOf(PoiKind.Peak, PoiKind.AlpineHut, PoiKind.Wilderne
 private const val FIELD_DEG = 90f
 private const val TICK_DEG = 5
 private const val FADE_DEG = 10f
-
-private const val TURN_MS = 250
 
 /** Slower than this (m/s), the GPS course is noise. */
 private const val MIN_COURSE_SPEED = 0.5f

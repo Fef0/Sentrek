@@ -8,11 +8,15 @@ import kotlin.math.abs
 /**
  * MapLibre's compass, passed on only when the heading really changes: the sensor reports ten
  * times a second, and every report turns the arrow and redraws the whole map, even with the
- * phone lying still. A few degrees of jitter now cost nothing.
+ * phone lying still. In Normal mode small turns pass, so the arrow and the compass strip keep
+ * up with the hand; battery saver and stamina wait for a bigger turn.
  */
 internal class SteadyCompass(private val source: CompassEngine) : CompassEngine, CompassListener {
     /** The fewest milliseconds between two turns of the arrow (longer in battery saver). */
     var minIntervalMs: Long = NORMAL_INTERVAL_MS
+
+    /** The smallest turn passed on (bigger in battery saver). */
+    var minTurnDegrees: Float = NORMAL_TURN_DEGREES
 
     private val listeners = mutableListOf<CompassListener>()
     private var heading = source.lastHeading
@@ -46,7 +50,7 @@ internal class SteadyCompass(private val source: CompassEngine) : CompassEngine,
     override fun onCompassChanged(userHeading: Float) {
         val now = SystemClock.elapsedRealtime()
         val turn = abs(((userHeading - heading) % 360 + 540) % 360 - 180)
-        if (!fresh && (turn < MIN_TURN_DEGREES || now - sentAt < minIntervalMs)) return
+        if (!fresh && (turn < minTurnDegrees || now - sentAt < minIntervalMs)) return
         fresh = false
         known = true
         heading = userHeading
@@ -60,9 +64,13 @@ internal class SteadyCompass(private val source: CompassEngine) : CompassEngine,
 
     companion object {
         /** Less than this is sensor noise, or a hand that isn't quite still. */
-        private const val MIN_TURN_DEGREES = 8f
+        const val NORMAL_TURN_DEGREES = 2f
 
-        const val NORMAL_INTERVAL_MS = 200L
+        /** Battery saver and stamina: only clear turns. */
+        const val SAVER_TURN_DEGREES = 8f
+
+        /** About 15 times a second. */
+        const val NORMAL_INTERVAL_MS = 66L
         const val SAVER_INTERVAL_MS = 1_000L
     }
 }

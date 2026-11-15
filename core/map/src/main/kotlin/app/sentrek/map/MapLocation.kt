@@ -63,6 +63,7 @@ object MapLocation {
         val compass = component.compassEngine as? SteadyCompass
             ?: component.compassEngine?.let(::SteadyCompass)?.also { component.compassEngine = it }
         compass?.minIntervalMs = if (power == Power.Normal) SteadyCompass.NORMAL_INTERVAL_MS else SteadyCompass.SAVER_INTERVAL_MS
+        compass?.minTurnDegrees = if (power == Power.Normal) SteadyCompass.NORMAL_TURN_DEGREES else SteadyCompass.SAVER_TURN_DEGREES
         component.isLocationComponentEnabled = true
         component.renderMode = if (power == Power.Minimal) RenderMode.NORMAL else RenderMode.COMPASS
         this.power = power

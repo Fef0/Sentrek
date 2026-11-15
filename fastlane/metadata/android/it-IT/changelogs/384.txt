@@ -1,0 +1,3 @@
+• Bussola in alto sulla mappa: dove punta il telefono, con le cime visibili, i rifugi e l'acqua da quella parte. Si può spegnere in Impostazioni › Mappa
+• Dopo un aggiornamento, Sentrek mostra una volta le novità, nella lingua dell'app
+• Copia la mia posizione nella schermata SOS conferma sul pulsante

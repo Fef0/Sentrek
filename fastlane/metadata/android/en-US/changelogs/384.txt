@@ -1,0 +1,3 @@
+• Compass strip at the top of the map: where the phone points, with the peaks in sight, huts and water that way. It can be turned off in Settings › Map
+• After an update, Sentrek shows once what's new, in the app's language
+• Copy my position on the SOS screen confirms on the button

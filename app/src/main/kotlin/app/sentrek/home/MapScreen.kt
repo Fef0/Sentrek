@@ -301,6 +301,7 @@ fun MapScreen(
     val controlsAlpha by animateFloatAsState(if (controlsHidden) 0f else 1f, label = "controls")
     val autoHideSetting by viewModel.autoHideControls.collectAsStateWithLifecycle()
     val showScaleBar by viewModel.showScaleBar.collectAsStateWithLifecycle()
+    val showHudCompass by viewModel.showHudCompass.collectAsStateWithLifecycle()
     val showZoomButtons by viewModel.showZoomButtons.collectAsStateWithLifecycle()
     val slopeTerrain by viewModel.slopeTerrain.collectAsStateWithLifecycle()
     val powerMode by viewModel.powerMode.collectAsStateWithLifecycle()
@@ -330,6 +331,8 @@ fun MapScreen(
     val sunny by viewModel.sunny.collectAsStateWithLifecycle()
     // The phone's compass while pointing the way: the arrow then points the real way.
     var heading by remember { mutableStateOf<Float?>(null) }
+    // The compass strip, whenever the user's position is on the map (not while planning).
+    val hudOn by remember { derivedStateOf { showHudCompass && hasLocation && lastFix.value != null && !plan.active } }
     val showLockButton by viewModel.showLockButton.collectAsStateWithLifecycle()
     val sosEnabled by viewModel.sosEnabled.collectAsStateWithLifecycle()
     var libraryOpen by rememberSaveable { mutableStateOf(false) }
@@ -557,6 +560,7 @@ fun MapScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 val planRouting by planner.routingLegs.collectAsStateWithLifecycle()
+                if (hudOn) HudCompass(heading, lastFix, goTo, Modifier.fillMaxWidth())
                 val choices = plan.choices
                 if (plan.active && choices != null) {
                     WayChoicePanel(choices, planner::showWay, planner::chooseWay, planner::dismissChoices, Modifier.fillMaxWidth())
@@ -1318,9 +1322,9 @@ fun MapScreen(
         )
     }
 
-    DisposableEffect(map, goTo != null, visible, hasLocation) {
+    DisposableEffect(map, goTo != null || hudOn, visible, hasLocation) {
         val m = map
-        if (m == null || goTo == null || !visible) return@DisposableEffect onDispose { heading = null }
+        if (m == null || (goTo == null && !hudOn) || !visible) return@DisposableEffect onDispose { heading = null }
         val stop = MapLocation.observeHeading(m) { heading = it }
         onDispose {
             stop()

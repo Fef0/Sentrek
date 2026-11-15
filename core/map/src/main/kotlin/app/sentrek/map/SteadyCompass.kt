@@ -18,9 +18,19 @@ internal class SteadyCompass(private val source: CompassEngine) : CompassEngine,
     private var heading = source.lastHeading
     private var sentAt = 0L
 
+    /** A listener just added gets the next reading whatever it is: it has none yet. */
+    private var fresh = false
+
+    /** Whether [heading] came from the sensor, not just the starting value. */
+    private var known = false
+
     override fun addCompassListener(listener: CompassListener) {
         if (listeners.isEmpty()) source.addCompassListener(this)
         listeners += listener
+        // The sensor may report only when it changes: a phone lying still would leave the new
+        // listener without a heading. It gets the last one now, and the next reading anyway.
+        if (known) listener.onCompassChanged(heading)
+        fresh = true
     }
 
     override fun removeCompassListener(listener: CompassListener) {
@@ -36,7 +46,9 @@ internal class SteadyCompass(private val source: CompassEngine) : CompassEngine,
     override fun onCompassChanged(userHeading: Float) {
         val now = SystemClock.elapsedRealtime()
         val turn = abs(((userHeading - heading) % 360 + 540) % 360 - 180)
-        if (turn < MIN_TURN_DEGREES || now - sentAt < minIntervalMs) return
+        if (!fresh && (turn < MIN_TURN_DEGREES || now - sentAt < minIntervalMs)) return
+        fresh = false
+        known = true
         heading = userHeading
         sentAt = now
         listeners.toList().forEach { it.onCompassChanged(userHeading) }

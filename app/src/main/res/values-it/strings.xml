@@ -651,4 +651,6 @@
     <string name="grid_lat_lon">Lat/long</string>
     <string name="whats_new_title">Novità di Sentrek %1$s</string>
     <string name="whats_new_ok">OK</string>
+    <string name="settings_hud_compass">Bussola in alto</string>
+    <string name="settings_hud_compass_hint">Quando la tua posizione è sulla mappa: una striscia in alto con la direzione in cui punta il telefono e le cime, i rifugi e l’acqua da quella parte.</string>
 </resources>

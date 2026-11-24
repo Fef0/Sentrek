@@ -1,8 +1,6 @@
 package app.sentrek.home
 
 import android.location.Location
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -13,6 +11,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -55,11 +58,13 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -158,11 +163,24 @@ fun HudCompass(
         position?.let(viewModel::near)
     }
 
-    // The compass moves in steps (see SteadyCompass); the strip slides between them.
-    val shown = remember { Animatable(heading) }
-    LaunchedEffect(heading) {
-        val turn = ((heading - shown.value) % 360 + 540) % 360 - 180
-        shown.animateTo(shown.value + turn, tween(TURN_MS))
+    // Each screen frame the strip moves part of the way to the latest heading, and stops once
+    // there. Restarting an animation for each reading didn't work: thirty a second, each one
+    // was cancelled before it had moved.
+    var shown by remember { mutableFloatStateOf(heading) }
+    val target by rememberUpdatedState(heading)
+    LaunchedEffect(Unit) {
+        while (true) {
+            snapshotFlow { angleTo(target, shown) }.first { abs(it) > SETTLED_DEG }
+            var last = 0L
+            while (abs(angleTo(target, shown)) > SETTLED_DEG) {
+                withFrameNanos { now ->
+                    val ms = if (last == 0L) FRAME_MS else (now - last) / 1_000_000f
+                    last = now
+                    val share = 1 - exp(-ms / EASE_MS)
+                    shown = (shown + angleTo(target, shown) * share + 360) % 360
+                }
+            }
+        }
     }
 
     val colors = MaterialTheme.colorScheme
@@ -174,19 +192,18 @@ fun HudCompass(
     val goToIcon = painterResource(app.sentrek.core.map.R.drawable.poi_star)
     val names = HUD_KINDS.associateWith { stringResource(routePlaceLabel(RoutePlace.Kind.Osm(it))) }
 
-    data class Seen(val name: String, val icon: Painter?, val tint: Color, val off: Float, val distance: Double, val rank: Int)
-    val seen = if (position == null) emptyList() else buildList {
-        val centre = shown.value
-        fun add(name: String, icon: Painter?, tint: Color, at: LatLon, rank: Int) {
-            val off = ((Geo.bearing(position, at).toFloat() - centre) % 360 + 540) % 360 - 180
-            if (abs(off) <= FIELD_DEG / 2) add(Seen(name, icon, tint, off, Geo.distance(position, at), rank))
-        }
+    data class Seen(val name: String, val icon: Painter?, val tint: Color, val azimuth: Float, val distance: Double, val rank: Int)
+    // All the places around, wherever the phone points: which of them fit on the strip is
+    // decided from where they lie, so turning only slides them, none comes or goes.
+    val around = if (position == null) emptyList() else buildList {
+        fun add(name: String, icon: Painter?, tint: Color, at: LatLon, rank: Int) =
+            add(Seen(name, icon, tint, Geo.bearing(position, at).toFloat(), Geo.distance(position, at), rank))
         goTo?.let { add(it.name, goToIcon, Color(GoToLayer.COLOR), it.position, 0) }
         for (mark in marks) {
             val icon = icons[mark.kind]
             add(mark.name ?: names.getValue(mark.kind), icon?.first, icon?.second ?: colors.primary, mark.position, 1 + HUD_KINDS.indexOf(mark.kind))
         }
-    }
+    }.sortedWith(compareBy({ it.rank }, { it.distance }))
 
     Surface(
         modifier = modifier,
@@ -198,7 +215,7 @@ fun HudCompass(
             val pxPerDeg = size.width / FIELD_DEG
             val mid = size.width / 2
             fun x(off: Float) = mid + off * pxPerDeg
-            val centre = shown.value
+            val centre = shown
             val first = Math.floorDiv((centre - FIELD_DEG / 2).toInt(), TICK_DEG) * TICK_DEG
             val tickTop = 9.dp.toPx()
             var deg = first
@@ -228,18 +245,18 @@ fun HudCompass(
             }
             drawPath(caret, colors.primary)
 
-            // The places that way. The one nearest straight ahead first, ringed, with its name
-            // below; then the most important where they would overlap.
+            // The places that way. Where two would overlap, the more important (then the nearer)
+            // stays. The one nearest straight ahead is ringed, with its name below.
             val iconSize = 20.dp.toPx()
             val iconTop = 32.dp.toPx()
-            val ahead = seen.minWithOrNull(compareBy({ abs(it.off) }, { it.rank }))
-            val taken = mutableListOf<ClosedFloatingPointRange<Float>>()
-            for (s in listOfNotNull(ahead) + seen.filter { it !== ahead }.sortedWith(compareBy({ it.rank }, { it.distance }))) {
-                val px = x(s.off)
-                val span = (px - iconSize * 0.6f)..(px + iconSize * 0.6f)
-                if (taken.any { it.start < span.endInclusive && span.start < it.endInclusive }) continue
-                taken += span
-                val alpha = fade(s.off)
+            val gap = iconSize * 1.2f / pxPerDeg
+            val kept = mutableListOf<Seen>()
+            for (s in around) if (kept.none { angle(it.azimuth, s.azimuth) < gap }) kept += s
+            val offs = kept.map { it to angleTo(it.azimuth, centre) }.filter { abs(it.second) <= FIELD_DEG / 2 }
+            val ahead = offs.minByOrNull { abs(it.second) }?.first
+            for ((s, off) in offs) {
+                val px = x(off)
+                val alpha = fade(off)
                 val centreY = iconTop + iconSize / 2
                 val radius = iconSize / 2 + 1.dp.toPx()
                 drawCircle(Color.White, radius, Offset(px, centreY), alpha = alpha)
@@ -260,12 +277,18 @@ fun HudCompass(
                     overflow = TextOverflow.Ellipsis,
                     constraints = Constraints(maxWidth = (size.width - 16.dp.toPx()).toInt()),
                 )
-                val left = (x(s.off) - text.size.width / 2).coerceIn(8.dp.toPx(), size.width - 8.dp.toPx() - text.size.width)
+                val left = (x(angleTo(s.azimuth, centre)) - text.size.width / 2).coerceIn(8.dp.toPx(), size.width - 8.dp.toPx() - text.size.width)
                 drawText(text, topLeft = Offset(left, iconTop + iconSize + 6.dp.toPx()))
             }
         }
     }
 }
+
+/** From [from] to [to], -180..180 degrees. */
+private fun angleTo(to: Float, from: Float): Float = ((to - from) % 360 + 540) % 360 - 180
+
+/** The angle between two directions, 0..180 degrees. */
+private fun angle(a: Float, b: Float): Float = abs(angleTo(a, b))
 
 /** Full in the middle, fading out over the last degrees at each end, so nothing is cut in half. */
 private fun fade(off: Float): Float = ((FIELD_DEG / 2 - abs(off)) / FADE_DEG).coerceIn(0f, 1f)
@@ -278,7 +301,12 @@ private const val FIELD_DEG = 90f
 private const val TICK_DEG = 5
 private const val FADE_DEG = 10f
 
-private const val TURN_MS = 250
+/** How quickly the strip catches up with the compass: about two thirds of the way in this time. */
+private const val EASE_MS = 60f
+private const val FRAME_MS = 16f
+
+/** Closer than this, the strip is where the compass points. */
+private const val SETTLED_DEG = 0.05f
 
 /** Slower than this (m/s), the GPS course is noise. */
 private const val MIN_COURSE_SPEED = 0.5f

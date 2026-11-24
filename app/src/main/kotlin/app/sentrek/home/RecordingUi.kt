@@ -94,7 +94,7 @@ fun BreadcrumbLine(modifier: Modifier = Modifier) {
 }
 
 /**
- * Red while the position goes out by SMS, grey without signal. Still, to spare the battery:
+ * Red while the position goes out by SMS, grey without signal or in airplane mode. Still, to spare the battery:
  * it only pulses for a moment when a text has just gone.
  */
 @Composable
@@ -108,7 +108,7 @@ private fun TrackedDot(status: Breadcrumbs.Status) {
             alpha.animateTo(1f, tween(PULSE_MS))
         }
     }
-    val color = if (status.noSignal) MaterialTheme.colorScheme.onSurfaceVariant else RecordRed
+    val color = if (status.noSignal || status.airplane) MaterialTheme.colorScheme.onSurfaceVariant else RecordRed
     Box(
         Modifier
             .size(8.dp)

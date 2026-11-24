@@ -23,14 +23,14 @@ object MapLocation {
     /** Zoom used when starting to follow from far out. */
     private const val FOLLOW_ZOOM = 15.0
     private const val TRANSITION_MS = 750L
-    private const val MAX_ANIMATION_FPS = 20
+    private const val MAX_ANIMATION_FPS = 60
     private const val SAVER_ANIMATION_FPS = 10
 
     /**
-     * While the camera follows the walk, each step moves the whole map: a few frames per step
-     * are enough at walking speed.
+     * While the camera follows the walk, each step moves the whole map: fewer frames than when
+     * browsing, still enough for the arrow to turn smoothly with the hand.
      */
-    private const val FOLLOW_ANIMATION_FPS = 10
+    private const val FOLLOW_ANIMATION_FPS = 30
     private const val SAVER_FOLLOW_ANIMATION_FPS = 5
 
     /** The dot slides to each new fix in a couple of steps instead of gliding. */
@@ -55,14 +55,17 @@ object MapLocation {
                     // that change nothing are skipped (see update).
                     // The accuracy circle jumps to its new size: animating it redraws the map for nothing.
                     .locationComponentOptions(
-                        LocationComponentOptions.builder(context).enableStaleState(false).accuracyAnimationEnabled(false).build(),
+                        LocationComponentOptions.builder(context).enableStaleState(false).accuracyAnimationEnabled(false)
+                            // Over everything on the map (see MapOrder).
+                            .layerAbove(MapOrder.SIGNAL)
+                            .build(),
                     )
                     .build(),
             )
         }
-        val compass = component.compassEngine as? SteadyCompass
-            ?: component.compassEngine?.let(::SteadyCompass)?.also { component.compassEngine = it }
-        compass?.minIntervalMs = if (power == Power.Normal) SteadyCompass.NORMAL_INTERVAL_MS else SteadyCompass.SAVER_INTERVAL_MS
+        val compass = component.compassEngine as? SentrekCompass
+            ?: SentrekCompass(context.applicationContext).also { component.compassEngine = it }
+        compass.saving = power != Power.Normal
         component.isLocationComponentEnabled = true
         component.renderMode = if (power == Power.Minimal) RenderMode.NORMAL else RenderMode.COMPASS
         this.power = power

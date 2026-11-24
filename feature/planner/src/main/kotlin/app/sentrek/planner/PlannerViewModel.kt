@@ -191,6 +191,23 @@ class PlannerViewModel @Inject constructor(
         .mapLatest { (legs, points) -> if (legs.isEmpty()) null else stats(join(legs)).copy(sections = sections(points, legs)) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    /** The name of the route that was being edited when it was deleted: the plan's name still. */
+    private var deletedName: String? = null
+
+    init {
+        // The route being edited deleted (from the routes list, say): the plan stays, as a new
+        // route. Saving it then makes one, instead of writing over a file that's gone.
+        viewModelScope.launch {
+            tracks.tracks.collect { all ->
+                val editing = _state.value.editing ?: return@collect
+                if (all.none { it.id == editing.id }) {
+                    deletedName = editing.name
+                    _state.value = _state.value.copy(editing = null)
+                }
+            }
+        }
+    }
+
     fun start() {
         if (blockedBy.value != null) return
         _state.value = _state.value.copy(active = true)
@@ -204,6 +221,7 @@ class PlannerViewModel @Inject constructor(
     }
 
     fun discard() {
+        deletedName = null
         editor.reset(emptyList())
         routes.clear()
         _state.value = _state.value.copy(editing = null, options = RouteOptions(), optionsChanged = false, choices = null)
@@ -232,6 +250,7 @@ class PlannerViewModel @Inject constructor(
             }
             edits.withLock {
                 editor.reset(plan.points)
+                deletedName = null
                 _state.value = _state.value.copy(active = true, editing = track, followTrails = true, options = plan.options, optionsChanged = false)
                 publish(selected = null)
             }
@@ -428,6 +447,16 @@ class PlannerViewModel @Inject constructor(
         return elevation.withElevation(graph.nodes).map { it.ele ?: Double.NaN }.toDoubleArray()
     }
 
+    /**
+     * "Take me there": the shortest way along the paths from [from] to [to], via ferratas
+     * included, with its totals; null when the paths don't join up, or none are known there.
+     * The plan isn't touched.
+     */
+    suspend fun wayTo(from: LatLon, to: LatLon): PlanStats? {
+        val leg = route(from, to, RouteOptions(profile = RouteOptions.Profile.Shortest)) ?: return null
+        return stats(leg.points)
+    }
+
     /** The leg from [a] to [b] as it is known now, for drawing while a point is dragged. */
     fun knownLeg(a: LatLon, b: LatLon, onTrails: Boolean): PlanLeg = knownLeg(PlanPoint(a, false), PlanPoint(b, onTrails))
 
@@ -454,7 +483,7 @@ class PlannerViewModel @Inject constructor(
 
     /** The name the save dialog starts with: the edited route's, or today's date. */
     fun defaultName(): String =
-        editedTrack()?.name ?: DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date())
+        editedTrack()?.name ?: deletedName ?: DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date())
 
     /** The route being edited as it is saved now (its note may have changed since it was opened). */
     fun editedTrack(): SavedTrack? = _state.value.editing?.let { tracks.find(it.id) ?: it }
@@ -496,9 +525,8 @@ class PlannerViewModel @Inject constructor(
      * The way along the paths from [a] to [b]. An end off the paths (dropped where there is
      * none) joins the nearest one within [CONNECT_M] in a straight line.
      */
-    private suspend fun route(a: LatLon, b: LatLon): PlanLeg? {
+    private suspend fun route(a: LatLon, b: LatLon, options: RouteOptions = _state.value.options): PlanLeg? {
         val source = trails ?: return null
-        val options = _state.value.options
         for (wide in listOf(false, true)) {
             val graph = graph(source, a, b, wide)
             val heights = heights(graph, options)

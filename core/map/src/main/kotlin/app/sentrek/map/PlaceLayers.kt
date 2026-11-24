@@ -78,7 +78,8 @@ object PlaceLayers {
             return
         }
         style.addSource(GeoJsonSource(LAYER, collection))
-        style.addLayer(
+        MapOrder.addPlace(
+            style,
             SymbolLayer(LAYER, LAYER).withProperties(
                 iconImage(get("i")),
                 iconAnchor(Property.ICON_ANCHOR_BOTTOM),
@@ -95,16 +96,6 @@ object PlaceLayers {
                 textHaloWidth(1.8f),
             ),
         )
-    }
-
-    /** Layers added so far by [addBelow]: a layer that must stay on top can tell when another came. */
-    internal var added = 0
-        private set
-
-    /** Adds [layer] below the places, so they stay on top whatever is added later. */
-    internal fun addBelow(style: Style, layer: Layer) {
-        added++
-        if (style.getLayer(LAYER) != null) style.addLayerBelow(layer, LAYER) else style.addLayer(layer)
     }
 
     private fun imageName(kind: PlaceKind, color: Int) = IMAGE + kind.id + "-" + Integer.toHexString(color)

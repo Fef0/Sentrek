@@ -1,6 +1,7 @@
 package app.sentrek
 
 import android.app.Application
+import app.sentrek.data.AppExit
 import app.sentrek.data.SettingsRepository
 import app.sentrek.map.MapEngine
 import app.sentrek.map.Server
@@ -19,10 +20,18 @@ class SentrekApp : Application() {
     @Inject lateinit var powerAutoSwitch: PowerAutoSwitch
     @Inject lateinit var updater: AppUpdater
 
+    /**
+     * Ready from the start (the services may ask to quit before any screen is up), but built
+     * only when asked: it reaches the map's storage, which needs the map engine set up first.
+     */
+    @Inject lateinit var exit: AppExit
+    @Inject lateinit var quit: dagger.Lazy<Quit>
+
     override fun onCreate() {
         super.onCreate()
         AppLanguage.applyToApp(this)
         MapEngine.init(this, BuildConfig.VERSION_NAME)
+        exit.onQuit = { quit.get().run() }
         // For the whole process: screens and the recording notification alike.
         MainScope().launch { settings.units.collect { Format.units = it } }
         // Read in the background: requests wait for it (ServerRoutes), the first screen doesn't.

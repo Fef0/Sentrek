@@ -2,10 +2,11 @@
 <resources>
     <string name="record_channel">Registrazione traccia</string>
     <!-- SMS to the emergency contact: GSM characters only (à è é ì ò ù are fine), one SMS each. -->
-    <string name="breadcrumb_started">Sentrek: inizio un\'escursione. La mia posizione ogni %1$d min: %2$s</string>
+    <string name="breadcrumb_started">Sentrek: ho iniziato un\'escursione alle %1$s. La mia posizione ogni %2$d min: %3$s</string>
+    <string name="breadcrumb_started_late">Sentrek: ho iniziato un\'escursione alle %1$s. La mia posizione ogni %2$d min. Posizione alle %3$s: %4$s</string>
     <string name="breadcrumb_position">Sentrek: la mia posizione alle %1$s: %2$s</string>
     <string name="breadcrumb_low_battery">Sentrek: batteria al %1$d%%, il telefono potrebbe spegnersi presto. Posizione alle %2$s: %3$s</string>
-    <string name="breadcrumb_finished">Sentrek: escursione finita. Sono a %1$s</string>
+    <string name="breadcrumb_finished">Sentrek: ho finito l\'escursione alle %1$s. Sono a %2$s</string>
     <string name="alerts_channel">Avvisi sul sentiero</string>
     <string name="water_alert_title">Riempi l’acqua qui</string>
     <string name="water_alert_text">È l’ultima sul percorso per %1$s (circa %2$s).</string>
@@ -24,6 +25,9 @@
     <string name="breadcrumb_last">Ultimo invio alle %s</string>
     <string name="breadcrumb_none_yet">Il primo sta partendo</string>
     <string name="breadcrumb_no_signal">Nessun segnale, riprovo</string>
+    <string name="breadcrumb_airplane">Modalità aereo attiva, non invio nulla</string>
+    <string name="breadcrumb_airplane_title">Modalità aereo attiva</string>
+    <string name="breadcrumb_airplane_text">Gli SMS con la tua posizione a %s non possono partire. Disattiva la modalità aereo per inviarli.</string>
     <string name="record_notification_title">Registrazione traccia</string>
     <string name="record_notification_paused">Registrazione in pausa</string>
     <string name="record_notification_text">%1$s · ↑ %2$s</string>

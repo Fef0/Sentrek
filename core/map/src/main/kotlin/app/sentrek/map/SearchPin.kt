@@ -26,7 +26,8 @@ object SearchPin {
             return
         }
         style.addSource(GeoJsonSource(ID, features))
-        style.addLayer(
+        MapOrder.addPlace(
+            style,
             CircleLayer(ID, ID).withProperties(
                 circleRadius(12f),
                 circleColor("#ffffff"),
@@ -34,6 +35,6 @@ object SearchPin {
                 circleStrokeWidth(4f),
             ),
         )
-        style.addLayer(CircleLayer(DOT, ID).withProperties(circleRadius(4f), circleColor(COLOR)))
+        MapOrder.addPlace(style, CircleLayer(DOT, ID).withProperties(circleRadius(4f), circleColor(COLOR)))
     }
 }

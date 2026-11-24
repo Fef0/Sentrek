@@ -60,7 +60,7 @@ object MapExtras {
     private const val BASE_SOURCE = "openmaptiles"
 
     /** Lines go above the trails and below every label, as the hiking overlay's. */
-    private const val BELOW_LABELS = "water-name"
+    private const val BELOW_LABELS = MapOrder.TRAILS
 
     /** Under the base tiles' paths and the hiking overlay, as the hiking routes. */
     private const val BELOW_TRAILS = "hiking-route"

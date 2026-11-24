@@ -6,6 +6,15 @@
     <string name="bar_library">Saved</string>
     <string name="gps_barometer_altitude">%s (barometer)</string>
     <string name="feature_go_to">Take me there</string>
+    <string name="way_finding">Finding the way to %s…</string>
+    <string name="way_to">Way to %s</string>
+    <string name="way_close">Close the way</string>
+    <string name="way_follow">Follow</string>
+    <string name="way_follow_failed">Couldn\'t start following the way. Try again.</string>
+    <string name="way_none">No way along the paths. The paths there may not be downloaded, or they don\'t join up.</string>
+    <string name="way_straight_line">Show the straight line</string>
+    <string name="way_no_gps">No GPS position yet. Try again once the GPS has found you.</string>
+    <string name="search_take_me_there">Take me there along the paths</string>
     <string name="goto_arrived">You’re there</string>
     <string name="goto_waiting">Waiting for GPS…</string>
     <string name="goto_stop">Stop pointing the way</string>
@@ -18,6 +27,7 @@
     <string name="emergency_sms_sending">Sending…</string>
     <string name="emergency_sms_sent">Sent at %s</string>
     <string name="emergency_sms_failed">Not sent. There may be no signal here: try again a little further on, or from the messaging app.</string>
+    <string name="emergency_sms_airplane">Not sent: airplane mode is on. Turn it off and send again.</string>
     <string name="emergency_sms_open">Open in the messaging app</string>
     <string name="emergency_no_permission">Sentrek needs your location to show where you are.</string>
     <string name="emergency_allow">Allow location</string>
@@ -63,6 +73,8 @@
     <string name="gps_copied">Copied</string>
     <string name="gps_copy_hint">Tap to copy</string>
     <string name="exit_press_again">Press back again to exit</string>
+    <string name="exit_press_again_recording">Press back again to exit. The recording stops and is saved.</string>
+    <string name="exit_press_again_following">Press back again to exit. Following the route stops.</string>
     <string name="my_location_details">Show position details</string>
     <string name="my_location_heading">Turn the map with your direction of travel</string>
     <string name="my_location_stop">Stop following your position</string>

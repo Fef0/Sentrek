@@ -117,6 +117,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var settings: SettingsRepository
     @Inject lateinit var tracks: TrackRepository
     @Inject lateinit var updater: AppUpdater
+    @Inject lateinit var quit: Quit
 
     /** True when the volume keys should zoom the map (glove mode, map screen). */
     private var volumeKeysZoom = false
@@ -233,12 +234,27 @@ class MainActivity : ComponentActivity() {
                     }
 
                     val shownCamera = camera ?: return@SentrekTheme
-                    ExitConfirmation(enabled = confirmExit && screen == Screen.Map)
-                    // The peak finder opens from Search: back goes there.
-                    if (screen != Screen.Map) BackHandler(onBack = if (screen == Screen.Peaks) ({ screen = Screen.Search }) else toMap)
                     val pages = rememberSaveableStateHolder()
                     // The map's own, shared: the SOS screen hands it a place to go to.
                     val home: HomeViewModel = hiltViewModel()
+                    val recordingNow by home.recording.collectAsStateWithLifecycle()
+                    val followingNow by home.following.collectAsStateWithLifecycle()
+                    // Back on the map closes the app for good: what it stops is said first.
+                    ExitConfirmation(
+                        enabled = screen == Screen.Map,
+                        confirm = confirmExit,
+                        message = when {
+                            recordingNow != null -> R.string.exit_press_again_recording
+                            followingNow != null -> R.string.exit_press_again_following
+                            else -> R.string.exit_press_again
+                        },
+                        onExit = {
+                            finishAndRemoveTask()
+                            quit.run()
+                        },
+                    )
+                    // The peak finder opens from Search: back goes there.
+                    if (screen != Screen.Map) BackHandler(onBack = if (screen == Screen.Peaks) ({ screen = Screen.Search }) else toMap)
                     Box(Modifier.fillMaxSize()) {
                         // A theme or power mode change rebuilds the map in the right colours and
                         // frame rate. Only the map: a screen open on top (Settings) stays where it was.
@@ -312,6 +328,13 @@ class MainActivity : ComponentActivity() {
                                         focus = around(position)
                                         screen = Screen.Map
                                     },
+                                    onTakeMeThere = { name, position ->
+                                        home.searchPin.value = null
+                                        // The planner steps aside: one line to look at.
+                                        planner.close()
+                                        home.wayThereAsked.value = GoTo(name, position)
+                                        screen = Screen.Map
+                                    },
                                 )
                                 Screen.Peaks -> PeaksScreen(onBack = { screen = Screen.Search })
                                 Screen.Emergency -> EmergencyScreen(
@@ -338,8 +361,6 @@ class MainActivity : ComponentActivity() {
                         // A new version: asked once per opening, on the map, never mid-hike (installing closes the app).
                         val update by updater.newVersion.collectAsStateWithLifecycle()
                         val updateCheck by updater.check.collectAsStateWithLifecycle()
-                        val recordingNow by home.recording.collectAsStateWithLifecycle()
-                        val followingNow by home.following.collectAsStateWithLifecycle()
                         var updateLater by rememberSaveable { mutableStateOf<String?>(null) }
                         val newVersion = update
                         if (newVersion != null && newVersion.version != updateLater && guideSeen && screen == Screen.Map && whatsNew == null &&

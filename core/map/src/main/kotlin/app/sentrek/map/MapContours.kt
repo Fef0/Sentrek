@@ -64,7 +64,7 @@ object MapContours {
     /** Above the relief and the steep slopes ([MapSlopes]), below water, roads and trails (hiking.json). */
     private const val ABOVE_LAYER = "hillshade"
     private const val BELOW_LAYER = "water"
-    private const val BELOW_LABELS = "water-name"
+    private const val BELOW_LABELS = MapOrder.TRAILS
 
     /** The hillshade of the base style; hidden, the night map is almost all black pixels. */
     fun showRelief(style: Style, show: Boolean) {

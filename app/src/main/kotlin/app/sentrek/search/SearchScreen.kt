@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.IconButton
@@ -90,6 +91,8 @@ fun SearchScreen(
     onPeaks: () -> Unit,
     /** A position typed or pasted: the map shows it, marked. */
     onShowPosition: (LatLon) -> Unit,
+    /** "Take me there": the way along the paths to a result, on the map. */
+    onTakeMeThere: (name: String, position: LatLon) -> Unit,
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
     val query by viewModel.query.collectAsStateWithLifecycle()
@@ -177,6 +180,7 @@ fun SearchScreen(
                     name = coordinates,
                     details = listOfNotNull(stringResource(R.string.search_position_go), away(near, position)).joinToString(" · "),
                     onClick = { onShowPosition(position) },
+                    onTakeMeThere = { onTakeMeThere(coordinates, position) },
                 )
             }
             section(R.string.search_places, results.places, key = { "p" + it.id }) { place ->
@@ -186,6 +190,7 @@ fun SearchScreen(
                     details = listOfNotNull(placeKindLabel(place.kind), away(near, place.position), place.note.takeIf { it.isNotEmpty() })
                         .joinToString(" · "),
                     onClick = { onShowOnMap(around(place.position)) },
+                    onTakeMeThere = { onTakeMeThere(place.name, place.position) },
                 )
             }
             section(R.string.search_tracks, results.tracks, key = { "t" + it.id }) { track ->
@@ -230,6 +235,7 @@ fun SearchScreen(
                             details = listOfNotNull(kindLabel(kind), hit.position.ele?.let(Format::elevation), away(near, hit.position))
                                 .joinToString(" · "),
                             onClick = { onShowOnMap(around(hit.position)) },
+                            onTakeMeThere = { onTakeMeThere(hit.name, hit.position) },
                         )
                     }
                     is MapHit.Named -> ResultRow(
@@ -249,6 +255,7 @@ fun SearchScreen(
                             away(near, hit.position),
                         ).joinToString(" · "),
                         onClick = { onShowOnMap(around(hit.position)) },
+                        onTakeMeThere = { onTakeMeThere(hit.name, hit.position) },
                     )
                 }
             }
@@ -271,7 +278,14 @@ private fun <T> LazyListScope.section(title: Int, items: List<T>, key: (T) -> St
 }
 
 @Composable
-private fun ResultRow(badge: @Composable () -> Unit, name: String, details: String, onClick: () -> Unit) {
+private fun ResultRow(
+    badge: @Composable () -> Unit,
+    name: String,
+    details: String,
+    onClick: () -> Unit,
+    /** A place to walk to: a button for the way there, apart from the row's own tap. */
+    onTakeMeThere: (() -> Unit)? = null,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -286,6 +300,11 @@ private fun ResultRow(badge: @Composable () -> Unit, name: String, details: Stri
             Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (details.isNotEmpty()) {
                 Text(details, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        if (onTakeMeThere != null) {
+            FilledTonalIconButton(onClick = onTakeMeThere, modifier = Modifier.size(TouchTarget)) {
+                Icon(SentrekIcons.Hiking, stringResource(R.string.search_take_me_there))
             }
         }
     }

@@ -128,7 +128,7 @@ object MapOverlays {
     private val loadedAt = WeakHashMap<Style, MutableMap<String, Long>>()
 
     /** First label layer of the hiking style. */
-    private const val BELOW_LAYER = "water-name"
+    private const val BELOW_LAYER = MapOrder.TRAILS
 
     internal fun isPointLayer(id: String) = id.startsWith(TRAILS) && id.contains(POINTS)
 
@@ -199,7 +199,7 @@ object MapOverlays {
             // One layer per zoom tier (filters can't use zoom). Symbols collide with base labels
             // whatever their order, so these can sit on top.
             for ((minZoom, kinds) in PoiKind.entries.filter { it.onMap }.groupBy { it.minZoom }) {
-                PlaceLayers.addBelow(style, pointLayer(sourceId, sourceId + POINTS + minZoom, minZoom, kinds))
+                MapOrder.addPoint(style, pointLayer(sourceId, sourceId + POINTS + minZoom, minZoom, kinds))
             }
         }
         for (layer in listOf(BASE_HIKING_POIS, BASE_PATH, BASE_TRACK, BASE_ROUTE, BASE_ROUTE_REF)) hideInDownloaded(style, layer, overlays.keys)

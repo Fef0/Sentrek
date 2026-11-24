@@ -1,5 +1,6 @@
 package app.sentrek.maps
 
+import app.sentrek.data.AppExit
 import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
@@ -36,6 +37,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class DownloadService : Service() {
     @Inject lateinit var regions: RegionRepository
+    @Inject lateinit var exit: AppExit
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var wakeLock: PowerManager.WakeLock? = null
@@ -80,6 +82,11 @@ class DownloadService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_NOT_STICKY
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    /** Swiped away from the recent apps: the app closes for good (see [AppExit]); the download goes on at the next start. */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        exit.quit()
+    }
 
     // Android 15 gives a data download 6 hours a day in the background. Past that the service
     // must stop or the app is closed; the download carries on while the app is open, and from

@@ -38,6 +38,9 @@ import app.sentrek.geo.LatLon
 import app.sentrek.data.SettingsRepository
 import app.sentrek.data.TurnaroundMode
 import app.sentrek.data.PowerMode
+import app.sentrek.data.AppExit
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -60,6 +63,7 @@ class TrackingService : Service() {
     @Inject lateinit var battery: BatteryWatch
     @Inject lateinit var wet: WetWatch
     @Inject lateinit var shade: ShadeWatch
+    @Inject lateinit var exit: AppExit
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val live by lazy { LiveNotification(this, CHANNEL_ID) }
@@ -136,6 +140,7 @@ class TrackingService : Service() {
             stopSelf()
             return
         }
+        _running.value = true
         // While the screen is on, the map asks for a fix every second and this gets those too;
         // in the pocket, the slower rate here is all the GPS does.
         screenOff.value = !power.isInteractive
@@ -263,6 +268,11 @@ class TrackingService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    /** Swiped away from the recent apps: the app closes for good (see [AppExit]). */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        exit.quit()
+    }
+
     /** A battery reading, and once a walk, a word when at this rate it won't last. */
     private fun checkBattery() {
         battery.sample(powerMode)
@@ -294,6 +304,7 @@ class TrackingService : Service() {
         wet.stop()
         shade.stop()
         scope.cancel()
+        _running.value = false
         super.onDestroy()
     }
 
@@ -348,6 +359,11 @@ class TrackingService : Service() {
         private const val SCREEN_OFF_NOTIFICATION_MS = 30_000L
         private const val CONFIRM_MS = 5_000L
         private const val ACTION_TOGGLE = "app.sentrek.record.TOGGLE_PAUSE"
+
+        private val _running = MutableStateFlow(false)
+
+        /** From the start of the service to its end. */
+        val running: StateFlow<Boolean> = _running.asStateFlow()
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, TrackingService::class.java))

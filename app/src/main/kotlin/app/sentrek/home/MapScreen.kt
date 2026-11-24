@@ -114,6 +114,11 @@ import app.sentrek.map.MapHeights
 import app.sentrek.map.MapOverlays
 import app.sentrek.map.MapStyle
 import app.sentrek.map.GoToLayer
+import app.sentrek.map.WayThereLayer
+import app.sentrek.record.TrackRepository
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import app.sentrek.map.GridLayer
 import app.sentrek.map.PlaceLayers
 import app.sentrek.map.MapTrails
@@ -171,6 +176,13 @@ val DefaultCamera: CameraPosition = CameraPosition.Builder()
 
 /** Turned less than this from north, the map snaps back to north when it stops. */
 private const val SNAP_NORTH_DEGREES = 5.0
+
+/** "Take me there": a fix this recent will do, or the next one is waited for this long. */
+private const val WAY_FIX_FRESH_MS = 120_000L
+private const val WAY_FIX_WAIT_MS = 20_000L
+
+/** Room round the way when the map shows it whole: under the panels on top too. */
+private const val WAY_PADDING_PX = 160
 
 private const val NORTH_ANIMATION_MS = 300
 
@@ -325,6 +337,36 @@ fun MapScreen(
     var locked by rememberSaveable { mutableStateOf(false) }
     val sharing = rememberSharing()
     val goTo by viewModel.goTo.collectAsStateWithLifecycle()
+    // "Take me there" from search: found here, drawn, followed only if the user says so.
+    var wayThere by remember { mutableStateOf<WayThere?>(null) }
+    val locationAllowed by rememberUpdatedState(hasLocation)
+    LaunchedEffect(map) {
+        val m = map ?: return@LaunchedEffect
+        // Taken off at once, so it isn't worked out twice; a newer one replaces one being found.
+        viewModel.wayThereAsked.filterNotNull().collectLatest { target ->
+            viewModel.wayThereAsked.value = null
+            val noGps = { Toast.makeText(context, R.string.way_no_gps, Toast.LENGTH_LONG).show() }
+            if (!locationAllowed) return@collectLatest noGps()
+            wayThere = WayThere.Finding(target)
+            // A fix of the last couple of minutes, or the next one: the map asks for them while it shows.
+            val fresh = { fix: Location -> System.currentTimeMillis() - fix.time < WAY_FIX_FRESH_MS }
+            val fix = lastFix.value?.takeIf(fresh)
+                ?: withTimeoutOrNull(WAY_FIX_WAIT_MS) { snapshotFlow { lastFix.value }.filterNotNull().first(fresh) }
+            if (fix == null) {
+                wayThere = null
+                return@collectLatest noGps()
+            }
+            val from = LatLon(fix.latitude, fix.longitude)
+            val stats = planner.wayTo(from, target.position)
+            // Closed meanwhile: it stays closed.
+            if (wayThere != WayThere.Finding(target)) return@collectLatest
+            wayThere = if (stats != null) WayThere.Found(target, stats) else WayThere.NotFound(target)
+            val shown = stats?.dense ?: listOf(from, target.position)
+            TrackRepository.bounds(shown)?.let { box ->
+                m.animateCamera(CameraUpdateFactory.newLatLngBounds(LatLngBounds.from(box.north, box.east, box.south, box.west), WAY_PADDING_PX))
+            }
+        }
+    }
     val lastSignal by viewModel.lastSignal.collectAsStateWithLifecycle()
     val battery by viewModel.battery.collectAsStateWithLifecycle()
     val wet by viewModel.wet.collectAsStateWithLifecycle()
@@ -569,6 +611,24 @@ fun MapScreen(
                 }
                 // Where the sun sets for the user: their position, or the map's before a fix.
                 val sunPosition = sunHere ?: map?.cameraPosition?.target?.let { LatLon(it.latitude, it.longitude) }
+                wayThere?.let { way ->
+                    WayTherePanel(
+                        way = way,
+                        onFollow = follow@{
+                            val found = way as? WayThere.Found ?: return@follow
+                            val start = {
+                                viewModel.followWayThere(found.stats.dense, found.target.name) { ok ->
+                                    if (ok) wayThere = null else Toast.makeText(context, R.string.way_follow_failed, Toast.LENGTH_LONG).show()
+                                }
+                            }
+                            val current = followedRoute
+                            if (current != null) confirm = FollowConfirmations.switch(context, current.name, found.target.name, start) else start()
+                        },
+                        onStraightLine = { wayThere = null; startGoTo(way.target) },
+                        onClose = { wayThere = null },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 goTo?.let { target ->
                     GoToPanel(
                         target = target,
@@ -1189,7 +1249,7 @@ fun MapScreen(
             onPlaceDraft = { placeDraft = it },
             onShare = sharing::share,
             onDeletePlace = { deletingPlace = it },
-            startGoTo = startGoTo,
+            takeMeThere = { viewModel.wayThereAsked.value = it },
             followRoute = { track ->
                 routeToFollow = track
                 withLocation(AfterPermission.FollowRoute) { viewModel.followTrack(track); routeToFollow = null }
@@ -1275,6 +1335,10 @@ fun MapScreen(
     }
 
     MapLayerEffects(viewModel, planner, map, style, planPreview, handleReach, goTo, lastFix, visible)
+    LaunchedEffect(style, wayThere) {
+        val s = style ?: return@LaunchedEffect
+        WayThereLayer.sync(s, (wayThere as? WayThere.Found)?.stats?.dense.orEmpty())
+    }
 
     if (askPlanName) {
         val edited = remember { planner.editedTrack() }
@@ -1347,7 +1411,8 @@ private fun PressedSheet(
     onPlaceDraft: (Place) -> Unit,
     onShare: (Place) -> Unit,
     onDeletePlace: (Place) -> Unit,
-    startGoTo: (GoTo) -> Unit,
+    /** The way along the paths to a place, as from search (see WayThere). */
+    takeMeThere: (GoTo) -> Unit,
     followRoute: (SavedTrack) -> Unit,
     onConfirm: (Confirmation) -> Unit,
     downloaded: Boolean,
@@ -1368,7 +1433,7 @@ private fun PressedSheet(
             onShare = { onClose(); onShare(place) },
             onDelete = { onClose(); onDeletePlace(place) },
             onDismiss = { onClose() },
-            onGoTo = { onClose(); startGoTo(GoTo(place.name, place.position)) },
+            onGoTo = { onClose(); takeMeThere(GoTo(place.name, place.position)) },
             loadWeather = { viewModel.weatherAt(place.position) },
         )
     } else if (track == null) {
@@ -1388,7 +1453,7 @@ private fun PressedSheet(
                 onClose()
                 val p = info.position
                 val name = info.name ?: info.kind?.takeIf { it != SPOT }?.let { kindName(context, it) } ?: unnamedPlace
-                startGoTo(GoTo(name, LatLon(p.latitude, p.longitude, info.tags["ele"]?.toDoubleOrNull())))
+                takeMeThere(GoTo(name, LatLon(p.latitude, p.longitude, info.tags["ele"]?.toDoubleOrNull())))
             },
             onDismiss = { onClose() },
             loadWeather = {

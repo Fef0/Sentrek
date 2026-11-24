@@ -131,7 +131,11 @@ class FollowRepository @Inject constructor(
         if (id != null) {
             scope.launch {
                 // The track list loads asynchronously.
-                val track = tracks.tracks.first { it.isNotEmpty() }.firstOrNull { it.id == id }
+                val track = if (id == TrackRepository.WAY_THERE_ID) {
+                    tracks.wayThere()
+                } else {
+                    tracks.tracks.first { it.isNotEmpty() }.firstOrNull { it.id == id }
+                }
                 // The user started or stopped a route meanwhile: theirs stands.
                 if (chosen) return@launch
                 if (track != null) start(track, reversed = lines.getOrNull(1) == "true") else stop()
@@ -142,6 +146,8 @@ class FollowRepository @Inject constructor(
     suspend fun start(track: SavedTrack, reversed: Boolean = false): Boolean {
         chosen = true
         val loaded = tracks.route(track) ?: return false
+        // Another route instead of the way to a searched place: that one is done with.
+        if (_state.value?.trackId == TrackRepository.WAY_THERE_ID && track.id != TrackRepository.WAY_THERE_ID) tracks.dropWayThere()
         route = if (reversed) loaded.reversed() else loaded
         along = null
         routePlaces = emptyList()
@@ -234,6 +240,7 @@ class FollowRepository @Inject constructor(
 
     fun stop() {
         chosen = true
+        if (_state.value?.trackId == TrackRepository.WAY_THERE_ID) tracks.dropWayThere()
         placesJob?.cancel()
         turnsJob?.cancel()
         turns = emptyList()

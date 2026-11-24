@@ -39,7 +39,7 @@ object SignalLayer {
         }
         style.addImage(IMAGE, MapIcons.badge(context, R.drawable.map_signal, COLOR, context.resources.displayMetrics.density))
         style.addSource(GeoJsonSource(ID, features))
-        PlaceLayers.addBelow(
+        MapOrder.addSignal(
             style,
             SymbolLayer(ID, ID).withProperties(
                 iconImage(IMAGE),

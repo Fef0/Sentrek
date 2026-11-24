@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -192,6 +193,8 @@ private fun Ready(state: PeaksState.Ready) {
         Modifier
             .fillMaxWidth()
             .height(300.dp)
+            // Nothing drawn over the list below.
+            .clipToBounds()
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
                     onDragStart = { dragging = true },
@@ -201,8 +204,15 @@ private fun Ready(state: PeaksState.Ready) {
     ) {
         val pxPerDeg = size.width / FIELD_DEG
         val inView = (0..size.width.toInt() step 4).map { x -> state.skyline.at((centre - FIELD_DEG / 2 + x / pxPerDeg).toDouble()).toDouble() }
-        // The view's angles fill the lower part; peaks' names above.
-        val low = inView.min()
+        // Where each summit shows: on the skyline, not above it (the map's summit heights are a
+        // little above the smoothed terrain the skyline is drawn from), or below it, a lower
+        // hill in front of the mountains.
+        fun tipAngle(peak: Panorama.Peak) = minOf(peak.elevation, state.skyline.at(peak.azimuth).toDouble())
+        val peaksInView = state.peaks.filter { abs(((it.azimuth - centre + 540) % 360) - 180) <= FIELD_DEG / 2 }
+        // The view's angles fill the lower part; peaks' names above. Low enough for a summit
+        // below the skyline too (one lower than the user, in front of a higher ridge).
+        val lowest = (inView + peaksInView.map(::tipAngle)).min()
+        val low = lowest - LOW_MARGIN_DEG
         val high = max(inView.max(), low + 2)
         val top = size.height * 0.45f
         val bottom = size.height
@@ -235,9 +245,7 @@ private fun Ready(state: PeaksState.Ready) {
                 .takeIf { it >= 0 } ?: continue
             rows[row] += span
             val labelY = row * 44.dp.toPx()
-            // On the skyline, not above it: the map's summit heights are a little above the
-            // smoothed terrain the skyline is drawn from.
-            val tip = y(minOf(peak.elevation, state.skyline.at(peak.azimuth).toDouble()))
+            val tip = y(tipAngle(peak))
             drawLine(colors.primary, Offset(x, labelY + 38.dp.toPx()), Offset(x, tip), strokeWidth = 1.5.dp.toPx())
             drawCircle(colors.primary, 4.dp.toPx(), Offset(x, tip))
             drawText(name, topLeft = Offset(labelX - name.size.width / 2, labelY))
@@ -322,3 +330,6 @@ private const val FIELD_DEG = 60f
 private const val SMOOTHING = 0.15f
 private const val LIST_MAX = 6
 private const val LABEL_ROWS = 3
+
+/** Below the lowest thing in view: a summit there keeps its dot above the bottom edge. */
+private const val LOW_MARGIN_DEG = 0.3

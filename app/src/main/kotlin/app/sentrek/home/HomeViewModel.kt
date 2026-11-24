@@ -288,7 +288,8 @@ class HomeViewModel @Inject constructor(
     val shownTracks: StateFlow<List<MapTrack>> = combine(tracks.shown, tracks.tracks) { shown, all ->
         val byId = all.associateBy { it.id }
         shown.mapNotNull { (id, shape) ->
-            byId[id]?.let { MapTrack(id, it.color, shape.segments, shape.waypoints) }
+            // The way to a searched place isn't a saved track: found apart.
+            (byId[id] ?: tracks.find(id))?.let { MapTrack(id, it.color, shape.segments, shape.waypoints) }
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
@@ -394,6 +395,20 @@ class HomeViewModel @Inject constructor(
 
     fun goTo(target: GoTo?) {
         _goTo.value = target
+    }
+
+    /** "Take me there" from search: the map works the way out (see WayThere), then this goes back to null. */
+    val wayThereAsked = MutableStateFlow<GoTo?>(null)
+
+    /**
+     * Follows [points], the way to [name], without saving it as a route. [onDone] gets false
+     * when it couldn't be started.
+     */
+    fun followWayThere(points: List<LatLon>, name: String, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val track = tracks.saveWayThere(points, name)
+            onDone(track != null && follower.start(track))
+        }
     }
 
     /** A position found with search, marked on the map until the next search or long press. */

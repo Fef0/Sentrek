@@ -22,7 +22,8 @@ import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 
 /**
- * "Take me there": a dashed straight line from the user to the place, and a ring on the place.
+ * The straight line to a place (the SOS screen's last signal, or no way along the paths): dashed,
+ * from the user to the place, and a ring on the place.
  * Straight on purpose: it says where the place is, not which way to walk.
  */
 object GoToLayer {
@@ -53,7 +54,7 @@ object GoToLayer {
         } else {
             emptyList()
         }
-        set(style, LINE, line) {
+        set(style, LINE, line, MapOrder::addLine) {
             LineLayer(LINE, LINE).withProperties(
                 lineColor(COLOR),
                 lineWidth(3.5f),
@@ -61,7 +62,7 @@ object GoToLayer {
                 lineCap(Property.LINE_CAP_ROUND),
             )
         }
-        set(style, TARGET, listOfNotNull(to?.let { Feature.fromGeometry(point(it)) })) {
+        set(style, TARGET, listOfNotNull(to?.let { Feature.fromGeometry(point(it)) }), MapOrder::addPoint) {
             CircleLayer(TARGET, TARGET).withProperties(
                 circleRadius(11f),
                 circleColor(rgb(255, 255, 255)),
@@ -71,7 +72,13 @@ object GoToLayer {
         }
     }
 
-    private fun set(style: Style, id: String, features: List<Feature>, layer: () -> org.maplibre.android.style.layers.Layer) {
+    private fun set(
+        style: Style,
+        id: String,
+        features: List<Feature>,
+        add: (Style, org.maplibre.android.style.layers.Layer) -> Unit,
+        layer: () -> org.maplibre.android.style.layers.Layer,
+    ) {
         val collection = FeatureCollection.fromFeatures(features)
         val source = style.getSourceAs<GeoJsonSource>(id)
         if (source != null) {
@@ -79,7 +86,7 @@ object GoToLayer {
             return
         }
         style.addSource(GeoJsonSource(id, collection))
-        PlaceLayers.addBelow(style, layer())
+        add(style, layer())
     }
 
     private fun point(p: LatLon) = Point.fromLngLat(p.lon, p.lat)

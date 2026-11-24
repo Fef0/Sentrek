@@ -1,0 +1,7 @@
+• Take me there, from search or a place's card: the shortest way along the paths, to follow if you want
+• Closing Sentrek ends it: a recording is saved, following stops
+• Smoother compass
+• Your position and last signal drawn over everything
+• Start and end texts give the times. In airplane mode no text is tried, and Sentrek says so
+• Shade and offline search work in every downloaded area
+• Place icons on the map's card; lower peaks stay in view

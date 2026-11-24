@@ -18,8 +18,8 @@ android {
         minSdk = 24
         targetSdk = 37
         // Each APK gets versionCode × 10 + its CPU number (see ABI_CODES below).
-        versionCode = 38
-        versionName = "0.32.0"
+        versionCode = 39
+        versionName = "0.32.1"
 
         // The languages the app is translated into, from its res/values-<language> folders: a
         // new translation shows in the language list by itself (see TRANSLATING.md).

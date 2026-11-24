@@ -152,7 +152,48 @@ class TrackRepository @Inject constructor(
     /** Where the tracks' files are, for backups. */
     val directory: File get() = dir
 
-    fun gpxFile(track: SavedTrack) = File(dir, track.id + GPX)
+    fun gpxFile(track: SavedTrack) = if (track.id == WAY_THERE_ID) File(wayDir, WAY_THERE_ID + GPX) else File(dir, track.id + GPX)
+
+    /**
+     * The way to a searched place ("Take me there"), while it's followed: a route like the
+     * others for following and drawing, but not one of the saved ones. Not in [tracks], and in
+     * a folder of its own, so no list and no backup has it.
+     */
+    private val wayDir = File(context.filesDir, "way-there")
+    private var wayThere: SavedTrack? = null
+
+    /** Keeps [points] as the way to [name], replacing the last one. Null when it can't be written. */
+    suspend fun saveWayThere(points: List<LatLon>, name: String): SavedTrack? = withContext(fileWrites) {
+        runCatching {
+            wayDir.mkdirs()
+            val now = System.currentTimeMillis()
+            val segments = listOf(points.map { TrackPoint(it, 0) })
+            val stats = TrackStats.of(segments, TrackStats.SMOOTH_CLIMB_THRESHOLD_M)
+            val track = SavedTrack(
+                WAY_THERE_ID, name, now, now, stats.distance, stats.ascent, stats.descent, 0,
+                imported = true, color = WAY_THERE_COLOR, note = "", photos = emptyList(),
+            )
+            File(wayDir, WAY_THERE_ID + GPX).bufferedWriter().use { Gpx.write(it, name, segments, CREATOR, emptyList(), "") }
+            File(wayDir, WAY_THERE_ID + SUMMARY).writeText(summaryJson(track))
+            track
+        }.onFailure { Log.w(TAG, "Cannot keep the way there", it) }.getOrNull()
+    }?.also {
+        profiles -= WAY_THERE_ID
+        wayThere = it
+    }
+
+    /** The way there being followed, read back after a restart; null when there's none. */
+    suspend fun wayThere(): SavedTrack? = wayThere ?: withContext(Dispatchers.IO) {
+        runCatching { readSummary(File(wayDir, WAY_THERE_ID + SUMMARY)) }.getOrNull()
+    }?.also { wayThere = it }
+
+    /** The way there is done with (following it stopped): off the map and gone. */
+    fun dropWayThere() {
+        hide(WAY_THERE_ID)
+        wayThere = null
+        profiles -= WAY_THERE_ID
+        scope.launch(fileWrites) { runCatching { wayDir.deleteRecursively() } }
+    }
 
     /**
      * [name]: blank or null uses [defaultName]. [smoothElevation]: heights come from the terrain
@@ -569,7 +610,7 @@ class TrackRepository @Inject constructor(
         points.maxByOrNull { it.position.ele ?: Double.NEGATIVE_INFINITY }?.position
     }
 
-    fun find(id: String): SavedTrack? = _tracks.value.firstOrNull { it.id == id }
+    fun find(id: String): SavedTrack? = if (id == WAY_THERE_ID) wayThere else _tracks.value.firstOrNull { it.id == id }
 
     /**
      * A copy of the GPX named after the track, for the share sheet: the receiving app shows
@@ -661,6 +702,12 @@ class TrackRepository @Inject constructor(
     }
 
     companion object {
+        /** The id of the way there (see [saveWayThere]); never a saved track's, those are dates. */
+        const val WAY_THERE_ID = "way-there"
+
+        /** As the straight line to a point on the map (GoToLayer). */
+        private const val WAY_THERE_COLOR = 0xFF00B8D4.toInt()
+
         private const val TAG = "TrackRepository"
         private const val GPX = ".gpx"
         private const val SUMMARY = ".json"

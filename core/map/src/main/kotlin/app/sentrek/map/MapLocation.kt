@@ -55,7 +55,10 @@ object MapLocation {
                     // that change nothing are skipped (see update).
                     // The accuracy circle jumps to its new size: animating it redraws the map for nothing.
                     .locationComponentOptions(
-                        LocationComponentOptions.builder(context).enableStaleState(false).accuracyAnimationEnabled(false).build(),
+                        LocationComponentOptions.builder(context).enableStaleState(false).accuracyAnimationEnabled(false)
+                            // Over everything on the map (see MapOrder).
+                            .layerAbove(MapOrder.SIGNAL)
+                            .build(),
                     )
                     .build(),
             )

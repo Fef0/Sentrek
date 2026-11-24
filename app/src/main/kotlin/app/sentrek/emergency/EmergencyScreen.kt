@@ -126,6 +126,10 @@ class EmergencyViewModel @Inject constructor(
     /** Sends [text] to [to] straight away, without the messaging app. */
     fun send(to: String, text: String) {
         if (_sent.value is SmsResult.Sending) return
+        if (SmsSender.airplaneMode(context)) {
+            _sent.value = SmsResult.Airplane
+            return
+        }
         _sent.value = SmsResult.Sending
         SmsSender.send(context, to, text) { ok ->
             _sent.value = if (ok) SmsResult.Sent(System.currentTimeMillis()) else SmsResult.Failed
@@ -146,6 +150,8 @@ sealed interface SmsResult {
     data class Sent(val at: Long) : SmsResult
     /** Mostly no signal: nothing left the phone. */
     data object Failed : SmsResult
+    /** Airplane mode on: not even tried. */
+    data object Airplane : SmsResult
 }
 
 /**
@@ -277,6 +283,8 @@ private fun SmsButton(viewModel: EmergencyViewModel, to: String, name: String, m
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
         )
+        SmsResult.Airplane ->
+            Text(stringResource(R.string.emergency_sms_airplane), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         SmsResult.Failed -> {
             Text(stringResource(R.string.emergency_sms_failed), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             OutlinedButton(onClick = { sms(context, to, message) }, modifier = modifier) {

@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Settings
 import android.telephony.SmsManager
 import android.telephony.SubscriptionManager
 import android.util.Log
@@ -56,6 +57,10 @@ object SmsSender {
             }
         }
     }
+
+    /** Airplane mode: the phone network is off, no text can go (and the phone won't say why). */
+    fun airplaneMode(context: Context): Boolean =
+        runCatching { Settings.Global.getInt(context.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) != 0 }.getOrDefault(false)
 
     fun hasPermission(context: Context) =
         ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED

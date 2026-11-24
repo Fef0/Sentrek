@@ -28,7 +28,8 @@ import java.util.Locale
 /**
  * Breadcrumbs: while recording, the position goes by SMS to the emergency contact every 30 or
  * 60 minutes, like the tracking of a satellite messenger but over the phone network. One text
- * when the recording starts, one each period, one when it ends. A text that doesn't go (no
+ * when the recording starts and one when it ends (each with the time it happened), one each
+ * period. In airplane mode none is tried: a notification says why. A text that doesn't go (no
  * signal, often, in the mountains) is tried again every couple of minutes with the newest
  * position. Texts cost what the user's plan charges for them: the settings say so. When the
  * battery runs low, one more text says so, with the position: the last one may come from there.
@@ -78,6 +79,7 @@ class Breadcrumbs(private val context: Context) {
     fun stop() {
         runCatching { context.unregisterReceiver(receiver) }
         setStatus(null)
+        airplaneWarning(false)
     }
 
     /**
@@ -91,19 +93,26 @@ class Breadcrumbs(private val context: Context) {
         val on = minutes > 0 && to.isNotBlank() && canSend()
         if (recording == null) {
             setStatus(null)
+            airplaneWarning(false)
             if (session == 0L) return
             // The last one, without retries: nothing keeps running after the recording.
-            if (on && fix != null) send(to, finished(fix), session, now)
+            if (on && fix != null && !SmsSender.airplaneMode(context)) send(to, finished(fix, now), session, now)
             saved.edit().remove(SESSION).remove(LAST_SENT).remove(LOW_BATTERY_SENT).apply()
             return
         }
-        if (!on) return setStatus(null)
+        if (!on) {
+            airplaneWarning(false)
+            return setStatus(null)
+        }
         val last = saved.getLong(LAST_SENT, 0).takeIf { session == recording.startTime && it > 0 }
-        setStatus(Status(name.ifBlank { to }, minutes, last, noSignal = now < retryAt))
-        if (fix == null || now < retryAt) return
+        // Airplane mode: nothing is tried, the user is told once; the texts due go when it's off.
+        val airplane = SmsSender.airplaneMode(context)
+        airplaneWarning(airplane, name.ifBlank { to })
+        setStatus(Status(name.ifBlank { to }, minutes, last, noSignal = now < retryAt, airplane = airplane))
+        if (fix == null || now < retryAt || airplane) return
         pending?.let { if (now - it.sentAt < PENDING_TIMEOUT_MS) return else pending = null }
         when {
-            session != recording.startTime -> send(to, started(fix, minutes), recording.startTime, now)
+            session != recording.startTime -> send(to, started(fix, minutes, recording.startTime), recording.startTime, now)
             lowBattery && saved.getLong(LOW_BATTERY_SENT, 0) != session && battery()?.let { it <= LOW_BATTERY_PERCENT } == true ->
                 send(to, lowBattery(fix, battery() ?: LOW_BATTERY_PERCENT), session, now, lowBattery = true)
             now - saved.getLong(LAST_SENT, 0) >= minutes * 60_000L -> send(to, position(fix), session, now)
@@ -154,8 +163,16 @@ class Breadcrumbs(private val context: Context) {
         }
     }
 
-    private fun started(fix: Location, minutes: Int) =
-        context.getString(R.string.breadcrumb_started, minutes, where(fix))
+    /**
+     * With the time the hike started: the text may go out a good while later (no signal at the
+     * start), and then the position in it, the latest, is from later too and says when.
+     */
+    private fun started(fix: Location, minutes: Int, startTime: Long) =
+        if (fix.time - startTime < LATE_START_MS) {
+            context.getString(R.string.breadcrumb_started, time(startTime), minutes, where(fix))
+        } else {
+            context.getString(R.string.breadcrumb_started_late, time(startTime), minutes, time(fix.time), where(fix))
+        }
 
     private fun position(fix: Location) =
         context.getString(R.string.breadcrumb_position, time(fix.time), where(fix))
@@ -163,8 +180,28 @@ class Breadcrumbs(private val context: Context) {
     private fun lowBattery(fix: Location, percent: Int) =
         context.getString(R.string.breadcrumb_low_battery, percent, time(fix.time), where(fix))
 
-    private fun finished(fix: Location) =
-        context.getString(R.string.breadcrumb_finished, where(fix))
+    /** Sent as the recording ends, [endTime]. */
+    private fun finished(fix: Location, endTime: Long) =
+        context.getString(R.string.breadcrumb_finished, time(endTime), where(fix))
+
+    private var airplaneWarned = false
+
+    /**
+     * A notification that pops up once when airplane mode keeps the texts from going, and goes
+     * away with airplane mode. [to]: the contact's name, or the number.
+     */
+    private fun airplaneWarning(on: Boolean, to: String = "") {
+        if (on == airplaneWarned) return
+        airplaneWarned = on
+        if (on) {
+            TrailAlerts.ring(
+                context, AIRPLANE_NOTIFICATION_ID, context.getString(R.string.breadcrumb_airplane_title),
+                context.getString(R.string.breadcrumb_airplane_text, to), AIRPLANE_PATTERN,
+            )
+        } else {
+            NotificationManagerCompat.from(context).cancel(AIRPLANE_NOTIFICATION_ID)
+        }
+    }
 
     /** Coordinates, altitude and a map link: readable on any phone, without an app. */
     private fun where(fix: Location): String {
@@ -206,7 +243,7 @@ class Breadcrumbs(private val context: Context) {
     }
 
     /** [to]: the contact's name, or the number. [lastSent]: null until the first text of this recording went. */
-    data class Status(val to: String, val minutes: Int, val lastSent: Long?, val noSignal: Boolean)
+    data class Status(val to: String, val minutes: Int, val lastSent: Long?, val noSignal: Boolean, val airplane: Boolean = false)
 
     companion object {
         private val _status = MutableStateFlow<Status?>(null)
@@ -216,6 +253,7 @@ class Breadcrumbs(private val context: Context) {
 
         /** "Last sent at 14:30", or why there's none yet. */
         fun statusLine(context: Context, s: Status): String = when {
+            s.airplane -> context.getString(R.string.breadcrumb_airplane)
             s.noSignal -> context.getString(R.string.breadcrumb_no_signal)
             s.lastSent == null -> context.getString(R.string.breadcrumb_none_yet)
             else -> context.getString(R.string.breadcrumb_last, time(s.lastSent))
@@ -230,6 +268,13 @@ class Breadcrumbs(private val context: Context) {
         private const val ACTION_SENT = "app.sentrek.record.BREADCRUMB_SENT"
         private const val CHANNEL_ID = "breadcrumbs"
         private const val NOTIFICATION_ID = 4
+        private const val AIRPLANE_NOTIFICATION_ID = 10
+
+        /** Two short buzzes. */
+        private val AIRPLANE_PATTERN = longArrayOf(0, 300, 200, 300)
+
+        /** Sent later than this after the start, the start text says when its position is from. */
+        private const val LATE_START_MS = 5 * 60_000L
         private const val SESSION = "session"
         private const val LAST_SENT = "last_sent"
         private const val LOW_BATTERY_SENT = "low_battery_sent"

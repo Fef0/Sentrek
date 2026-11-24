@@ -94,15 +94,16 @@ object PlanLayers {
         style.getLayer(ARROWS)?.setProperties(visibility(if (arrows) Property.VISIBLE else Property.NONE))
         // Over every track, whenever one was drawn after the plan: the route being made is
         // the one the user is looking at.
-        if (points.isNotEmpty() && (style !== raisedStyle || PlaceLayers.added != raisedAt)) raise(style)
+        if (points.isNotEmpty() && (style !== raisedStyle || MapOrder.added != raisedAt)) raise(style)
     }
 
     private var raisedStyle: Style? = null
     private var raisedAt = -1
 
-    /** The plan's layers (and the other ways', over it) taken out and put back on top, below the places. */
+    /** The plan's layers (and the other ways', over it) taken out and put back on top of the lines. */
     private fun raise(style: Style) {
-        val ids = style.layers.map { it.id }
+        // Only lines count: the tracks' points are over every line anyway (MapOrder).
+        val ids = style.layers.map { it.id }.take(MapOrder.linesEnd(style).coerceAtLeast(0))
         val first = ids.indexOf(LINE + CASING)
         val lastTrack = ids.indexOfLast { it.startsWith("track-") || it.startsWith("goto") }
         if (first < 0 || lastTrack > first) {
@@ -111,7 +112,7 @@ object PlanLayers {
             if (style.getSource(WAYS) != null) addExtraLayers(style)
         }
         raisedStyle = style
-        raisedAt = PlaceLayers.added
+        raisedAt = MapOrder.added
     }
 
     /** Hides the plan without forgetting the layers (the planner was closed). */
@@ -131,7 +132,7 @@ object PlanLayers {
     }
 
     private fun addLayers(style: Style) {
-        PlaceLayers.addBelow(
+        MapOrder.addLine(
             style,
             LineLayer(LINE + CASING, LINE).withProperties(
                 lineColor(rgb(255, 255, 255)),
@@ -140,7 +141,7 @@ object PlanLayers {
                 lineJoin(Property.LINE_JOIN_ROUND),
             ),
         )
-        PlaceLayers.addBelow(
+        MapOrder.addLine(
             style,
             LineLayer(LINE, LINE).withProperties(
                 lineColor(COLOR),
@@ -149,7 +150,7 @@ object PlanLayers {
                 lineJoin(Property.LINE_JOIN_ROUND),
             ).withFilter(eq(get("t"), true)),
         )
-        PlaceLayers.addBelow(
+        MapOrder.addLine(
             style,
             LineLayer(LINE + STRAIGHT, LINE).withProperties(
                 lineColor(COLOR),
@@ -158,7 +159,7 @@ object PlanLayers {
             ).withFilter(eq(get("t"), false)),
         )
         TrackLayers.addArrowImage(style)
-        PlaceLayers.addBelow(
+        MapOrder.addLine(
             style,
             SymbolLayer(ARROWS, LINE).withProperties(
                 symbolPlacement(Property.SYMBOL_PLACEMENT_LINE),
@@ -166,7 +167,7 @@ object PlanLayers {
                 iconImage(TrackLayers.ARROW_IMAGE),
             ).apply { minZoom = TrackLayers.ARROWS_MIN_ZOOM },
         )
-        PlaceLayers.addBelow(
+        MapOrder.addPoint(
             style,
             CircleLayer(POINTS, POINTS).withProperties(
                 // Small, so they hide little of the map: a touch reaches further than the dot (PlanGestures).
@@ -194,7 +195,7 @@ object PlanLayers {
             ),
         )
         // The section's number in its end point (the selected one too: the number stays).
-        PlaceLayers.addBelow(
+        MapOrder.addPoint(
             style,
             SymbolLayer(NUMBERS, POINTS).withProperties(
                 textField(get("n")),
@@ -251,7 +252,7 @@ object PlanLayers {
 
     private fun addExtraLayers(style: Style) {
         // Over the plan: the others thinner, the one looked at bold, with an edge, on top.
-        PlaceLayers.addBelow(
+        MapOrder.addLine(
             style,
             LineLayer(WAYS, WAYS).withProperties(
                 lineColor(wayColor()),
@@ -261,7 +262,7 @@ object PlanLayers {
                 lineJoin(Property.LINE_JOIN_ROUND),
             ).withFilter(eq(get("s"), false)),
         )
-        PlaceLayers.addBelow(
+        MapOrder.addLine(
             style,
             LineLayer(WAYS + SHOWN + CASING, WAYS).withProperties(
                 lineColor(rgb(255, 255, 255)),
@@ -270,7 +271,7 @@ object PlanLayers {
                 lineJoin(Property.LINE_JOIN_ROUND),
             ).withFilter(eq(get("s"), true)),
         )
-        PlaceLayers.addBelow(
+        MapOrder.addLine(
             style,
             LineLayer(WAYS + SHOWN, WAYS).withProperties(
                 lineColor(wayColor()),
@@ -279,7 +280,7 @@ object PlanLayers {
                 lineJoin(Property.LINE_JOIN_ROUND),
             ).withFilter(eq(get("s"), true)),
         )
-        PlaceLayers.addBelow(
+        MapOrder.addPoint(
             style,
             CircleLayer(WAY_NUMBERS, AVOIDED).withProperties(
                 circleRadius(12f),
@@ -288,7 +289,7 @@ object PlanLayers {
                 circleStrokeWidth(2.5f),
             ).withFilter(has("n")),
         )
-        PlaceLayers.addBelow(
+        MapOrder.addPoint(
             style,
             CircleLayer(AVOIDED, AVOIDED).withProperties(
                 circleRadius(11f),
@@ -297,7 +298,7 @@ object PlanLayers {
                 circleStrokeWidth(2.5f),
             ).withFilter(has("x")),
         )
-        PlaceLayers.addBelow(
+        MapOrder.addPoint(
             style,
             SymbolLayer(AVOIDED + "-text", AVOIDED).withProperties(
                 textField(coalesce(get("n"), get("x"))),

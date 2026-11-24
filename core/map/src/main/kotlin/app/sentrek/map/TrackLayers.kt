@@ -194,8 +194,8 @@ object TrackLayers {
     /** Both casings below both lines, so the join of the two parts doesn't show. */
     private fun addRecordingLayers(style: Style) {
         for (id in listOf(RECORDING, RECORDING_TAIL)) style.addSource(GeoJsonSource(id, FeatureCollection.fromFeatures(emptyList()), lineOptions()))
-        for (id in listOf(RECORDING, RECORDING_TAIL)) PlaceLayers.addBelow(style, casing(id))
-        for (id in listOf(RECORDING, RECORDING_TAIL)) PlaceLayers.addBelow(style, line(id))
+        for (id in listOf(RECORDING, RECORDING_TAIL)) MapOrder.addLine(style, casing(id))
+        for (id in listOf(RECORDING, RECORDING_TAIL)) MapOrder.addLine(style, line(id))
     }
 
     /**
@@ -217,8 +217,8 @@ object TrackLayers {
             return
         }
         style.addSource(GeoJsonSource(id, collection, lineOptions()))
-        PlaceLayers.addBelow(style, casing(id))
-        PlaceLayers.addBelow(style, line(id))
+        MapOrder.addLine(style, casing(id))
+        MapOrder.addLine(style, line(id))
     }
 
     private fun casing(id: String) = LineLayer(id + CASING, id).withProperties(
@@ -241,7 +241,7 @@ object TrackLayers {
      */
     private fun addArrows(style: Style) {
         addArrowImage(style)
-        PlaceLayers.addBelow(
+        MapOrder.addLine(
             style,
             SymbolLayer(ARROWS, ARROWS).withProperties(
                 symbolPlacement(Property.SYMBOL_PLACEMENT_LINE),
@@ -306,7 +306,7 @@ object TrackLayers {
         style.addSource(GeoJsonSource(ENDS, collection))
         // The planner's colours: green where it starts, red where it ends.
         val color = match(get("r"), rgb(198, 40, 40), stop("start", rgb(46, 125, 50)), stop("both", rgb(46, 125, 50)))
-        PlaceLayers.addBelow(
+        MapOrder.addPoint(
             style,
             CircleLayer(ENDS, ENDS).withProperties(
                 circleRadius(7f),
@@ -315,7 +315,7 @@ object TrackLayers {
                 circleStrokeWidth(2.5f),
             ),
         )
-        PlaceLayers.addBelow(
+        MapOrder.addPoint(
             style,
             SymbolLayer(ENDS + LABELS, ENDS).withProperties(
                 textField(get("label")),
@@ -339,7 +339,7 @@ object TrackLayers {
             return
         }
         style.addSource(GeoJsonSource(WAYPOINTS, collection))
-        PlaceLayers.addBelow(
+        MapOrder.addPoint(
             style,
             CircleLayer(WAYPOINTS, WAYPOINTS).withProperties(
                 circleRadius(match(get("class"), literal(7f), stop("section", 10f))),
@@ -348,7 +348,7 @@ object TrackLayers {
                 circleStrokeWidth(2.5f),
             ),
         )
-        PlaceLayers.addBelow(
+        MapOrder.addPoint(
             style,
             SymbolLayer(WAYPOINTS + LABELS, WAYPOINTS).withProperties(
                 textField(coalesce(get("name"), literal(""))),
@@ -362,7 +362,7 @@ object TrackLayers {
                 textHaloWidth(1.8f),
             ).withFilter(neq(get("class"), "section")),
         )
-        PlaceLayers.addBelow(
+        MapOrder.addPoint(
             style,
             SymbolLayer(WAYPOINTS + NUMBERS, WAYPOINTS).withProperties(
                 textField(get("n")),

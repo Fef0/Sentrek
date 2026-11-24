@@ -88,6 +88,7 @@ fun SentrekMap(
                     isAttributionEnabled = false
                 }
                 map.setStyle(Style.Builder().fromUri(style.uri)) { loaded ->
+                    MapOrder.install(loaded)
                     if (night) NightStyle.apply(loaded)
                     MapIcons.install(context, loaded)
                     currentOnMapReady.value(map, loaded)

@@ -35,7 +35,7 @@ object GridLayer {
     private const val LABEL_SOURCE = "coordinate-grid-numbers"
     private const val LINES = "coordinate-grid-lines"
     private const val LABELS = "coordinate-grid-labels"
-    private const val BELOW_LABELS = "water-name"
+    private const val BELOW_LABELS = MapOrder.TRAILS
 
     /** The area and step the grid was last made for, per style. */
     private class Made(val kind: CoordinateGrid.Kind, val box: BoundingBox, val step: Int, val lines: List<CoordinateGrid.Line>)
@@ -107,7 +107,7 @@ object GridLayer {
         val labels = style.getLayer(LABELS)
         if (labels == null) {
             // Just under the saved places, over the base labels: grid numbers must read.
-            PlaceLayers.addBelow(
+            MapOrder.addPoint(
                 style,
                 SymbolLayer(LABELS, LABEL_SOURCE).withProperties(
                     textField(get("l")),

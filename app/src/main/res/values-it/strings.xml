@@ -5,6 +5,15 @@
     <string name="bar_library">Salvati</string>
     <string name="gps_barometer_altitude">%s (barometro)</string>
     <string name="feature_go_to">Portami lì</string>
+    <string name="way_finding">Cerco la strada per %s…</string>
+    <string name="way_to">Strada per %s</string>
+    <string name="way_close">Chiudi la strada</string>
+    <string name="way_follow">Segui</string>
+    <string name="way_follow_failed">Non riesco a seguire la strada. Riprova.</string>
+    <string name="way_none">Nessuna strada lungo i sentieri. Forse i sentieri lì non sono scaricati, o non si collegano.</string>
+    <string name="way_straight_line">Mostra la linea retta</string>
+    <string name="way_no_gps">Ancora nessuna posizione GPS. Riprova quando il GPS ti ha trovato.</string>
+    <string name="search_take_me_there">Portami lì lungo i sentieri</string>
     <string name="goto_arrived">Sei arrivato</string>
     <string name="goto_waiting">In attesa del GPS…</string>
     <string name="goto_stop">Smetti di indicare la strada</string>
@@ -17,6 +26,7 @@
     <string name="emergency_sms_sending">Invio in corso…</string>
     <string name="emergency_sms_sent">Inviato alle %s</string>
     <string name="emergency_sms_failed">Non inviato. Forse qui non c\'è campo: riprova un po\' più avanti, o dall\'app dei messaggi.</string>
+    <string name="emergency_sms_airplane">Non inviato: la modalità aereo è attiva. Disattivala e invia di nuovo.</string>
     <string name="emergency_sms_open">Apri nell\'app dei messaggi</string>
     <string name="emergency_no_permission">Sentrek ha bisogno della tua posizione per mostrarti dove sei.</string>
     <string name="emergency_allow">Consenti la posizione</string>
@@ -62,6 +72,8 @@
     <string name="gps_copied">Copiato</string>
     <string name="gps_copy_hint">Tocca per copiare</string>
     <string name="exit_press_again">Premi di nuovo indietro per uscire</string>
+    <string name="exit_press_again_recording">Premi di nuovo indietro per uscire. La registrazione si ferma e viene salvata.</string>
+    <string name="exit_press_again_following">Premi di nuovo indietro per uscire e smettere di seguire il percorso.</string>
     <string name="my_location_details">Mostra i dettagli della posizione</string>
     <string name="my_location_heading">Ruota la mappa con la direzione di marcia</string>
     <string name="my_location_stop">Smetti di seguire la tua posizione</string>

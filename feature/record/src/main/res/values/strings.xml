@@ -2,10 +2,11 @@
 <resources>
     <string name="record_channel">Track recording</string>
     <!-- Breadcrumb texts to the emergency contact. Plain characters only, and short: one SMS each (160 characters with the position). -->
-    <string name="breadcrumb_started">Sentrek: I\'m starting a hike. My position every %1$d min: %2$s</string>
+    <string name="breadcrumb_started">Sentrek: I started a hike at %1$s. My position every %2$d min: %3$s</string>
+    <string name="breadcrumb_started_late">Sentrek: I started a hike at %1$s. My position every %2$d min. Position at %3$s: %4$s</string>
     <string name="breadcrumb_position">Sentrek: my position at %1$s: %2$s</string>
     <string name="breadcrumb_low_battery">Sentrek: battery at %1$d%%, my phone may switch off soon. Position at %2$s: %3$s</string>
-    <string name="breadcrumb_finished">Sentrek: hike finished. I\'m at %1$s</string>
+    <string name="breadcrumb_finished">Sentrek: I finished my hike at %1$s. I\'m at %2$s</string>
     <string name="alerts_channel">Trail alerts</string>
     <string name="water_alert_title">Fill up your water here</string>
     <string name="water_alert_text">It\'s the last on the route for %1$s (about %2$s).</string>
@@ -24,6 +25,9 @@
     <string name="breadcrumb_last">Last sent at %s</string>
     <string name="breadcrumb_none_yet">First one on its way</string>
     <string name="breadcrumb_no_signal">No signal, trying again</string>
+    <string name="breadcrumb_airplane">Airplane mode is on, nothing is sent</string>
+    <string name="breadcrumb_airplane_title">Airplane mode is on</string>
+    <string name="breadcrumb_airplane_text">Your position texts to %s can\'t be sent. Turn airplane mode off to send them.</string>
     <string name="record_notification_title">Recording track</string>
     <string name="record_notification_paused">Recording paused</string>
     <!-- Distance, then ascent, e.g. "3.42 km · ↑ 420 m". -->

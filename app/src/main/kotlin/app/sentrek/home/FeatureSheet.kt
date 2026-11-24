@@ -35,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.sentrek.R
+import app.sentrek.geo.overlay.PoiKind
 import app.sentrek.geo.overlay.SacScale
 import app.sentrek.geo.overlay.ViaFerrataScale
 import app.sentrek.map.MapFeatures
@@ -55,6 +56,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.material3.Icon
 import androidx.compose.foundation.clickable
 import java.util.Locale
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
+import app.sentrek.map.MapIcons
 
 /** Everything we know about a long-pressed map feature. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,13 +95,19 @@ fun FeatureSheet(
             val kind = info.kind?.let { kindName(context, it) }
             // A route pressed off any path (on a road, say) is named after the route.
             val routeName = info.routes.firstOrNull()?.name?.takeIf { info.kind == "route" }
-            Text(
-                text = info.name ?: routeName ?: kind ?: stringResource(R.string.feature_unnamed),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-            )
-            if (info.name != null && kind != null) {
-                Text(kind, style = MaterialTheme.typography.titleMedium)
+            // The map's own icon for it before the name, as a saved place's card has.
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                FeatureBadge(info, TouchTarget * 0.7f)
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = info.name ?: routeName ?: kind ?: stringResource(R.string.feature_unnamed),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    if (info.name != null && kind != null) {
+                        Text(kind, style = MaterialTheme.typography.titleMedium)
+                    }
+                }
             }
             // What a download adds is about trails: nothing for a river, a lake or a ford.
             if (!downloaded && !info.isWater && !info.ford) NotDownloadedNote(onDownload)
@@ -268,6 +283,80 @@ private fun RouteFacts(route: MapRoute, onOpen: (String) -> Unit) {
         }
     }
 }
+
+/**
+ * What the card is about, as the map shows it: a hut's, spring's or peak's own icon; a route's
+ * waymark; a walker for a path, a via ferrata's grade, a drop for water. Nothing for the rest.
+ */
+@Composable
+private fun FeatureBadge(info: MapFeatureInfo, size: Dp) {
+    val kind = info.kind
+    val density = LocalDensity.current.density
+    val mark = info.routes.firstOrNull()?.mark?.takeIf { kind == "route" }
+    val markImage = remember(mark, density) { mark?.let { RouteMarks.image(RouteMarks.PREFIX + it, density)?.asImageBitmap() } }
+    // As the map picks its icon: from the OSM tags, or the base map's kind by its icon's name.
+    val icon = PoiKind.classify(info.tags)?.icon ?: kind?.let { KIND_ICONS[it] ?: it }
+    val symbol = icon?.let(MapIcons::symbol) ?: MapIcons.symbol("ford").takeIf { info.ford }
+    when {
+        symbol != null -> {
+            val (res, color) = symbol
+            Surface(Modifier.size(size), shape = CircleShape, color = Color.White, border = BorderStroke(1.5.dp, Color(color))) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(painterResource(res), contentDescription = null, tint = Color(color), modifier = Modifier.size(size * 0.6f))
+                }
+            }
+        }
+        markImage != null -> Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+            Image(markImage, contentDescription = null, modifier = Modifier.size(size * 0.9f))
+        }
+        info.ferrataGrade != null -> Surface(
+            Modifier.size(size),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.inverseSurface,
+            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                val grade = info.ferrataGrade?.takeIf { it > 0 }?.let { MapOverlays.HUSLER_GRADES[it] }
+                if (grade != null) {
+                    Text(grade, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                } else {
+                    Icon(SentrekIcons.Hiking, contentDescription = null, modifier = Modifier.padding(8.dp))
+                }
+            }
+        }
+        info.isWater -> RoundIcon(SentrekIcons.Water, size)
+        kind == "cycleway" -> RoundIcon(SentrekIcons.Cycling, size)
+        kind?.startsWith("piste") == true -> RoundIcon(SentrekIcons.Skiing, size)
+        info.sacGrade != null || kind in PATH_KINDS -> RoundIcon(SentrekIcons.Hiking, size)
+    }
+}
+
+@Composable
+private fun RoundIcon(icon: ImageVector, size: Dp) {
+    Surface(
+        Modifier.size(size),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.padding(8.dp))
+    }
+}
+
+/** The base map's kinds whose icon has another name. */
+private val KIND_ICONS = mapOf(
+    "cave_entrance" to "cave",
+    "camp_site" to "camping",
+    "wayside_cross" to "cross",
+    "wayside_shrine" to "shrine",
+    "ruins" to "archaeological_site",
+    "water_point" to "drinking_water",
+    "fast_food" to "restaurant",
+    "pub" to "bar",
+)
+
+/** Ways walked on foot, as long-pressed on the map. */
+private val PATH_KINDS = setOf("path", "track", "footway", "bridleway", "steps", "route")
 
 @Composable
 private fun Fact(label: String, value: String) {

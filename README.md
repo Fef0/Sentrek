@@ -86,13 +86,14 @@ You can also set a turnaround alarm.
 
 ### Safety
 - A red SOS button on the map opens a screen with your position in big text (coordinates, UTM and Plus Code), with buttons to call for help and to send your position by SMS to your emergency contact. It asks first, then sends the text itself.
-- It can send your position by SMS to someone every 30 or 60 minutes while you record. SMS works without mobile data.
+- It can send your position by SMS to someone every 30 or 60 minutes while you record, with the time you started and finished. SMS works without mobile data. In airplane mode it doesn't try, and tells you.
 - "Peaks around" tells you the names of the mountains you can see.
 - When your position is on the map, a compass strip at the top shows where the phone points and the peaks in sight, huts and water that way, with the name and distance of the one nearest straight ahead. It can be turned off in Settings › Map.
 
 ### Search
 - One search box for your places and tracks, and the towns, peaks, lakes, huts, springs, paths, marked routes (by name or number) and via ferratas of the downloaded areas. It works offline.
 - Paste coordinates (from a text message, say) and the map shows that spot.
+- "Take me there" on a result, or on a place's card on the map, shows the shortest way along the paths from where you are, with its distance, climb and time. Follow it if you want; it isn't saved as a route.
 
 ### Your own servers
 Sentrek gets its data from free public services, so it doesn't depend on a server of mine. If one of them shuts down or changes its rules, you can host your own copy and point the app to it in Settings › Advanced › Servers. This works for:

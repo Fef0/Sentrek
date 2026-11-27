@@ -176,6 +176,33 @@ Builds:
     output: build/outputs/apk/fdroid/release/app-fdroid-x86_64-release-unsigned.apk
     binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-fdroid-x86_64.apk
 
+  - versionName: 0.32.2
+    versionCode: 401
+    commit: 37c2ab9d37b4bcf29453f54a78dd7862f6872c61
+    subdir: app
+    gradle:
+      - fdroid
+    output: build/outputs/apk/fdroid/release/app-fdroid-armeabi-v7a-release-unsigned.apk
+    binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-fdroid-armv7.apk
+
+  - versionName: 0.32.2
+    versionCode: 402
+    commit: 37c2ab9d37b4bcf29453f54a78dd7862f6872c61
+    subdir: app
+    gradle:
+      - fdroid
+    output: build/outputs/apk/fdroid/release/app-fdroid-arm64-v8a-release-unsigned.apk
+    binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-fdroid-arm64.apk
+
+  - versionName: 0.32.2
+    versionCode: 404
+    commit: 37c2ab9d37b4bcf29453f54a78dd7862f6872c61
+    subdir: app
+    gradle:
+      - fdroid
+    output: build/outputs/apk/fdroid/release/app-fdroid-x86_64-release-unsigned.apk
+    binary: https://github.com/Fef0/Sentrek/releases/download/v%v/Sentrek-%v-fdroid-x86_64.apk
+
 AllowedAPKSigningKeys: 74e093678be51816e75b0870b663eaab89f6cd71e00b32c32719f2c796ec65d5
 
 AutoUpdateMode: Version
@@ -184,5 +211,5 @@ VercodeOperation:
   - 10*%c+1
   - 10*%c+2
   - 10*%c+4
-CurrentVersion: 0.32.1
-CurrentVersionCode: 394
+CurrentVersion: 0.32.2
+CurrentVersionCode: 404

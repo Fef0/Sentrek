@@ -10,6 +10,7 @@ import app.sentrek.search.PeaksScreen
 import app.sentrek.home.FirstRunGuide
 import app.sentrek.record.around
 import app.sentrek.home.GoTo
+import app.sentrek.home.WayAsk
 import app.sentrek.home.HomeViewModel
 import android.content.Context
 import android.content.Intent
@@ -332,7 +333,7 @@ class MainActivity : ComponentActivity() {
                                         home.searchPin.value = null
                                         // The planner steps aside: one line to look at.
                                         planner.close()
-                                        home.wayThereAsked.value = GoTo(name, position)
+                                        home.wayThereAsked.value = WayAsk(GoTo(name, position))
                                         screen = Screen.Map
                                     },
                                 )
@@ -340,7 +341,8 @@ class MainActivity : ComponentActivity() {
                                 Screen.Emergency -> EmergencyScreen(
                                     onBack = toMap,
                                     onGoTo = { name, position ->
-                                        home.goTo(GoTo(name, position))
+                                        // Along the paths, or straight when there's no way.
+                                        home.wayThereAsked.value = WayAsk(GoTo(name, position), straightIfNone = true)
                                         screen = Screen.Map
                                     },
                                 )

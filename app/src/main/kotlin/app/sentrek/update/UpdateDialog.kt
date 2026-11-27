@@ -42,13 +42,19 @@ fun UpdateDialog(
         onDismissRequest = onLater,
         title = { Text(stringResource(R.string.update_new_title, update.version)) },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Only the list scrolls: the download's progress below stays in sight, however long it is.
                 if (update.changes.isNotEmpty()) {
-                    Text(stringResource(R.string.update_changes), style = MaterialTheme.typography.titleSmall)
-                    for (change in update.changes) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("•", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                            Text(change, style = MaterialTheme.typography.bodyMedium)
+                    Column(
+                        Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(stringResource(R.string.update_changes), style = MaterialTheme.typography.titleSmall)
+                        for (change in update.changes) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("•", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                Text(change, style = MaterialTheme.typography.bodyMedium)
+                            }
                         }
                     }
                 }

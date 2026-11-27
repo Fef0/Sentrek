@@ -449,10 +449,12 @@ class PlannerViewModel @Inject constructor(
 
     /**
      * "Take me there": the shortest way along the paths from [from] to [to], via ferratas
-     * included, with its totals; null when the paths don't join up, or none are known there.
+     * included, with its totals; null when the paths don't join up, none are known there, or
+     * the place is more than [MAX_WAY_M] away.
      * The plan isn't touched.
      */
     suspend fun wayTo(from: LatLon, to: LatLon): PlanStats? {
+        if (Geo.distance(from, to) > MAX_WAY_M) return null
         val leg = route(from, to, RouteOptions(profile = RouteOptions.Profile.Shortest)) ?: return null
         return stats(leg.points)
     }
@@ -543,7 +545,8 @@ class PlannerViewModel @Inject constructor(
     private suspend fun graph(source: TrailSource, a: LatLon, b: LatLon, wide: Boolean): TrailGraph {
         val span = Geo.distance(a, b)
         val lines = if (wide) {
-            val box = box(listOf(a, b), max(WIDE_MARGIN_M, span * 1.5))
+            // Every path of the areas in the box goes into memory: a long leg's box stays narrow.
+            val box = box(listOf(a, b), (span * 1.5).coerceIn(WIDE_MARGIN_M, MAX_WIDE_MARGIN_M))
             source.lines(box) + source.areaLines(box)
         } else {
             source.lines(box(listOf(a, b), max(MIN_MARGIN_M, span * 0.5)))
@@ -609,8 +612,12 @@ class PlannerViewModel @Inject constructor(
         private const val CONNECT_M = 300.0
         private const val MIN_MARGIN_M = 500.0
 
-        /** The wider search's margin around a leg, at least. */
+        /** The wider search's margin around a leg, at least and at most. */
         private const val WIDE_MARGIN_M = 3_000.0
+        private const val MAX_WIDE_MARGIN_M = 5_000.0
+
+        /** "Take me there" further than this isn't looked for along the paths: a day's walk and more. */
+        private const val MAX_WAY_M = 25_000.0
 
         /** The legs end to end, without repeating the shared points. */
         fun join(legs: List<PlanLeg>): List<LatLon> =

@@ -397,8 +397,8 @@ class HomeViewModel @Inject constructor(
         _goTo.value = target
     }
 
-    /** "Take me there" from search: the map works the way out (see WayThere), then this goes back to null. */
-    val wayThereAsked = MutableStateFlow<GoTo?>(null)
+    /** "Take me there": the map works the way out (see WayThere), then this goes back to null. */
+    val wayThereAsked = MutableStateFlow<WayAsk?>(null)
 
     /**
      * Follows [points], the way to [name], without saving it as a route. [onDone] gets false

@@ -45,6 +45,13 @@ sealed interface WayThere {
     data class NotFound(override val target: GoTo) : WayThere
 }
 
+/**
+ * "Take me there" to [target]. [straightIfNone]: with no way along the paths (or no GPS fix
+ * yet), the straight line at once instead of saying so: for the way back to signal, where
+ * any direction beats none.
+ */
+data class WayAsk(val target: GoTo, val straightIfNone: Boolean = false)
+
 /** The way there, its totals, and Follow; or why there's none, and the straight line instead. */
 @Composable
 fun WayTherePanel(

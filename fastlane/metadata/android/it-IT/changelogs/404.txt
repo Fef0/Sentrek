@@ -1,0 +1,3 @@
+• Corretto: Portami lì verso un luogo lontano poteva chiudere l'app
+• La strada verso l'ultimo punto con segnale segue i sentieri, o una linea retta se non ce ne sono
+• L'avanzamento dell'aggiornamento resta visibile sotto un lungo elenco di novità

@@ -1,0 +1,3 @@
+• Fixed: Take me there to a far place could close the app
+• The way back to the last place with signal follows the paths, or a straight line when there's none
+• The update download's progress stays in sight under a long list of changes

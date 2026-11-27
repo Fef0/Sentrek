@@ -343,9 +343,17 @@ fun MapScreen(
     LaunchedEffect(map) {
         val m = map ?: return@LaunchedEffect
         // Taken off at once, so it isn't worked out twice; a newer one replaces one being found.
-        viewModel.wayThereAsked.filterNotNull().collectLatest { target ->
+        viewModel.wayThereAsked.filterNotNull().collectLatest { ask ->
             viewModel.wayThereAsked.value = null
-            val noGps = { Toast.makeText(context, R.string.way_no_gps, Toast.LENGTH_LONG).show() }
+            val target = ask.target
+            // The straight line, for a way that must show something (see WayAsk).
+            val straight = {
+                wayThere = null
+                viewModel.goTo(target)
+            }
+            val noGps = {
+                if (ask.straightIfNone) straight() else Toast.makeText(context, R.string.way_no_gps, Toast.LENGTH_LONG).show()
+            }
             if (!locationAllowed) return@collectLatest noGps()
             wayThere = WayThere.Finding(target)
             // A fix of the last couple of minutes, or the next one: the map asks for them while it shows.
@@ -360,6 +368,9 @@ fun MapScreen(
             val stats = planner.wayTo(from, target.position)
             // Closed meanwhile: it stays closed.
             if (wayThere != WayThere.Finding(target)) return@collectLatest
+            if (stats == null && ask.straightIfNone) return@collectLatest straight()
+            // One line to the place: the straight one to it goes.
+            if (stats != null && goTo?.position == target.position) viewModel.goTo(null)
             wayThere = if (stats != null) WayThere.Found(target, stats) else WayThere.NotFound(target)
             val shown = stats?.dense ?: listOf(from, target.position)
             TrackRepository.bounds(shown)?.let { box ->
@@ -721,9 +732,9 @@ fun MapScreen(
                 // No signal: where the last one was, a tap away from "take me there".
                 lastSignal?.let { spot ->
                     val signalName = stringResource(R.string.signal_goto_name)
-                    if (goTo?.position != spot.position) {
+                    if (goTo?.position != spot.position && wayThere?.target?.position != spot.position) {
                         SignalNote(spot, nearHere) {
-                            viewModel.goTo(GoTo(signalName, spot.position))
+                            viewModel.wayThereAsked.value = WayAsk(GoTo(signalName, spot.position), straightIfNone = true)
                         }
                     }
                 }
@@ -1249,7 +1260,7 @@ fun MapScreen(
             onPlaceDraft = { placeDraft = it },
             onShare = sharing::share,
             onDeletePlace = { deletingPlace = it },
-            takeMeThere = { viewModel.wayThereAsked.value = it },
+            takeMeThere = { viewModel.wayThereAsked.value = WayAsk(it) },
             followRoute = { track ->
                 routeToFollow = track
                 withLocation(AfterPermission.FollowRoute) { viewModel.followTrack(track); routeToFollow = null }

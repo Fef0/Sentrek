@@ -93,7 +93,7 @@ You can also set a turnaround alarm.
 ### Search
 - One search box for your places and tracks, and the towns, peaks, lakes, huts, springs, paths, marked routes (by name or number) and via ferratas of the downloaded areas. It works offline.
 - Paste coordinates (from a text message, say) and the map shows that spot.
-- "Take me there" on a result, or on a place's card on the map, shows the shortest way along the paths from where you are, with its distance, climb and time. Follow it if you want; it isn't saved as a route.
+- "Take me there" on a result, on a place's card on the map, or to the last place with signal, shows the shortest way along the paths from where you are, with its distance, climb and time. Follow it if you want; it isn't saved as a route.
 
 ### Your own servers
 Sentrek gets its data from free public services, so it doesn't depend on a server of mine. If one of them shuts down or changes its rules, you can host your own copy and point the app to it in Settings › Advanced › Servers. This works for:
